@@ -41,6 +41,7 @@ classifiers = [
 
 [project.urls]
 Homepage = "https://datamasque.com/"
+Documentation = "https://datamasque-python.readthedocs.io/"
 Repository = "https://github.com/datamasque/datamasque-python"
 Issues = "https://github.com/datamasque/datamasque-python/issues"
 
