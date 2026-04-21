@@ -1,0 +1,122 @@
+[project]
+name = "datamasque-python"
+version = "1.0.0"
+description = "Official Python client for the DataMasque data-masking API."
+authors = [
+    { name = "DataMasque Ltd" },
+]
+readme = "README.rst"
+license = "Apache-2.0"
+license-files = ["LICENSE"]
+requires-python = ">=3.9"
+dependencies = [
+    "requests>=2.31.0",
+    "pydantic>=2.5,<3",
+]
+keywords = [
+    "datamasque",
+    "data-masking",
+    "data-privacy",
+    "api-client",
+    "test-data",
+    "synthetic-data",
+]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: Apache Software License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: Database",
+    "Topic :: Security",
+    "Typing :: Typed",
+]
+
+[project.urls]
+Homepage = "https://datamasque.com/"
+Repository = "https://github.com/datamasque/datamasque-python"
+Issues = "https://github.com/datamasque/datamasque-python/issues"
+
+[dependency-groups]
+dev = [
+    "bump2version>=1.0.1",
+    "ruff>=0.9.0",
+    "pytest>=7.4.4",
+    "Sphinx>=7.2.6",
+    "faker>=22.2.0",
+    "pytest-cov>=4.1.0",
+    "requests-mock>=1.11.0",
+    "mypy>=1.8.0",
+    "types-requests>=2.31.0",
+]
+
+[tool.ruff]
+exclude = [
+    ".git",
+    ".mypy_cache",
+    ".ruff_cache",
+    "__pycache__",
+    "node_modules",
+]
+line-length = 120
+indent-width = 4
+target-version = "py39"
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F", "B", "D", "I"]
+ignore = [
+    "D100",  # Missing docstring in public module
+    "D102",  # Missing docstring in public method — computed fields and simple properties are self-explanatory
+    "D103",  # Missing docstring in public function
+    "D104",  # Missing docstring in public package
+    "D105",  # Missing docstring in magic method
+    "D107",  # Missing docstring in __init__
+    "D202",  # No blank lines allowed after function docstring — allow a blank line for readability
+    "D203",  # 1 blank line required before class docstring — conflicts with D211
+    "D212",  # Multi-line docstring summary should start at the first line — we use D213 (second line)
+    "D400",  # First line should end with a period
+    "D401",  # First line should be in imperative mood
+    "D407",  # Missing dashed underline after section
+    "D413",  # Missing blank line after last section
+]
+dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
+per-file-ignores = { "datamasque/client/__init__.py" = ["F401"], "tests/**" = ["D101", "D103"] }
+
+[tool.ruff.format]
+indent-style = "space"
+quote-style = "preserve"
+
+[tool.pytest.ini_options]
+addopts = "--ignore=setup.py"
+
+[tool.mypy]
+python_version = "3.9"
+explicit_package_bases = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+check_untyped_defs = true
+strict_optional = true
+warn_redundant_casts = true
+# Relax - API boundaries return Any from response.json()
+warn_return_any = false
+plugins = ["pydantic.mypy"]
+
+[tool.pydantic-mypy]
+init_forbid_extra = true
+init_typed = true
+warn_required_dynamic_aliases = true
+
+[tool.hatch.build.targets.wheel]
+packages = ["datamasque"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
