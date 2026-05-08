@@ -768,6 +768,27 @@ def test_database_connection_model_validate_keeps_schema_for_postgres():
     assert conn.db_schema == "public"
 
 
+def test_database_connection_model_validate_databricks_lakebase():
+    payload = {
+        "id": "abc-lakebase",
+        "name": "lakebase",
+        "mask_type": "database",
+        "db_type": "databricks_lakebase",
+        "host": "lakebase-host",
+        "port": 5432,
+        "database": "lakebasedb",
+        "user": "lakebase_user",
+        "schema": "public",
+        "is_read_only": False,
+    }
+
+    conn = DatabaseConnectionConfig.model_validate(payload)
+
+    assert isinstance(conn, DatabaseConnectionConfig)
+    assert conn.database_type is DatabaseType.databricks_lakebase
+    assert conn.db_schema == "public"
+
+
 def test_mssql_linked_connection_model_validate_includes_linked_server():
     payload = {
         "id": "48a7af45-f63f-4e05-bf9f-7b1cc3a0e89d",

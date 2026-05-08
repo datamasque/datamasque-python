@@ -2,6 +2,11 @@
 History
 =======
 
+1.0.1 (2026-05-11)
+------------------
+
+* Added ``databricks_lakebase`` to ``DatabaseType`` enum.
+
 1.0.0 (2026-04-21)
 ------------------
 
