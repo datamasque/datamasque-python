@@ -1,6 +1,6 @@
 [project]
 name = "datamasque-python"
-version = "1.0.0"
+version = "1.0.1"
 description = "Official Python client for the DataMasque data-masking API."
 authors = [
     { name = "DataMasque Ltd" },

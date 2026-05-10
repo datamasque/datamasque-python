@@ -44,6 +44,7 @@ class DatabaseType(Enum):
     mssql_linked = "mssql_linked"
     snowflake = "snowflake"
     mongodb = "mongodb"
+    databricks_lakebase = "databricks_lakebase"
 
 
 class SnowflakeStageLocation(str, Enum):
