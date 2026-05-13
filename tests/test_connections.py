@@ -9,6 +9,7 @@ from datamasque.client.models.connection import (
     ConnectionId,
     DatabaseConnectionConfig,
     DatabaseType,
+    DatabricksDeltaS3ConnectionConfig,
     DynamoConnectionConfig,
     MongoConnectionConfig,
     MountedShareConnectionConfig,
@@ -693,6 +694,65 @@ def test_s3_connection_model_validate_no_iam_role():
 
     conn = S3ConnectionConfig.model_validate(payload)
     assert conn.iam_role_arn is None
+
+
+def test_databricks_delta_s3_connection_model_validate():
+    payload = {
+        "id": "11223344-5566-7788-99aa-bbccddeeff00",
+        "name": "delta_s3",
+        "mask_type": "file",
+        "type": "databricks_delta_s3_connection",
+        "base_directory": "delta/",
+        "is_file_mask_source": True,
+        "is_file_mask_destination": False,
+        "bucket": "my-delta-bucket",
+        "iam_role_arn": "arn:aws:iam::111122223333:role/delta-role",
+    }
+
+    conn = DatabricksDeltaS3ConnectionConfig.model_validate(payload)
+
+    assert isinstance(conn, DatabricksDeltaS3ConnectionConfig)
+    assert conn.id == "11223344-5566-7788-99aa-bbccddeeff00"
+    assert conn.name == "delta_s3"
+    assert conn.bucket == "my-delta-bucket"
+    assert conn.base_directory == "delta/"
+    assert conn.is_file_mask_source is True
+    assert conn.is_file_mask_destination is False
+    assert conn.iam_role_arn == "arn:aws:iam::111122223333:role/delta-role"
+
+
+def test_databricks_delta_s3_connection_model_validate_no_iam_role():
+    payload = {
+        "id": "id-delta",
+        "name": "delta_s3",
+        "mask_type": "file",
+        "type": "databricks_delta_s3_connection",
+        "base_directory": "",
+        "is_file_mask_source": True,
+        "is_file_mask_destination": False,
+        "bucket": "my-delta-bucket",
+    }
+
+    conn = DatabricksDeltaS3ConnectionConfig.model_validate(payload)
+    assert conn.iam_role_arn is None
+
+
+def test_validate_connection_dispatches_databricks_delta_s3():
+    payload = {
+        "id": "aabb-ccdd",
+        "name": "delta",
+        "mask_type": "file",
+        "type": "databricks_delta_s3_connection",
+        "base_directory": "",
+        "is_file_mask_source": False,
+        "is_file_mask_destination": True,
+        "bucket": "delta-bucket",
+    }
+
+    conn = validate_connection(payload)
+
+    assert isinstance(conn, DatabricksDeltaS3ConnectionConfig)
+    assert conn.bucket == "delta-bucket"
 
 
 def test_azure_connection_model_validate_blanks_encrypted_connection_string():

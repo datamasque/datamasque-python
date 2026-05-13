@@ -2,6 +2,11 @@
 History
 =======
 
+1.0.2 (2026-05-14)
+------------------
+
+* Added ``DatabricksDeltaS3ConnectionConfig`` for Databricks Delta tables stored in S3.
+
 1.0.1 (2026-05-11)
 ------------------
 
