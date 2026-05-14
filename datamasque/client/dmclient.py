@@ -1,6 +1,7 @@
 from datamasque.client.base import FileOrContent, UploadFile
 from datamasque.client.connections import ConnectionClient
 from datamasque.client.discovery import DiscoveryClient
+from datamasque.client.discovery_configs import DiscoveryConfigClient
 from datamasque.client.files import FileClient
 from datamasque.client.license import LicenseClient
 from datamasque.client.ruleset_libraries import RulesetLibraryClient
@@ -20,6 +21,7 @@ class DataMasqueClient(
     FileClient,
     RunClient,
     DiscoveryClient,
+    DiscoveryConfigClient,
     UserClient,
     SettingsClient,
 ):
