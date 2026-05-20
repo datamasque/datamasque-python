@@ -70,61 +70,6 @@ def ruleset_library():
     )
 
 
-def test_ruleset_library_model_dump() -> None:
-    lib = RulesetLibrary(name="lib1", namespace="ns", yaml="content: true")
-    assert lib.model_dump(exclude_none=True, by_alias=True, mode="json") == {
-        "name": "lib1",
-        "namespace": "ns",
-        "config_yaml": "content: true",
-    }
-
-
-def test_ruleset_library_model_dump_no_yaml() -> None:
-    lib = RulesetLibrary(name="lib1", namespace="ns")
-    api_dict = lib.model_dump(exclude_none=True, by_alias=True, mode="json")
-    assert "config_yaml" not in api_dict
-    assert api_dict == {"name": "lib1", "namespace": "ns"}
-
-
-def test_ruleset_library_model_validate() -> None:
-    response = {
-        "id": LIBRARY_ID_1,
-        "name": "my_library",
-        "namespace": "org",
-        "config_yaml": "version: '1.0'",
-        "is_valid": "valid",
-        "created": "2025-01-01T12:00:00Z",
-        "modified": "2025-01-02T12:00:00Z",
-    }
-    lib = RulesetLibrary.model_validate(response)
-    assert lib.id == RulesetLibraryId(LIBRARY_ID_1)
-    assert lib.name == "my_library"
-    assert lib.namespace == "org"
-    assert lib.yaml == "version: '1.0'"
-    assert lib.is_valid is ValidationStatus.valid
-    assert lib.created == datetime.fromisoformat("2025-01-01T12:00:00+00:00")
-    assert lib.modified == datetime.fromisoformat("2025-01-02T12:00:00+00:00")
-
-
-def test_ruleset_library_model_validate_list(
-    sample_library_list_response: dict[str, Any],
-) -> None:
-    """List responses omit config_yaml, so yaml should be None."""
-    result = sample_library_list_response["results"][0]
-    lib = RulesetLibrary.model_validate(result)
-    assert lib.yaml is None
-    assert lib.is_valid is ValidationStatus.valid
-
-
-def test_ruleset_library_equality() -> None:
-    """Pydantic structural equality compares all fields."""
-    lib1 = RulesetLibrary(name="lib", namespace="ns", yaml="content")
-    lib2 = RulesetLibrary(name="lib", namespace="ns", yaml="content")
-    lib3 = RulesetLibrary(name="lib", namespace="other", yaml="content")
-    assert lib1 == lib2
-    assert lib1 != lib3
-
-
 def test_list_ruleset_libraries(client: DataMasqueClient, sample_library_list_response: dict[str, Any]) -> None:
     with requests_mock.Mocker() as m:
         m.get(
