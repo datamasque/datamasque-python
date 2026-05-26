@@ -420,19 +420,10 @@ class DatabricksConnectionConfig(ConnectionConfig):
         return data
 
 
-class DatabricksDeltaS3ConnectionConfig(FileConnectionConfig):
-    """Connection configuration for Databricks Delta tables stored in S3."""
-
-    type: Literal["databricks_delta_s3_connection"] = "databricks_delta_s3_connection"
-    bucket: str = ""
-    iam_role_arn: Optional[str] = None
-
-
 FILE_TYPE_MAP: dict[str, type[FileConnectionConfig]] = {
     "s3_connection": S3ConnectionConfig,
     "azure_blob_connection": AzureConnectionConfig,
     "mounted_share_connection": MountedShareConnectionConfig,
-    "databricks_delta_s3_connection": DatabricksDeltaS3ConnectionConfig,
 }
 
 DB_TYPE_MAP: dict[str, type[ConnectionConfig]] = {
