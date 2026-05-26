@@ -9,6 +9,7 @@ from datamasque.client.models.connection import (
     ConnectionId,
     DatabaseConnectionConfig,
     DatabaseType,
+    DatabricksConnectionConfig,
     DatabricksDeltaS3ConnectionConfig,
     DynamoConnectionConfig,
     MongoConnectionConfig,
@@ -753,6 +754,69 @@ def test_validate_connection_dispatches_databricks_delta_s3():
 
     assert isinstance(conn, DatabricksDeltaS3ConnectionConfig)
     assert conn.bucket == "delta-bucket"
+
+
+def test_databricks_connection_model_validate():
+    payload = {
+        "id": "db-id-1",
+        "name": "databricks",
+        "mask_type": "database",
+        "db_type": "databricks",
+        "server_hostname": "adb-1234.azuredatabricks.net",
+        "http_path": "/sql/1.0/warehouses/abcd1234",
+        "access_token": "dapi1234",
+        "catalog": "main",
+        "schema": "default",
+        "is_read_only": False,
+    }
+
+    conn = DatabricksConnectionConfig.model_validate(payload)
+
+    assert isinstance(conn, DatabricksConnectionConfig)
+    assert conn.id == "db-id-1"
+    assert conn.server_hostname == "adb-1234.azuredatabricks.net"
+    assert conn.http_path == "/sql/1.0/warehouses/abcd1234"
+    assert conn.access_token == "dapi1234"
+    assert conn.catalog == "main"
+    assert conn.db_schema == "default"
+    assert conn.database_type is DatabaseType.databricks
+
+
+def test_databricks_connection_model_validate_blanks_encrypted_token():
+    payload = {
+        "id": "db-id-2",
+        "name": "databricks",
+        "mask_type": "database",
+        "db_type": "databricks",
+        "server_hostname": "adb-1234.azuredatabricks.net",
+        "http_path": "/sql/1.0/warehouses/abcd1234",
+        "access_token_encrypted": "some_base64_here",
+        "catalog": "main",
+        "is_read_only": False,
+    }
+
+    conn = DatabricksConnectionConfig.model_validate(payload)
+
+    assert isinstance(conn, DatabricksConnectionConfig)
+    assert conn.access_token is None
+
+
+def test_validate_connection_dispatches_databricks():
+    payload = {
+        "id": "db-id-3",
+        "name": "databricks",
+        "mask_type": "database",
+        "db_type": "databricks",
+        "server_hostname": "adb-1234.azuredatabricks.net",
+        "http_path": "/sql/1.0/warehouses/abcd1234",
+        "catalog": "main",
+        "is_read_only": False,
+    }
+
+    conn = validate_connection(payload)
+
+    assert isinstance(conn, DatabricksConnectionConfig)
+    assert conn.catalog == "main"
 
 
 def test_azure_connection_model_validate_blanks_encrypted_connection_string():
