@@ -2,6 +2,12 @@
 History
 =======
 
+1.0.3 (2026-05-27)
+------------------
+
+* Added ``databricks`` to ``DatabaseType`` enum.
+* Removed ``DatabricksDeltaS3ConnectionConfig``.
+
 1.0.2 (2026-05-14)
 ------------------
 
