@@ -25,6 +25,7 @@ from datamasque.client.exceptions import (
     DataMasqueApiError,
     DataMasqueException,
     FailedToStartError,
+    InvalidDiscoveryConfigError,
 )
 from datamasque.client.models.connection import ConnectionId, DatabaseConnectionConfig, DatabaseType
 from datamasque.client.models.data_selection import SelectedColumns, SelectedFileData, UserSelection
@@ -848,3 +849,70 @@ def test_start_file_data_discovery_run_raises_on_non_201(client):
         )
         with pytest.raises(FailedToStartError, match="File data discovery run failed to start"):
             client.start_file_data_discovery_run(FileDataDiscoveryRequest(connection="nope"))
+
+
+def test_start_schema_discovery_raises_invalid_discovery_config_when_not_valid(client):
+    """A 400 with a `discovery_config` validation message raises the specific subclass."""
+    with requests_mock.Mocker() as m:
+        m.post(
+            "http://test-server/api/schema-discovery/",
+            json={
+                "discovery_config": ['Discovery config "my_cfg" cannot be used: validation status is `invalid`.'],
+            },
+            status_code=400,
+        )
+        with pytest.raises(
+            InvalidDiscoveryConfigError,
+            match=r'Schema discovery run failed to start due to discovery config error: .*"my_cfg".*invalid',
+        ):
+            client.start_schema_discovery_run(
+                SchemaDiscoveryRequest(connection="conn-1", discovery_config=DiscoveryConfigId(DISCOVERY_CONFIG_ID)),
+            )
+
+
+def test_start_schema_discovery_raises_invalid_discovery_config_when_missing(client):
+    """A 400 from DRF's PrimaryKeyRelatedField (config not found / archived) is also classified."""
+    with requests_mock.Mocker() as m:
+        m.post(
+            "http://test-server/api/schema-discovery/",
+            json={"discovery_config": [f'Invalid pk "{DISCOVERY_CONFIG_ID}" - object does not exist.']},
+            status_code=400,
+        )
+        with pytest.raises(InvalidDiscoveryConfigError, match="object does not exist"):
+            client.start_schema_discovery_run(
+                SchemaDiscoveryRequest(connection="conn-1", discovery_config=DiscoveryConfigId(DISCOVERY_CONFIG_ID)),
+            )
+
+
+def test_start_file_data_discovery_raises_invalid_discovery_config(client):
+    with requests_mock.Mocker() as m:
+        m.post(
+            "http://test-server/api/run-file-data-discovery/",
+            json={
+                "discovery_config": ['Discovery config "my_cfg" cannot be used: validation status is `in_progress`.'],
+            },
+            status_code=400,
+        )
+        with pytest.raises(
+            InvalidDiscoveryConfigError,
+            match=r"File data discovery run failed to start due to discovery config error: .*in_progress",
+        ):
+            client.start_file_data_discovery_run(
+                FileDataDiscoveryRequest(
+                    connection="conn-1",
+                    discovery_config=DiscoveryConfigId(DISCOVERY_CONFIG_ID),
+                ),
+            )
+
+
+def test_start_schema_discovery_non_discovery_config_400_still_raises_generic_error(client):
+    """Other 400s (e.g. unknown connection) keep raising the base FailedToStartError."""
+    with requests_mock.Mocker() as m:
+        m.post(
+            "http://test-server/api/schema-discovery/",
+            json={"connection": ['Invalid pk "nope" - object does not exist.']},
+            status_code=400,
+        )
+        with pytest.raises(FailedToStartError) as exc_info:
+            client.start_schema_discovery_run(SchemaDiscoveryRequest(connection="nope"))
+        assert not isinstance(exc_info.value, InvalidDiscoveryConfigError)
