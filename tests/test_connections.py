@@ -9,7 +9,7 @@ from datamasque.client.models.connection import (
     ConnectionId,
     DatabaseConnectionConfig,
     DatabaseType,
-    DatabricksDeltaS3ConnectionConfig,
+    DatabricksConnectionConfig,
     DynamoConnectionConfig,
     MongoConnectionConfig,
     MountedShareConnectionConfig,
@@ -696,63 +696,67 @@ def test_s3_connection_model_validate_no_iam_role():
     assert conn.iam_role_arn is None
 
 
-def test_databricks_delta_s3_connection_model_validate():
+def test_databricks_connection_model_validate():
     payload = {
-        "id": "11223344-5566-7788-99aa-bbccddeeff00",
-        "name": "delta_s3",
-        "mask_type": "file",
-        "type": "databricks_delta_s3_connection",
-        "base_directory": "delta/",
-        "is_file_mask_source": True,
-        "is_file_mask_destination": False,
-        "bucket": "my-delta-bucket",
-        "iam_role_arn": "arn:aws:iam::111122223333:role/delta-role",
+        "id": "db-id-1",
+        "name": "databricks",
+        "mask_type": "database",
+        "db_type": "databricks",
+        "server_hostname": "adb-1234.azuredatabricks.net",
+        "http_path": "/sql/1.0/warehouses/abcd1234",
+        "access_token": "dapi1234",
+        "catalog": "main",
+        "schema": "default",
+        "is_read_only": False,
     }
 
-    conn = DatabricksDeltaS3ConnectionConfig.model_validate(payload)
+    conn = DatabricksConnectionConfig.model_validate(payload)
 
-    assert isinstance(conn, DatabricksDeltaS3ConnectionConfig)
-    assert conn.id == "11223344-5566-7788-99aa-bbccddeeff00"
-    assert conn.name == "delta_s3"
-    assert conn.bucket == "my-delta-bucket"
-    assert conn.base_directory == "delta/"
-    assert conn.is_file_mask_source is True
-    assert conn.is_file_mask_destination is False
-    assert conn.iam_role_arn == "arn:aws:iam::111122223333:role/delta-role"
+    assert isinstance(conn, DatabricksConnectionConfig)
+    assert conn.id == "db-id-1"
+    assert conn.server_hostname == "adb-1234.azuredatabricks.net"
+    assert conn.http_path == "/sql/1.0/warehouses/abcd1234"
+    assert conn.access_token == "dapi1234"
+    assert conn.catalog == "main"
+    assert conn.db_schema == "default"
+    assert conn.database_type is DatabaseType.databricks
 
 
-def test_databricks_delta_s3_connection_model_validate_no_iam_role():
+def test_databricks_connection_model_validate_blanks_encrypted_token():
     payload = {
-        "id": "id-delta",
-        "name": "delta_s3",
-        "mask_type": "file",
-        "type": "databricks_delta_s3_connection",
-        "base_directory": "",
-        "is_file_mask_source": True,
-        "is_file_mask_destination": False,
-        "bucket": "my-delta-bucket",
+        "id": "db-id-2",
+        "name": "databricks",
+        "mask_type": "database",
+        "db_type": "databricks",
+        "server_hostname": "adb-1234.azuredatabricks.net",
+        "http_path": "/sql/1.0/warehouses/abcd1234",
+        "access_token_encrypted": "some_base64_here",
+        "catalog": "main",
+        "is_read_only": False,
     }
 
-    conn = DatabricksDeltaS3ConnectionConfig.model_validate(payload)
-    assert conn.iam_role_arn is None
+    conn = DatabricksConnectionConfig.model_validate(payload)
+
+    assert isinstance(conn, DatabricksConnectionConfig)
+    assert conn.access_token is None
 
 
-def test_validate_connection_dispatches_databricks_delta_s3():
+def test_validate_connection_dispatches_databricks():
     payload = {
-        "id": "aabb-ccdd",
-        "name": "delta",
-        "mask_type": "file",
-        "type": "databricks_delta_s3_connection",
-        "base_directory": "",
-        "is_file_mask_source": False,
-        "is_file_mask_destination": True,
-        "bucket": "delta-bucket",
+        "id": "db-id-3",
+        "name": "databricks",
+        "mask_type": "database",
+        "db_type": "databricks",
+        "server_hostname": "adb-1234.azuredatabricks.net",
+        "http_path": "/sql/1.0/warehouses/abcd1234",
+        "catalog": "main",
+        "is_read_only": False,
     }
 
     conn = validate_connection(payload)
 
-    assert isinstance(conn, DatabricksDeltaS3ConnectionConfig)
-    assert conn.bucket == "delta-bucket"
+    assert isinstance(conn, DatabricksConnectionConfig)
+    assert conn.catalog == "main"
 
 
 def test_azure_connection_model_validate_blanks_encrypted_connection_string():

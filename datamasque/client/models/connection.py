@@ -45,6 +45,7 @@ class DatabaseType(Enum):
     snowflake = "snowflake"
     mongodb = "mongodb"
     databricks_lakebase = "databricks_lakebase"
+    databricks = "databricks"
 
 
 class SnowflakeStageLocation(str, Enum):
@@ -280,6 +281,8 @@ class DatabaseConnectionConfig(ConnectionConfig):
             raise ValueError("For Snowflake, use the SnowflakeConnectionConfig class instead")
         if self.database_type is DatabaseType.mongodb:
             raise ValueError("For MongoDB, use the MongoConnectionConfig class instead")
+        if self.database_type is DatabaseType.databricks:
+            raise ValueError("For Databricks SQL Warehouse, use the DatabricksConnectionConfig class instead")
         return self
 
     mask_type: Literal["database"] = "database"
@@ -391,19 +394,36 @@ class MountedShareConnectionConfig(FileConnectionConfig):
     type: Literal["mounted_share_connection"] = "mounted_share_connection"
 
 
-class DatabricksDeltaS3ConnectionConfig(FileConnectionConfig):
-    """Connection configuration for Databricks Delta tables stored in S3."""
+class DatabricksConnectionConfig(ConnectionConfig):
+    """Connection configuration for a Databricks SQL Warehouse."""
 
-    type: Literal["databricks_delta_s3_connection"] = "databricks_delta_s3_connection"
-    bucket: str = ""
-    iam_role_arn: Optional[str] = None
+    server_hostname: str
+    http_path: str
+    access_token: Optional[str] = None
+    catalog: str
+    db_schema: Optional[str] = Field(default=None, alias="schema")
+    is_read_only: bool = False
+    version: str = "1.0"
+
+    mask_type: Literal["database"] = "database"
+    db_type: Literal["databricks"] = "databricks"
+
+    @property
+    def database_type(self) -> DatabaseType:
+        return DatabaseType.databricks
+
+    @model_validator(mode="before")
+    @classmethod
+    def _strip_encrypted_token(cls, data: dict) -> dict:
+        if isinstance(data, dict):
+            data.pop("access_token_encrypted", None)
+        return data
 
 
 FILE_TYPE_MAP: dict[str, type[FileConnectionConfig]] = {
     "s3_connection": S3ConnectionConfig,
     "azure_blob_connection": AzureConnectionConfig,
     "mounted_share_connection": MountedShareConnectionConfig,
-    "databricks_delta_s3_connection": DatabricksDeltaS3ConnectionConfig,
 }
 
 DB_TYPE_MAP: dict[str, type[ConnectionConfig]] = {
@@ -411,6 +431,7 @@ DB_TYPE_MAP: dict[str, type[ConnectionConfig]] = {
     DatabaseType.mongodb.value: MongoConnectionConfig,
     DatabaseType.snowflake.value: SnowflakeConnectionConfig,
     DatabaseType.mssql_linked.value: MssqlLinkedServerConnectionConfig,
+    DatabaseType.databricks.value: DatabricksConnectionConfig,
     # others use the default `DatabaseConnectionConfig`
 }
 
