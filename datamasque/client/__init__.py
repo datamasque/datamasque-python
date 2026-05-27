@@ -54,6 +54,8 @@ from datamasque.client.models.data_selection import (
 from datamasque.client.models.discovery import (
     ConstraintColumns,
     DiscoveryMatch,
+    FileDataDiscoveryOptions,
+    FileDataDiscoveryRequest,
     FileDiscoveryFile,
     FileDiscoveryLocatorResult,
     FileDiscoveryMatch,
@@ -137,6 +139,8 @@ __all__ = [
     "DynamoConnectionConfig",
     "FailedToStartError",
     "FileConnectionConfig",
+    "FileDataDiscoveryOptions",
+    "FileDataDiscoveryRequest",
     "FileDiscoveryFile",
     "FileDiscoveryLocatorResult",
     "FileDiscoveryMatch",

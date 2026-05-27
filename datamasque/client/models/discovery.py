@@ -6,6 +6,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from datamasque.client.models.connection import ConnectionConfig, ConnectionId, unwrap_connection_id
 from datamasque.client.models.data_selection import HashColumnsTableConfig, Locator, UserSelection
+from datamasque.client.models.discovery_config import DiscoveryConfig, DiscoveryConfigId, unwrap_discovery_config_id
 from datamasque.client.models.pagination import Page
 
 
@@ -35,12 +36,15 @@ class SchemaDiscoveryRequest(BaseModel):
     Request body for `POST /api/schema-discovery/`.
 
     `connection` accepts either a `ConnectionId` or a full `ConnectionConfig` returned by an earlier client call.
+    `discovery_config` (optional) accepts either a `DiscoveryConfigId` or a full `DiscoveryConfig`;
+    when omitted the server's built-in default discovery config is used.
     Every other field uses the server's default value when omitted.
     """
 
     model_config = ConfigDict(extra="forbid")
 
     connection: Union[ConnectionId, ConnectionConfig]
+    discovery_config: Optional[Union[DiscoveryConfigId, DiscoveryConfig]] = None
     custom_keywords: list[str] = Field(default_factory=list)
     ignored_keywords: list[str] = Field(default_factory=list)
     schemas: list[str] = Field(default_factory=list)
@@ -53,6 +57,11 @@ class SchemaDiscoveryRequest(BaseModel):
     @classmethod
     def _unwrap_connection(cls, value: Any) -> Any:
         return unwrap_connection_id(value)
+
+    @field_validator("discovery_config", mode="before")
+    @classmethod
+    def _unwrap_discovery_config(cls, value: Any) -> Any:
+        return unwrap_discovery_config_id(value)
 
 
 class RulesetGenerationRequest(BaseModel):
@@ -75,6 +84,53 @@ class RulesetGenerationRequest(BaseModel):
     @classmethod
     def _unwrap_connection(cls, value: Any) -> Any:
         return unwrap_connection_id(value)
+
+
+class FileDataDiscoveryOptions(BaseModel):
+    """Run options nested under `FileDataDiscoveryRequest.options`."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    dry_run: Optional[bool] = None
+    diagnostic_logging: Optional[bool] = None
+
+
+class FileDataDiscoveryRequest(BaseModel):
+    """
+    Request body for `POST /api/run-file-data-discovery/`.
+
+    `connection` accepts either a `ConnectionId` or a full `ConnectionConfig` returned by an earlier client call.
+    `discovery_config` (optional) accepts either a `DiscoveryConfigId` or a full `DiscoveryConfig`;
+    when omitted the server's built-in default discovery config is used.
+    All other fields use the server's default value when omitted.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    connection: Union[ConnectionId, ConnectionConfig]
+    discovery_config: Optional[Union[DiscoveryConfigId, DiscoveryConfig]] = None
+    options: Optional[FileDataDiscoveryOptions] = None
+    custom_keywords: list[str] = Field(default_factory=list)
+    ignored_keywords: list[str] = Field(default_factory=list)
+    disable_built_in_keywords: bool = False
+    disable_global_custom_keywords: Optional[bool] = None
+    disable_global_ignored_keywords: Optional[bool] = None
+    in_data_discovery: Optional[InDataDiscoveryConfig] = None
+    recurse: Optional[bool] = None
+    include: Optional[list[str]] = None
+    skip: Optional[list[str]] = None
+    encoding: Optional[str] = None
+    workers: Optional[int] = None
+
+    @field_validator("connection", mode="before")
+    @classmethod
+    def _unwrap_connection(cls, value: Any) -> Any:
+        return unwrap_connection_id(value)
+
+    @field_validator("discovery_config", mode="before")
+    @classmethod
+    def _unwrap_discovery_config(cls, value: Any) -> Any:
+        return unwrap_discovery_config_id(value)
 
 
 class FileRulesetGenerationRequest(BaseModel):
