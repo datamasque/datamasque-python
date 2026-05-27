@@ -2,6 +2,17 @@ name: Release (TestPyPI)
 
 on:
   workflow_dispatch:
+    inputs:
+      ref:
+        description: 'Branch, tag, or commit SHA to build from'
+        required: true
+        default: 'main'
+      dev_version:
+        description: >-
+          Optional PEP 440 pre/dev version override (e.g. 1.1.0.dev1, 1.1.0a2, 1.1.0rc1).
+          Leave blank to use the version in pyproject.toml as-is.
+        required: false
+        default: ''
 
 jobs:
   build:
@@ -9,6 +20,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
 
       - name: Set up uv
         uses: astral-sh/setup-uv@v5
@@ -18,11 +31,37 @@ jobs:
       - name: Set up Python
         run: uv python install 3.12
 
+      - name: Apply dev_version override
+        if: inputs.dev_version != ''
+        # Pass the input through the environment, never interpolated into the script body:
+        # `${{ }}` is expanded into the script text before the shell runs, so splicing it inline
+        # would let a crafted dev_version inject shell commands before the validation below could reject it.
+        env:
+          DEV_VERSION: ${{ inputs.dev_version }}
+        run: |
+          # Reject anything that isn't a pre-release / dev version — final releases must go through release.yml.
+          if ! printf '%s' "${DEV_VERSION}" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+(a|b|rc|\.dev)[0-9]+$'; then
+            echo "::error::dev_version '${DEV_VERSION}' is not a PEP 440 pre/dev version (must end in aN, bN, rcN, or .devN)"
+            exit 1
+          fi
+          uv run python -c "
+          import os, re, pathlib
+          version = os.environ['DEV_VERSION']
+          path = pathlib.Path('pyproject.toml')
+          text = path.read_text()
+          new = re.sub(r'^version\s*=\s*\".*\"', f'version = \"{version}\"', text, count=1, flags=re.M)
+          if new == text:
+              raise SystemExit('Failed to locate version line in pyproject.toml')
+          path.write_text(new)
+          "
+
       - name: Show package version
+        env:
+          REF: ${{ inputs.ref }}
         run: |
           VERSION="$(uv run python -c 'import tomllib; print(tomllib.loads(open("pyproject.toml","rb").read().decode())["project"]["version"])')"
-          echo "Publishing version: ${VERSION}"
-          echo "::notice title=TestPyPI version::${VERSION}"
+          echo "Publishing version: ${VERSION} (from ref ${REF})"
+          echo "::notice title=TestPyPI version::${VERSION} from ${REF}"
 
       - name: Build
         run: uv build
