@@ -4,11 +4,14 @@ from io import BufferedIOBase, BytesIO, TextIOBase
 from pathlib import Path
 from typing import Iterator, Optional, Union
 
+from requests import Response
+
 from datamasque.client.base import BaseClient, UploadFile
 from datamasque.client.exceptions import (
     AsyncRulesetGenerationInProgressError,
     DataMasqueException,
     FailedToStartError,
+    InvalidDiscoveryConfigError,
 )
 from datamasque.client.models.connection import ConnectionId
 from datamasque.client.models.data_selection import (
@@ -208,7 +211,9 @@ class DiscoveryClient(BaseClient):
             RunId: The ID of the started discovery run
 
         Raises:
-            FailedToStartError: If run fails to start
+            InvalidDiscoveryConfigError: the run failed to start because the referenced
+                discovery config is missing, archived, or not in a `valid` validation state.
+            FailedToStartError: the run failed to start for any other reason.
         """
 
         data = discovery_config.model_dump(exclude_none=True, mode="json")
@@ -218,13 +223,14 @@ class DiscoveryClient(BaseClient):
             data=data,
             require_status_check=False,
         )
-        run_data = response.json()
+        run_data = response.json() if response.content else {}
 
         if response.status_code == 201:
             logger.info("Schema discovery run %s started successfully", run_data["id"])
             return RunId(run_data["id"])
 
         logger.error("Schema discovery run failed to start: %s", run_data)
+        self._maybe_raise_discovery_config_error(run_data, response, "Schema discovery")
         raise FailedToStartError(
             f"Schema discovery run failed to start "
             f"(server responded with status {response.status_code}: {response.text}).",
@@ -242,7 +248,9 @@ class DiscoveryClient(BaseClient):
             RunId: The ID of the started discovery run
 
         Raises:
-            FailedToStartError: If run fails to start
+            InvalidDiscoveryConfigError: the run failed to start because the referenced
+                discovery config is missing, archived, or not in a `valid` validation state.
+            FailedToStartError: the run failed to start for any other reason.
         """
 
         data = request.model_dump(exclude_none=True, mode="json")
@@ -252,16 +260,30 @@ class DiscoveryClient(BaseClient):
             data=data,
             require_status_check=False,
         )
-        run_data = response.json()
+        run_data = response.json() if response.content else {}
 
         if response.status_code == 201:
             logger.info("File data discovery run %s started successfully", run_data["id"])
             return RunId(run_data["id"])
 
         logger.error("File data discovery run failed to start: %s", run_data)
+        self._maybe_raise_discovery_config_error(run_data, response, "File data discovery")
         raise FailedToStartError(
             f"File data discovery run failed to start "
             f"(server responded with status {response.status_code}: {response.text}).",
+            response=response,
+        )
+
+    @staticmethod
+    def _maybe_raise_discovery_config_error(run_data: object, response: Response, run_kind: str) -> None:
+        """Raise `InvalidDiscoveryConfigError` if the server's 400 body cites `discovery_config`."""
+        if not isinstance(run_data, dict) or "discovery_config" not in run_data:
+            return
+
+        errors = run_data["discovery_config"]
+        detail = errors[0] if isinstance(errors, list) and errors else str(errors)
+        raise InvalidDiscoveryConfigError(
+            f"{run_kind} run failed to start due to discovery config error: {detail}",
             response=response,
         )
 
