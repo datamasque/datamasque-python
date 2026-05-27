@@ -9,6 +9,10 @@ import requests_mock
 
 from datamasque.client import (
     DataMasqueClient,
+    DiscoveryConfig,
+    DiscoveryConfigId,
+    FileDataDiscoveryOptions,
+    FileDataDiscoveryRequest,
     FileRulesetGenerationRequest,
     RulesetGenerationRequest,
     RunId,
@@ -26,6 +30,8 @@ from datamasque.client.models.connection import ConnectionId, DatabaseConnection
 from datamasque.client.models.data_selection import SelectedColumns, SelectedFileData, UserSelection
 from datamasque.client.models.status import AsyncRulesetGenerationTaskStatus
 from tests.helpers import parse_multipart_form
+
+DISCOVERY_CONFIG_ID = "aaaaaaaa-1111-2222-3333-444444444444"
 
 
 def test_generate_ruleset(client):
@@ -727,3 +733,118 @@ def test_start_schema_discovery_run_raises_on_non_201(client):
         )
         with pytest.raises(FailedToStartError, match="Schema discovery run failed to start"):
             client.start_schema_discovery_run(SchemaDiscoveryRequest(connection="nope"))
+
+
+def test_schema_discovery_request_accepts_discovery_config_id():
+    """A `DiscoveryConfigId` string passes through unchanged in the request body."""
+    req = SchemaDiscoveryRequest(
+        connection="conn-1",
+        discovery_config=DiscoveryConfigId(DISCOVERY_CONFIG_ID),
+    )
+    dumped = req.model_dump(exclude_none=True, mode="json")
+    assert dumped["discovery_config"] == DISCOVERY_CONFIG_ID
+
+
+def test_schema_discovery_request_unwraps_discovery_config_model():
+    """Passing a full `DiscoveryConfig` object substitutes its `id` for the wire payload."""
+    config = DiscoveryConfig(name="my_cfg", id=DiscoveryConfigId(DISCOVERY_CONFIG_ID))
+    req = SchemaDiscoveryRequest(connection="conn-1", discovery_config=config)
+    assert req.model_dump(exclude_none=True, mode="json")["discovery_config"] == DISCOVERY_CONFIG_ID
+
+
+def test_schema_discovery_request_rejects_unsaved_discovery_config():
+    """A `DiscoveryConfig` without an `id` cannot be used yet — raises immediately."""
+    config = DiscoveryConfig(name="my_cfg")
+    with pytest.raises(ValueError, match="id is None"):
+        SchemaDiscoveryRequest(connection="conn-1", discovery_config=config)
+
+
+def test_start_schema_discovery_run_sends_discovery_config(client):
+    """`start_schema_discovery_run` posts the discovery_config id to the server."""
+    req = SchemaDiscoveryRequest(
+        connection="conn-1",
+        discovery_config=DiscoveryConfigId(DISCOVERY_CONFIG_ID),
+    )
+    with requests_mock.Mocker() as m:
+        m.post(
+            "http://test-server/api/schema-discovery/",
+            json={"id": 11},
+            status_code=201,
+        )
+        assert client.start_schema_discovery_run(req) == 11
+
+    assert m.last_request.json()["discovery_config"] == DISCOVERY_CONFIG_ID
+
+
+def test_start_file_data_discovery_run_minimal(client):
+    """A minimal FDD request — only `connection` set — round-trips through the server."""
+    req = FileDataDiscoveryRequest(connection="conn-1")
+    with requests_mock.Mocker() as m:
+        m.post(
+            "http://test-server/api/run-file-data-discovery/",
+            json={"id": 42},
+            status_code=201,
+        )
+        run_id = client.start_file_data_discovery_run(req)
+
+    assert run_id == 42
+    body = m.last_request.json()
+    assert body["connection"] == "conn-1"
+    assert "discovery_config" not in body
+
+
+def test_start_file_data_discovery_run_full(client):
+    """All FDD request fields populate the wire payload and pass through unwrap helpers."""
+    config = DiscoveryConfig(name="my_cfg", id=DiscoveryConfigId(DISCOVERY_CONFIG_ID))
+    req = FileDataDiscoveryRequest(
+        connection="conn-1",
+        discovery_config=config,
+        options=FileDataDiscoveryOptions(dry_run=True, diagnostic_logging=True),
+        custom_keywords=["foo"],
+        ignored_keywords=["bar"],
+        disable_built_in_keywords=True,
+        disable_global_custom_keywords=True,
+        disable_global_ignored_keywords=False,
+        in_data_discovery={"enabled": True, "row_sample_size": 50},
+        recurse=True,
+        include=["*.csv"],
+        skip=["**/tmp/**"],
+        encoding="utf-8",
+        workers=4,
+    )
+    with requests_mock.Mocker() as m:
+        m.post(
+            "http://test-server/api/run-file-data-discovery/",
+            json={"id": 99},
+            status_code=201,
+        )
+        assert client.start_file_data_discovery_run(req) == 99
+
+    body = m.last_request.json()
+    assert body == {
+        "connection": "conn-1",
+        "discovery_config": DISCOVERY_CONFIG_ID,
+        "options": {"dry_run": True, "diagnostic_logging": True},
+        "custom_keywords": ["foo"],
+        "ignored_keywords": ["bar"],
+        "disable_built_in_keywords": True,
+        "disable_global_custom_keywords": True,
+        "disable_global_ignored_keywords": False,
+        "in_data_discovery": {"enabled": True, "row_sample_size": 50},
+        "recurse": True,
+        "include": ["*.csv"],
+        "skip": ["**/tmp/**"],
+        "encoding": "utf-8",
+        "workers": 4,
+    }
+
+
+def test_start_file_data_discovery_run_raises_on_non_201(client):
+    with requests_mock.Mocker() as m:
+        m.post(
+            "http://test-server/api/run-file-data-discovery/",
+            json={"detail": "connection not found"},
+            status_code=400,
+        )
+        with pytest.raises(FailedToStartError, match="File data discovery run failed to start"):
+            client.start_file_data_discovery_run(FileDataDiscoveryRequest(connection="nope"))

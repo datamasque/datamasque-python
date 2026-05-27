@@ -8,7 +8,12 @@ import requests_mock
 
 from datamasque.client import DataMasqueClient
 from datamasque.client.exceptions import DataMasqueApiError, DataMasqueException
-from datamasque.client.models.discovery_config import DiscoveryConfig, DiscoveryConfigId
+from datamasque.client.models.discovery_config import (
+    DiscoveryConfig,
+    DiscoveryConfigId,
+    unwrap_discovery_config_id,
+)
+from datamasque.client.models.status import ValidationStatus
 
 CONFIG_ID_1 = "aaaaaaaa-1111-2222-3333-444444444444"
 CONFIG_ID_2 = "bbbbbbbb-1111-2222-3333-444444444444"
@@ -428,3 +433,52 @@ def test_get_default_discovery_config_yaml(client: DataMasqueClient) -> None:
         result = client.get_default_discovery_config_yaml()
 
     assert result == yaml_body
+
+
+def test_discovery_config_parses_validation_fields() -> None:
+    """`is_valid` and `validation_error` round-trip from API responses."""
+    config = DiscoveryConfig.model_validate(
+        {
+            "id": CONFIG_ID_1,
+            "name": "my_config",
+            "config_yaml": "labels: []",
+            "is_valid": "invalid",
+            "validation_error": "bad shape on line 3",
+            "created": "2025-01-01T12:00:00Z",
+            "modified": "2025-01-02T12:00:00Z",
+        }
+    )
+
+    assert config.is_valid is ValidationStatus.invalid
+    assert config.validation_error == "bad shape on line 3"
+
+
+def test_discovery_config_validation_fields_optional() -> None:
+    """Older / lighter API responses without validation fields still parse."""
+    config = DiscoveryConfig.model_validate(
+        {
+            "id": CONFIG_ID_1,
+            "name": "my_config",
+            "created": "2025-01-01T12:00:00Z",
+            "modified": "2025-01-02T12:00:00Z",
+        }
+    )
+
+    assert config.is_valid is None
+    assert config.validation_error is None
+
+
+def test_unwrap_discovery_config_id_passes_through_strings() -> None:
+    assert unwrap_discovery_config_id(CONFIG_ID_1) == CONFIG_ID_1
+    assert unwrap_discovery_config_id(None) is None
+
+
+def test_unwrap_discovery_config_id_extracts_id_from_model() -> None:
+    config = DiscoveryConfig(name="x", id=DiscoveryConfigId(CONFIG_ID_1))
+    assert unwrap_discovery_config_id(config) == CONFIG_ID_1
+
+
+def test_unwrap_discovery_config_id_raises_without_id() -> None:
+    config = DiscoveryConfig(name="x")
+    with pytest.raises(ValueError, match="id is None"):
+        unwrap_discovery_config_id(config)

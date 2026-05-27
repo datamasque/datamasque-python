@@ -17,6 +17,7 @@ from datamasque.client.models.data_selection import (
     SelectedFileData,
 )
 from datamasque.client.models.discovery import (
+    FileDataDiscoveryRequest,
     FileDiscoveryResult,
     FileRulesetGenerationRequest,
     RulesetGenerationRequest,
@@ -226,6 +227,40 @@ class DiscoveryClient(BaseClient):
         logger.error("Schema discovery run failed to start: %s", run_data)
         raise FailedToStartError(
             f"Schema discovery run failed to start "
+            f"(server responded with status {response.status_code}: {response.text}).",
+            response=response,
+        )
+
+    def start_file_data_discovery_run(self, request: FileDataDiscoveryRequest) -> RunId:
+        """
+        Starts a file data discovery run with the given configuration.
+
+        Args:
+            request: A `FileDataDiscoveryRequest` with connection and optional settings.
+
+        Returns:
+            RunId: The ID of the started discovery run
+
+        Raises:
+            FailedToStartError: If run fails to start
+        """
+
+        data = request.model_dump(exclude_none=True, mode="json")
+        response = self.make_request(
+            "POST",
+            "/api/run-file-data-discovery/",
+            data=data,
+            require_status_check=False,
+        )
+        run_data = response.json()
+
+        if response.status_code == 201:
+            logger.info("File data discovery run %s started successfully", run_data["id"])
+            return RunId(run_data["id"])
+
+        logger.error("File data discovery run failed to start: %s", run_data)
+        raise FailedToStartError(
+            f"File data discovery run failed to start "
             f"(server responded with status {response.status_code}: {response.text}).",
             response=response,
         )
