@@ -1,8 +1,9 @@
 """Typed request and response shapes for schema-discovery and ruleset-generation endpoints."""
 
+from enum import Enum
 from typing import Any, Optional, Union
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from datamasque.client.models.connection import ConnectionConfig, ConnectionId, unwrap_connection_id
 from datamasque.client.models.data_selection import HashColumnsTableConfig, Locator, UserSelection
@@ -28,6 +29,7 @@ class InDataDiscoveryConfig(BaseModel):
     row_sample_size: Optional[int] = None
     custom_rules: Optional[list[InDataDiscoveryRule]] = None
     non_sensitive_rules: Optional[list[InDataDiscoveryRule]] = None
+    ignore_rules: Optional[list[InDataDiscoveryRule]] = None
     force: Optional[bool] = None
 
 
@@ -86,6 +88,35 @@ class RulesetGenerationRequest(BaseModel):
         return unwrap_connection_id(value)
 
 
+class FileFilterMatchAgainst(str, Enum):
+    """Which part of a file's path an `include`/`skip` filter is matched against."""
+
+    path = "path"
+    filename = "filename"
+
+
+class FileFilter(BaseModel):
+    """
+    A single `include` or `skip` filter for file data discovery.
+
+    Exactly one of `glob` or `regex` must be set.
+    `match_against` selects whether the pattern is applied to the full path or just the filename
+    (the server defaults to the full path when omitted).
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    glob: Optional[str] = None
+    regex: Optional[str] = None
+    match_against: Optional[FileFilterMatchAgainst] = None
+
+    @model_validator(mode="after")
+    def _check_glob_xor_regex(self) -> "FileFilter":
+        if bool(self.glob) == bool(self.regex):
+            raise ValueError("A `FileFilter` must set exactly one of `glob` or `regex`.")
+        return self
+
+
 class FileDataDiscoveryOptions(BaseModel):
     """Run options nested under `FileDataDiscoveryRequest.options`."""
 
@@ -117,8 +148,8 @@ class FileDataDiscoveryRequest(BaseModel):
     disable_global_ignored_keywords: Optional[bool] = None
     in_data_discovery: Optional[InDataDiscoveryConfig] = None
     recurse: Optional[bool] = None
-    include: Optional[list[str]] = None
-    skip: Optional[list[str]] = None
+    include: Optional[list[FileFilter]] = None
+    skip: Optional[list[FileFilter]] = None
     encoding: Optional[str] = None
     workers: Optional[int] = None
 

@@ -6,6 +6,7 @@ from unittest.mock import patch
 
 import pytest
 import requests_mock
+from pydantic import ValidationError
 
 from datamasque.client import (
     DataMasqueClient,
@@ -13,7 +14,10 @@ from datamasque.client import (
     DiscoveryConfigId,
     FileDataDiscoveryOptions,
     FileDataDiscoveryRequest,
+    FileFilter,
+    FileFilterMatchAgainst,
     FileRulesetGenerationRequest,
+    InDataDiscoveryConfig,
     RulesetGenerationRequest,
     RunId,
     SchemaDiscoveryPage,
@@ -808,8 +812,8 @@ def test_start_file_data_discovery_run_full(client):
         disable_global_ignored_keywords=False,
         in_data_discovery={"enabled": True, "row_sample_size": 50},
         recurse=True,
-        include=["*.csv"],
-        skip=["**/tmp/**"],
+        include=[{"glob": "*.csv"}],
+        skip=[{"regex": r".*/tmp/.*", "match_against": "path"}],
         encoding="utf-8",
         workers=4,
     )
@@ -833,11 +837,39 @@ def test_start_file_data_discovery_run_full(client):
         "disable_global_ignored_keywords": False,
         "in_data_discovery": {"enabled": True, "row_sample_size": 50},
         "recurse": True,
-        "include": ["*.csv"],
-        "skip": ["**/tmp/**"],
+        "include": [{"glob": "*.csv"}],
+        "skip": [{"regex": r".*/tmp/.*", "match_against": "path"}],
         "encoding": "utf-8",
         "workers": 4,
     }
+
+
+def test_file_filter_requires_exactly_one_of_glob_or_regex():
+    """A `FileFilter` with neither, or both, of `glob`/`regex` is rejected."""
+    FileFilter(glob="*.csv")
+    FileFilter(regex=r".*\.csv")
+    FileFilter(glob="*.csv", match_against=FileFilterMatchAgainst.filename)
+
+    with pytest.raises(ValidationError, match="exactly one of `glob` or `regex`"):
+        FileFilter()
+
+    with pytest.raises(ValidationError, match="exactly one of `glob` or `regex`"):
+        FileFilter(glob="*.csv", regex=r".*\.csv")
+
+
+def test_file_data_discovery_ignore_rules_serialize():
+    """`in_data_discovery.ignore_rules` round-trips into the wire payload."""
+    req = FileDataDiscoveryRequest(
+        connection="conn-1",
+        in_data_discovery=InDataDiscoveryConfig(
+            enabled=True,
+            custom_rules=[{"name": "cc", "pattern": r"^1234"}],
+            non_sensitive_rules=[{"pattern": r"^5555"}],
+            ignore_rules=[{"pattern": r"^4321"}],
+        ),
+    )
+    dumped = req.model_dump(exclude_none=True, mode="json")
+    assert dumped["in_data_discovery"]["ignore_rules"] == [{"pattern": r"^4321"}]
 
 
 def test_start_file_data_discovery_run_raises_on_non_201(client):
