@@ -1,7 +1,10 @@
 import logging
+import platform
+import sys
 import warnings
 from contextlib import contextmanager
 from dataclasses import dataclass
+from importlib.metadata import PackageNotFoundError, version
 from io import BufferedIOBase, BytesIO, TextIOBase
 from pathlib import Path
 from typing import Any, Callable, Iterator, Optional, Type, TypeVar, Union
@@ -25,16 +28,39 @@ FileOrContent = Union[str, bytes, TextIOBase, BufferedIOBase, Path]
 _T = TypeVar("_T", bound=BaseModel)
 
 
+def _build_user_agent() -> str:
+    """
+    Identify ourselves to the DataMasque server in access logs and audit trails.
+
+    Default `python-requests/x.y.z` is anonymous; this surfaces the SDK name +
+    version, Python interpreter, and OS so operators can correlate API traffic
+    with a specific SDK release (e.g. when triaging a bug report).
+    """
+
+    try:
+        sdk_version = version("datamasque-python")
+    except PackageNotFoundError:
+        # Source checkouts without installed metadata.
+        sdk_version = "dev"
+    py = f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"
+    return f"datamasque-python/{sdk_version} (Python/{py}; {platform.system()}/{platform.release()})"
+
+
+USER_AGENT = _build_user_agent()
+
+
 def _build_session(verify_ssl: bool) -> requests.Session:
     """
     Build a configured `requests.Session` for one client's lifetime.
 
-    Centralises the `verify` default so every call site inherits it
-    automatically — keeping the per-call code free of boilerplate and removing
-    the risk of forgetting the flag on a new endpoint.
+    Centralises the `User-Agent` and `verify` defaults so every call site
+    inherits them automatically — keeping the per-call code free of
+    boilerplate and removing the risk of forgetting either flag on a new
+    endpoint.
     """
 
     session = requests.Session()
+    session.headers["User-Agent"] = USER_AGENT
     session.verify = verify_ssl
     return session
 
@@ -90,8 +116,8 @@ class BaseClient:
     Uses a single `requests.Session` for the lifetime of the client so that
     per-host TCP / TLS connections are pooled across calls (paginated list
     endpoints and tight polling loops benefit most). Session-wide defaults
-    (`verify`) are set once on construction; per-call headers like
-    `Authorization` are merged at request time.
+    (`User-Agent`, `verify`) are set once on construction; per-call headers
+    like `Authorization` are merged at request time.
 
     `requests.Session` is not thread-safe; do not share a client between
     threads. Construct one per worker.
