@@ -229,7 +229,14 @@ class BaseClient:
                 raise DataMasqueTransportError(f"Failed to reach DataMasque server at {url}: {e}") from e
 
         response = send()
-        if response.status_code == 401:
+        if response.status_code == 401 and requires_authorization:
+            # Token-expiry recovery: re-auth and replay. Only meaningful when the
+            # caller actually sent a token; on `requires_authorization=False`
+            # calls a 401 means the server itself is rejecting anonymous access
+            # (e.g. admin-install on an already-configured instance), and
+            # re-authing with whatever creds the client happens to hold would
+            # both misdiagnose the failure and emit a misleading
+            # "credentials are incorrect" error to the user.
             logger.debug("Re-authenticating")
             self.authenticate()
             # Reset file pointers so the retry doesn't send empty files

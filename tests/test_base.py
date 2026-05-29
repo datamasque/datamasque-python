@@ -280,6 +280,37 @@ def test_token_source_called_again_on_401_retry():
     assert client.token == "Token t2"
 
 
+def test_401_does_not_retry_when_requires_authorization_is_false(client):
+    """
+    A 401 on an anonymous request must surface as-is, not trigger a re-auth retry.
+
+    `/api/users/admin-install/` returns 401 once any user exists -- the endpoint
+    is gated on "no user has been created yet" and DRF treats it as a normal
+    auth-required endpoint thereafter. Re-authing on that 401 would both
+    misdiagnose the failure ("login credentials are correct") and waste a
+    round-trip on a call the caller said doesn't need auth.
+    """
+    with requests_mock.Mocker() as m:
+        m.post(
+            "http://test-server/api/users/admin-install/",
+            status_code=401,
+            json={"detail": "Authentication credentials were not provided."},
+        )
+
+        with pytest.raises(DataMasqueApiError) as excinfo:
+            client.make_request(
+                "POST",
+                "/api/users/admin-install/",
+                data={"email": "x@y", "username": "x", "password": "p", "re_password": "p", "allowed_hosts": []},
+                requires_authorization=False,
+            )
+
+        assert excinfo.value.response.status_code == 401
+        # Exactly one request: no re-auth roundtrip to /api/auth/token/login/ and no replay.
+        assert m.call_count == 1
+        assert m.request_history[0].path == "/api/users/admin-install/"
+
+
 def test_token_source_callable_exception_propagates():
     """Errors from `token_source` are surfaced to the caller, not swallowed."""
 
