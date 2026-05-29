@@ -74,8 +74,12 @@ def test_healthcheck_transport_failure(client):
 
 
 @pytest.mark.parametrize("verify_ssl", [True, False])
-def test_make_request_verify_ssl_true_by_default(config, verify_ssl):
-    """Verifies SSL setting is passed through to the `requests` call."""
+def test_session_verify_reflects_config(config, verify_ssl):
+    """
+    `verify_ssl` is applied to the client's `requests.Session` once at construction.
+
+    Every outgoing call then inherits it without per-call boilerplate.
+    """
     config_with_ssl = DataMasqueInstanceConfig(
         base_url=config.base_url,
         username=config.username,
@@ -84,24 +88,14 @@ def test_make_request_verify_ssl_true_by_default(config, verify_ssl):
     )
     client = DataMasqueClient(config_with_ssl)
 
-    with patch(
-        "datamasque.client.base.requests.request",
-        return_value=make_ok_response(),
-    ) as mock_request:
-        client.make_request("GET", "/api/test/")
-
-    _, kwargs = mock_request.call_args
-    assert kwargs["verify"] is verify_ssl
+    assert client._session.verify is verify_ssl
 
 
 def test_make_request_verify_ssl_true_does_not_touch_global_warning_filter(client):
     """With `verify_ssl=True`, the client should not modify `warnings.filters`."""
     filters_before = list(warnings.filters)
 
-    with patch(
-        "datamasque.client.base.requests.request",
-        return_value=make_ok_response(),
-    ):
+    with patch.object(client._session, "request", return_value=make_ok_response()):
         client.make_request("GET", "/api/test/")
 
     assert warnings.filters == filters_before
@@ -125,10 +119,7 @@ def test_make_request_verify_ssl_false_suppresses_warning_locally(config):
 
     with warnings.catch_warnings(record=True) as captured:
         warnings.simplefilter("always")  # ensure we'd otherwise see the warning
-        with patch(
-            "datamasque.client.base.requests.request",
-            side_effect=raise_insecure_warning_then_respond,
-        ):
+        with patch.object(client._session, "request", side_effect=raise_insecure_warning_then_respond):
             client.make_request("GET", "/api/test/")
 
         # The warning raised inside the request call was suppressed by the client.
