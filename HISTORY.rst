@@ -2,6 +2,14 @@
 History
 =======
 
+1.0.4 (2026-06-09)
+------------------
+
+* Added ``informix`` to ``DatabaseType`` enum.
+* Pool HTTP connections via a per-client ``requests.Session`` so TCP/TLS connections are reused across calls. Note: a client is not thread-safe; construct one per worker.
+* Send a descriptive ``User-Agent`` identifying the SDK name, version, Python interpreter, and OS.
+* Only re-authenticate and replay on a ``401`` for requests that actually sent a token (gate the retry on ``requires_authorization``).
+
 1.0.3 (2026-05-27)
 ------------------
 
