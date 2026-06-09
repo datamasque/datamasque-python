@@ -24,6 +24,21 @@ logger = logging.getLogger(__name__)
 FileOrContent = Union[str, bytes, TextIOBase, BufferedIOBase, Path]
 _T = TypeVar("_T", bound=BaseModel)
 
+
+def _build_session(verify_ssl: bool) -> requests.Session:
+    """
+    Build a configured `requests.Session` for one client's lifetime.
+
+    Centralises the `verify` default so every call site inherits it
+    automatically — keeping the per-call code free of boilerplate and removing
+    the risk of forgetting the flag on a new endpoint.
+    """
+
+    session = requests.Session()
+    session.verify = verify_ssl
+    return session
+
+
 # Substrings (case-insensitive) that mark a key whose value should be redacted
 # before logging on an error path, so that passwords, API tokens, and similar secrets don't
 # end up in user-visible logs when a request fails.
@@ -71,6 +86,15 @@ class BaseClient:
 
     Holds the connection config, cached auth token, and the core `make_request` dispatcher
     used by all per-feature mixins that compose `DataMasqueClient`.
+
+    Uses a single `requests.Session` for the lifetime of the client so that
+    per-host TCP / TLS connections are pooled across calls (paginated list
+    endpoints and tight polling loops benefit most). Session-wide defaults
+    (`verify`) are set once on construction; per-call headers like
+    `Authorization` are merged at request time.
+
+    `requests.Session` is not thread-safe; do not share a client between
+    threads. Construct one per worker.
     """
 
     token: str = ""
@@ -86,6 +110,7 @@ class BaseClient:
         self.password = connection_config.password
         self.verify_ssl = connection_config.verify_ssl
         self.token_source = connection_config.token_source
+        self._session = _build_session(self.verify_ssl)
 
     @contextmanager
     def _maybe_suppress_insecure_warning(self) -> Iterator[None]:
@@ -186,28 +211,32 @@ class BaseClient:
         url = urljoin(self.base_url, path)
 
         def send() -> Response:
-            headers: Optional[dict] = {"Authorization": self.token} if requires_authorization else None
+            headers = {"Authorization": self.token} if requires_authorization else None
             try:
                 with self._maybe_suppress_insecure_warning():
                     if files:
                         files_payload = {f.field_name: (f.filename, f.content, f.content_type or "") for f in files}
-                        return requests.request(
+                        return self._session.request(
                             method,
                             url,
                             data=data,
                             params=params,
                             headers=headers,
                             files=files_payload,
-                            verify=self.verify_ssl,
                         )
-                    return requests.request(
-                        method, url, json=data, params=params, headers=headers, verify=self.verify_ssl
-                    )
+                    return self._session.request(method, url, json=data, params=params, headers=headers)
             except requests.RequestException as e:
                 raise DataMasqueTransportError(f"Failed to reach DataMasque server at {url}: {e}") from e
 
         response = send()
-        if response.status_code == 401:
+        if response.status_code == 401 and requires_authorization:
+            # Token-expiry recovery: re-auth and replay. Only meaningful when the
+            # caller actually sent a token; on `requires_authorization=False`
+            # calls a 401 means the server itself is rejecting anonymous access
+            # (e.g. admin-install on an already-configured instance), and
+            # re-authing with whatever creds the client happens to hold would
+            # both misdiagnose the failure and emit a misleading
+            # "credentials are incorrect" error to the user.
             logger.debug("Re-authenticating")
             self.authenticate()
             # Reset file pointers so the retry doesn't send empty files

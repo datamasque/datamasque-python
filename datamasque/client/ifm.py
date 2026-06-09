@@ -17,7 +17,7 @@ import requests
 from pydantic import BaseModel
 from requests import Response
 
-from datamasque.client.base import suppress_insecure_warning_if_needed
+from datamasque.client.base import _build_session, suppress_insecure_warning_if_needed
 from datamasque.client.exceptions import (
     DataMasqueApiError,
     DataMasqueNotReadyError,
@@ -82,6 +82,9 @@ class DataMasqueIfmClient:
         self.password = connection_config.password
         self.verify_ssl = connection_config.verify_ssl
         self.token_source = connection_config.token_source
+        # One session for both admin-server (JWT login/refresh) and IFM (data plane)
+        # traffic -- different hosts, but a single session handles per-host pooling.
+        self._session = _build_session(self.verify_ssl)
 
     def authenticate(self) -> None:
         """Obtain an access (and refresh) token from the admin server, or via `token_source`."""
@@ -95,10 +98,9 @@ class DataMasqueIfmClient:
         login_url = urljoin(self.admin_server_base_url, "/api/auth/jwt/login/")
         try:
             with self._maybe_suppress_insecure_warning():
-                response = requests.post(
+                response = self._session.post(
                     login_url,
                     json={"username": self.username, "password": self.password},
-                    verify=self.verify_ssl,
                 )
         except requests.RequestException as e:
             raise DataMasqueTransportError(f"Failed to reach admin server at {login_url}: {e}") from e
@@ -122,10 +124,9 @@ class DataMasqueIfmClient:
         refresh_url = urljoin(self.admin_server_base_url, "/api/auth/jwt/refresh/")
         try:
             with self._maybe_suppress_insecure_warning():
-                response = requests.post(
+                response = self._session.post(
                     refresh_url,
                     json={"refresh": self.refresh_token},
-                    verify=self.verify_ssl,
                 )
         except requests.RequestException as e:
             raise DataMasqueTransportError(f"Failed to reach admin server at {refresh_url}: {e}") from e
@@ -187,13 +188,12 @@ class DataMasqueIfmClient:
         def send() -> Response:
             try:
                 with self._maybe_suppress_insecure_warning():
-                    return requests.request(
+                    return self._session.request(
                         method,
                         url,
                         json=json_body,
                         params=params,
                         headers={"Authorization": f"Bearer {self.access_token}"},
-                        verify=self.verify_ssl,
                     )
             except requests.RequestException as e:
                 raise DataMasqueTransportError(f"Failed to reach IFM server at {url}: {e}") from e
