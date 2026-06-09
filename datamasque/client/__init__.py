@@ -57,6 +57,7 @@ from datamasque.client.models.discovery import (
     DiscoveryMatch,
     FileDataDiscoveryOptions,
     FileDataDiscoveryRequest,
+    FileDataDiscoveryV2Request,
     FileDiscoveryFile,
     FileDiscoveryLocatorResult,
     FileDiscoveryMatch,
@@ -73,6 +74,7 @@ from datamasque.client.models.discovery import (
     SchemaDiscoveryPage,
     SchemaDiscoveryRequest,
     SchemaDiscoveryResult,
+    SchemaDiscoveryV2Request,
     TableConstraints,
 )
 from datamasque.client.models.discovery_config import DiscoveryConfig, DiscoveryConfigId
@@ -144,6 +146,7 @@ __all__ = [
     "FileConnectionConfig",
     "FileDataDiscoveryOptions",
     "FileDataDiscoveryRequest",
+    "FileDataDiscoveryV2Request",
     "FileDiscoveryFile",
     "FileDiscoveryLocatorResult",
     "FileDiscoveryMatch",
@@ -198,6 +201,7 @@ __all__ = [
     "SchemaDiscoveryPage",
     "SchemaDiscoveryRequest",
     "SchemaDiscoveryResult",
+    "SchemaDiscoveryV2Request",
     "SeedFile",
     "SelectedColumns",
     "SelectedData",
