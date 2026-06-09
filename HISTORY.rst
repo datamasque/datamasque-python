@@ -2,6 +2,14 @@
 History
 =======
 
+1.1.0 (unreleased)
+------------------
+
+* Added discovery-config management APIs on ``DataMasqueClient`` (``list_discovery_configs``, ``get_discovery_config``, ``create_discovery_config``, ``update_discovery_config``, and friends), backed by the ``DiscoveryConfig`` / ``DiscoveryConfigId`` models.
+* Added ``start_schema_discovery_run_v2`` and ``start_file_data_discovery_run_v2`` for starting discovery runs from a saved discovery config, via the ``/api/schema-discovery/v2/`` and ``/api/run-file-data-discovery/v2/`` endpoints. The discovery config is a full override of all detection options, so the v2 request models (``SchemaDiscoveryV2Request``, ``FileDataDiscoveryV2Request``) reject the legacy keyword/schema/in-data-discovery fields.
+* The v1 ``start_schema_discovery_run`` and ``start_file_data_discovery_run`` endpoints are unchanged and do not accept a discovery config; ``start_file_data_discovery_run`` (with ``FileDataDiscoveryRequest``, the ``FileFilter`` include/skip model, and ``FileDataDiscoveryOptions``) is newly exposed for ad-hoc file data discovery.
+* Added ``InvalidDiscoveryConfigError``, raised by the v2 run-start methods when the referenced config is missing, archived, or not in a ``valid`` validation state.
+
 1.0.5 (2026-06-18)
 ------------------
 

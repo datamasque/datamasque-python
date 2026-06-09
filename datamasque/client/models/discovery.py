@@ -38,15 +38,12 @@ class SchemaDiscoveryRequest(BaseModel):
     Request body for `POST /api/schema-discovery/`.
 
     `connection` accepts either a `ConnectionId` or a full `ConnectionConfig` returned by an earlier client call.
-    `discovery_config` (optional) accepts either a `DiscoveryConfigId` or a full `DiscoveryConfig`;
-    when omitted the server's built-in default discovery config is used.
     Every other field uses the server's default value when omitted.
     """
 
     model_config = ConfigDict(extra="forbid")
 
     connection: Union[ConnectionId, ConnectionConfig]
-    discovery_config: Optional[Union[DiscoveryConfigId, DiscoveryConfig]] = None
     custom_keywords: list[str] = Field(default_factory=list)
     ignored_keywords: list[str] = Field(default_factory=list)
     schemas: list[str] = Field(default_factory=list)
@@ -54,6 +51,27 @@ class SchemaDiscoveryRequest(BaseModel):
     disable_built_in_keywords: bool = False
     disable_global_custom_keywords: bool = False
     disable_global_ignored_keywords: bool = False
+
+    @field_validator("connection", mode="before")
+    @classmethod
+    def _unwrap_connection(cls, value: Any) -> Any:
+        return unwrap_connection_id(value)
+
+
+class SchemaDiscoveryV2Request(BaseModel):
+    """
+    Request body for `POST /api/schema-discovery/v2/` (start a run from a saved discovery config).
+
+    `connection` accepts either a `ConnectionId` or a full `ConnectionConfig` returned by an earlier client call.
+    `discovery_config` accepts either a `DiscoveryConfigId` or a full `DiscoveryConfig`, and is a full
+    override: it supplies every detection option, so the legacy keyword/schema/in-data-discovery fields
+    accepted by `SchemaDiscoveryRequest` are rejected here.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    connection: Union[ConnectionId, ConnectionConfig]
+    discovery_config: Union[DiscoveryConfigId, DiscoveryConfig]
 
     @field_validator("connection", mode="before")
     @classmethod
@@ -131,15 +149,12 @@ class FileDataDiscoveryRequest(BaseModel):
     Request body for `POST /api/run-file-data-discovery/`.
 
     `connection` accepts either a `ConnectionId` or a full `ConnectionConfig` returned by an earlier client call.
-    `discovery_config` (optional) accepts either a `DiscoveryConfigId` or a full `DiscoveryConfig`;
-    when omitted the server's built-in default discovery config is used.
     All other fields use the server's default value when omitted.
     """
 
     model_config = ConfigDict(extra="forbid")
 
     connection: Union[ConnectionId, ConnectionConfig]
-    discovery_config: Optional[Union[DiscoveryConfigId, DiscoveryConfig]] = None
     options: Optional[FileDataDiscoveryOptions] = None
     custom_keywords: list[str] = Field(default_factory=list)
     ignored_keywords: list[str] = Field(default_factory=list)
@@ -147,6 +162,35 @@ class FileDataDiscoveryRequest(BaseModel):
     disable_global_custom_keywords: Optional[bool] = None
     disable_global_ignored_keywords: Optional[bool] = None
     in_data_discovery: Optional[InDataDiscoveryConfig] = None
+    recurse: Optional[bool] = None
+    include: Optional[list[FileFilter]] = None
+    skip: Optional[list[FileFilter]] = None
+    encoding: Optional[str] = None
+    workers: Optional[int] = None
+
+    @field_validator("connection", mode="before")
+    @classmethod
+    def _unwrap_connection(cls, value: Any) -> Any:
+        return unwrap_connection_id(value)
+
+
+class FileDataDiscoveryV2Request(BaseModel):
+    """
+    Request body for `POST /api/run-file-data-discovery/v2/` (start a run from a saved discovery config).
+
+    `discovery_config` is a full override of the detection options, so the legacy keyword and
+    in-data-discovery fields accepted by `FileDataDiscoveryRequest` are rejected here.
+    The file-handling parameters (`recurse`, `include`, `skip`, `encoding`, `workers`) and run
+    `options` remain accepted, since the discovery config does not own them.
+    `connection` accepts either a `ConnectionId` or a full `ConnectionConfig`, and `discovery_config`
+    accepts either a `DiscoveryConfigId` or a full `DiscoveryConfig`.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    connection: Union[ConnectionId, ConnectionConfig]
+    discovery_config: Union[DiscoveryConfigId, DiscoveryConfig]
+    options: Optional[FileDataDiscoveryOptions] = None
     recurse: Optional[bool] = None
     include: Optional[list[FileFilter]] = None
     skip: Optional[list[FileFilter]] = None
