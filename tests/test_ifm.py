@@ -12,6 +12,7 @@ from datamasque.client import (
     RulesetPlanPartialUpdateRequest,
     RulesetPlanUpdateRequest,
 )
+from datamasque.client.base import USER_AGENT
 from datamasque.client.exceptions import DataMasqueApiError, DataMasqueUserError
 
 ADMIN = "http://admin.test"
@@ -63,9 +64,22 @@ def test_authenticate_via_jwt_login(ifm_config):
             status_code=200,
         )
         client.authenticate()
+        assert m.request_history[0].headers["User-Agent"] == USER_AGENT
 
     assert client.access_token == "ACC"
     assert client.refresh_token == "REF"
+
+
+def test_ifm_request_carries_user_agent(authed_ifm_client):
+    """
+    Every IFM call must identify the SDK in the User-Agent header.
+
+    Covers login, refresh, and authenticated requests.
+    """
+    with requests_mock.Mocker() as m:
+        m.get(f"{IFM}/health/", json={"status": "ok"})
+        authed_ifm_client._make_request("GET", "/health/")
+        assert m.request_history[0].headers["User-Agent"] == USER_AGENT
 
 
 def test_authenticate_failure_raises_ifm_auth_error(ifm_config):

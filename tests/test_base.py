@@ -10,6 +10,7 @@ import requests_mock
 from urllib3.exceptions import InsecureRequestWarning
 
 from datamasque.client import DataMasqueClient, RunId
+from datamasque.client.base import USER_AGENT
 from datamasque.client.exceptions import (
     DataMasqueApiError,
     DataMasqueNotReadyError,
@@ -278,6 +279,37 @@ def test_token_source_called_again_on_401_retry():
 
     # The retry consumed the second token from the iterator.
     assert client.token == "Token t2"
+
+
+def test_user_agent_identifies_the_sdk(client):
+    """
+    Every outgoing request must carry an SDK-identifying User-Agent header.
+
+    This lets operators attribute API traffic to a specific SDK release rather
+    than the generic `python-requests/x.y.z` default.
+    """
+    assert USER_AGENT.startswith("datamasque-python/")
+
+    with requests_mock.Mocker() as m:
+        m.get("http://test-server/api/healthcheck/", json={})
+        client.healthcheck()
+        assert m.request_history[0].headers["User-Agent"] == USER_AGENT
+
+
+def test_user_agent_sent_on_authenticated_requests(client):
+    """
+    The User-Agent must be present on authenticated calls, alongside the auth token.
+
+    It is not limited to anonymous requests.
+    """
+    client.token = "Token test-token"
+
+    with requests_mock.Mocker() as m:
+        m.get("http://test-server/api/runs/", json={"results": [], "next": None})
+        client.make_request("GET", "/api/runs/")
+        headers = m.request_history[0].headers
+        assert headers["User-Agent"] == USER_AGENT
+        assert headers["Authorization"] == "Token test-token"
 
 
 def test_401_does_not_retry_when_requires_authorization_is_false(client):
