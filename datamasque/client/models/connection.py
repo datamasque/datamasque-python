@@ -46,6 +46,7 @@ class DatabaseType(Enum):
     mongodb = "mongodb"
     databricks_lakebase = "databricks_lakebase"
     databricks = "databricks"
+    informix = "informix"
 
 
 class SnowflakeStageLocation(str, Enum):
