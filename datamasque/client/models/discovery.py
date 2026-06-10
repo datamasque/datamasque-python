@@ -204,24 +204,17 @@ class FileDataDiscoveryV2Request(BaseModel):
     """
     Request body for `POST /api/run-file-data-discovery/v2/` (start a run from a saved discovery config).
 
-    `discovery_config` is a full override of the detection options, so the legacy keyword and
-    in-data-discovery fields accepted by `FileDataDiscoveryRequest` are rejected here.
-    The file-handling parameters (`recurse`, `include`, `skip`, `encoding`, `workers`) and run
-    `options` remain accepted, since the discovery config does not own them.
-    `connection` accepts either a `ConnectionId` or a full `ConnectionConfig`, and `discovery_config`
-    accepts either a `DiscoveryConfigId` or a full `DiscoveryConfig`.
+    `connection` accepts either a `ConnectionId` or a full `ConnectionConfig` returned by an earlier client call.
+    `discovery_config` accepts either a `DiscoveryConfigId` or a full `DiscoveryConfig`, and is a full
+    override: it supplies every detection option as well as the file-handling and run options, so the
+    legacy keyword/in-data-discovery fields and the file-handling parameters (`recurse`, `include`, `skip`,
+    `encoding`, `workers`) accepted by `FileDataDiscoveryRequest` are rejected here.
     """
 
     model_config = ConfigDict(extra="forbid")
 
     connection: Union[ConnectionId, ConnectionConfig]
     discovery_config: Union[DiscoveryConfigId, DiscoveryConfig]
-    options: Optional[FileDataDiscoveryOptions] = None
-    recurse: Optional[bool] = None
-    include: Optional[list[FileFilter]] = None
-    skip: Optional[list[FileFilter]] = None
-    encoding: Optional[str] = None
-    workers: Optional[int] = None
 
     @field_validator("connection", mode="before")
     @classmethod

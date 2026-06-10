@@ -901,13 +901,26 @@ def test_schema_discovery_v2_request_rejects_legacy_fields():
         )
 
 
-def test_file_data_discovery_v2_request_rejects_legacy_detection_fields():
-    """The v2 FDD request rejects detection options owned by the config, while keeping file-handling params."""
+@pytest.mark.parametrize(
+    "extra_field",
+    [
+        {"custom_keywords": ["foo"]},
+        {"in_data_discovery": {"enabled": True}},
+        {"options": {"dry_run": True}},
+        {"recurse": True},
+        {"include": [{"glob": "*.csv"}]},
+        {"skip": [{"glob": "*.tmp"}]},
+        {"encoding": "utf-8"},
+        {"workers": 4},
+    ],
+)
+def test_file_data_discovery_v2_request_rejects_non_config_fields(extra_field):
+    """The config is a full override: detection options, file-handling params, and run options are all rejected."""
     with pytest.raises(ValidationError):
         FileDataDiscoveryV2Request(
             connection="conn-1",
             discovery_config=DiscoveryConfigId(DISCOVERY_CONFIG_ID),
-            custom_keywords=["foo"],
+            **extra_field,
         )
 
 
@@ -921,33 +934,15 @@ def test_start_schema_discovery_run_v2_sends_discovery_config(client):
     assert m.last_request.json() == {"connection": "conn-1", "discovery_config": DISCOVERY_CONFIG_ID}
 
 
-def test_start_file_data_discovery_run_v2_full(client):
-    """The v2 FDD request carries the config plus the file-handling params the config does not own."""
+def test_start_file_data_discovery_run_v2_sends_discovery_config(client):
+    """`start_file_data_discovery_run_v2` posts only the connection and discovery_config id to the v2 endpoint."""
     config = DiscoveryConfig(name="my_cfg", id=DiscoveryConfigId(DISCOVERY_CONFIG_ID))
-    req = FileDataDiscoveryV2Request(
-        connection="conn-1",
-        discovery_config=config,
-        options=FileDataDiscoveryOptions(dry_run=True, diagnostic_logging=True),
-        recurse=True,
-        include=[{"glob": "*.csv"}],
-        skip=[{"regex": r".*/tmp/.*", "match_against": "path"}],
-        encoding="utf-8",
-        workers=4,
-    )
+    req = FileDataDiscoveryV2Request(connection="conn-1", discovery_config=config)
     with requests_mock.Mocker() as m:
         m.post("http://test-server/api/run-file-data-discovery/v2/", json={"id": 99}, status_code=201)
         assert client.start_file_data_discovery_run_v2(req) == 99
 
-    assert m.last_request.json() == {
-        "connection": "conn-1",
-        "discovery_config": DISCOVERY_CONFIG_ID,
-        "options": {"dry_run": True, "diagnostic_logging": True},
-        "recurse": True,
-        "include": [{"glob": "*.csv"}],
-        "skip": [{"regex": r".*/tmp/.*", "match_against": "path"}],
-        "encoding": "utf-8",
-        "workers": 4,
-    }
+    assert m.last_request.json() == {"connection": "conn-1", "discovery_config": DISCOVERY_CONFIG_ID}
 
 
 def test_start_schema_discovery_run_v2_raises_invalid_discovery_config_when_not_valid(client):
