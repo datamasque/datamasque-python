@@ -37,10 +37,9 @@ class SchemaDiscoveryRequest(BaseModel):
     """
     Request body for `POST /api/schema-discovery/` (the keyword-driven schema-discovery trigger).
 
-    `connection` accepts either a `ConnectionId` or a full `ConnectionConfig` returned by an earlier client call.
-    This request does not accept a `discovery_config`; to run from a saved discovery config use
-    `start_schema_discovery_run_v2` with a `SchemaDiscoveryV2Request`. Every other field uses the
-    server's default value when omitted.
+    `connection` accepts either a `ConnectionId` or a full `ConnectionConfig`
+    returned by an earlier client call.
+    This request does not accept a `discovery_config`
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -65,26 +64,26 @@ class SchemaDiscoveryRequest(BaseModel):
         if isinstance(data, dict) and "discovery_config" in data:
             raise ValueError(
                 "`discovery_config` is not accepted by the keyword-driven schema-discovery request; "
-                "use `start_schema_discovery_run_v2` with a `SchemaDiscoveryV2Request` to run from a saved "
-                "discovery config."
+                "use `start_schema_discovery_run_from_config` with a `SchemaDiscoveryFromConfigRequest` "
+                "to run from a saved discovery config."
             )
         return data
 
 
-class SchemaDiscoveryV2Request(BaseModel):
+class SchemaDiscoveryFromConfigRequest(BaseModel):
     """
     Request body for `POST /api/schema-discovery/v2/` (start a run from a saved discovery config).
 
-    `connection` accepts either a `ConnectionId` or a full `ConnectionConfig` returned by an earlier client call.
-    `discovery_config` accepts either a `DiscoveryConfigId` or a full `DiscoveryConfig`, and is a full
-    override: it supplies every detection option, so the legacy keyword/schema/in-data-discovery fields
-    accepted by `SchemaDiscoveryRequest` are rejected here.
+    `connection` accepts either a `ConnectionId` or a full `ConnectionConfig`
+    returned by an earlier client call.
+    `discovery_config` accepts either a `DiscoveryConfigId` or a full `DiscoveryConfig`,
+    or `None` to run with the server's default discovery options.
     """
 
     model_config = ConfigDict(extra="forbid")
 
     connection: Union[ConnectionId, ConnectionConfig]
-    discovery_config: Union[DiscoveryConfigId, DiscoveryConfig]
+    discovery_config: Optional[Union[DiscoveryConfigId, DiscoveryConfig]] = None
 
     @field_validator("connection", mode="before")
     @classmethod
@@ -161,10 +160,9 @@ class FileDataDiscoveryRequest(BaseModel):
     """
     Request body for `POST /api/run-file-data-discovery/` (the keyword-driven file-data-discovery trigger).
 
-    `connection` accepts either a `ConnectionId` or a full `ConnectionConfig` returned by an earlier client call.
-    This request does not accept a `discovery_config`; to run from a saved discovery config use
-    `start_file_data_discovery_run_v2` with a `FileDataDiscoveryV2Request`. All other fields use the
-    server's default value when omitted.
+    `connection` accepts either a `ConnectionId` or a full `ConnectionConfig`
+    returned by an earlier client call.
+    This request does not accept a `discovery_config`.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -194,27 +192,29 @@ class FileDataDiscoveryRequest(BaseModel):
         if isinstance(data, dict) and "discovery_config" in data:
             raise ValueError(
                 "`discovery_config` is not accepted by the keyword-driven file-data-discovery request; "
-                "use `start_file_data_discovery_run_v2` with a `FileDataDiscoveryV2Request` to run from a saved "
-                "discovery config."
+                "use `start_file_data_discovery_run_from_config` with a `FileDataDiscoveryFromConfigRequest` "
+                "to run from a saved discovery config."
             )
         return data
 
 
-class FileDataDiscoveryV2Request(BaseModel):
+class FileDataDiscoveryFromConfigRequest(BaseModel):
     """
     Request body for `POST /api/run-file-data-discovery/v2/` (start a run from a saved discovery config).
 
-    `connection` accepts either a `ConnectionId` or a full `ConnectionConfig` returned by an earlier client call.
-    `discovery_config` accepts either a `DiscoveryConfigId` or a full `DiscoveryConfig`, and is a full
-    override: it supplies every detection option as well as the file-handling and run options, so the
-    legacy keyword/in-data-discovery fields and the file-handling parameters (`recurse`, `include`, `skip`,
-    `encoding`, `workers`) accepted by `FileDataDiscoveryRequest` are rejected here.
+    `connection` accepts either a `ConnectionId` or a full `ConnectionConfig`
+    returned by an earlier client call.
+    `discovery_config` accepts either a `DiscoveryConfigId` or a full `DiscoveryConfig`,
+    or `None` to run with the server's default discovery options.
+    `options` carries run-time toggles (`dry_run`, `diagnostic_logging`);
+    detection and file-handling settings come from the discovery config, not the request.
     """
 
     model_config = ConfigDict(extra="forbid")
 
     connection: Union[ConnectionId, ConnectionConfig]
-    discovery_config: Union[DiscoveryConfigId, DiscoveryConfig]
+    discovery_config: Optional[Union[DiscoveryConfigId, DiscoveryConfig]] = None
+    options: Optional[FileDataDiscoveryOptions] = None
 
     @field_validator("connection", mode="before")
     @classmethod
