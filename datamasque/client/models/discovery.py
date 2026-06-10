@@ -35,10 +35,12 @@ class InDataDiscoveryConfig(BaseModel):
 
 class SchemaDiscoveryRequest(BaseModel):
     """
-    Request body for `POST /api/schema-discovery/`.
+    Request body for `POST /api/schema-discovery/` (the keyword-driven schema-discovery trigger).
 
     `connection` accepts either a `ConnectionId` or a full `ConnectionConfig` returned by an earlier client call.
-    Every other field uses the server's default value when omitted.
+    This request does not accept a `discovery_config`; to run from a saved discovery config use
+    `start_schema_discovery_run_v2` with a `SchemaDiscoveryV2Request`. Every other field uses the
+    server's default value when omitted.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -56,6 +58,17 @@ class SchemaDiscoveryRequest(BaseModel):
     @classmethod
     def _unwrap_connection(cls, value: Any) -> Any:
         return unwrap_connection_id(value)
+
+    @model_validator(mode="before")
+    @classmethod
+    def _reject_discovery_config(cls, data: Any) -> Any:
+        if isinstance(data, dict) and "discovery_config" in data:
+            raise ValueError(
+                "`discovery_config` is not accepted by the keyword-driven schema-discovery request; "
+                "use `start_schema_discovery_run_v2` with a `SchemaDiscoveryV2Request` to run from a saved "
+                "discovery config."
+            )
+        return data
 
 
 class SchemaDiscoveryV2Request(BaseModel):
@@ -146,10 +159,12 @@ class FileDataDiscoveryOptions(BaseModel):
 
 class FileDataDiscoveryRequest(BaseModel):
     """
-    Request body for `POST /api/run-file-data-discovery/`.
+    Request body for `POST /api/run-file-data-discovery/` (the keyword-driven file-data-discovery trigger).
 
     `connection` accepts either a `ConnectionId` or a full `ConnectionConfig` returned by an earlier client call.
-    All other fields use the server's default value when omitted.
+    This request does not accept a `discovery_config`; to run from a saved discovery config use
+    `start_file_data_discovery_run_v2` with a `FileDataDiscoveryV2Request`. All other fields use the
+    server's default value when omitted.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -172,6 +187,17 @@ class FileDataDiscoveryRequest(BaseModel):
     @classmethod
     def _unwrap_connection(cls, value: Any) -> Any:
         return unwrap_connection_id(value)
+
+    @model_validator(mode="before")
+    @classmethod
+    def _reject_discovery_config(cls, data: Any) -> Any:
+        if isinstance(data, dict) and "discovery_config" in data:
+            raise ValueError(
+                "`discovery_config` is not accepted by the keyword-driven file-data-discovery request; "
+                "use `start_file_data_discovery_run_v2` with a `FileDataDiscoveryV2Request` to run from a saved "
+                "discovery config."
+            )
+        return data
 
 
 class FileDataDiscoveryV2Request(BaseModel):
