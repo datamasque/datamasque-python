@@ -315,13 +315,11 @@ class DiscoveryClient(BaseClient):
         """
         Starts a file data discovery run from a saved discovery config (v2 API).
 
-        Detection options come from the saved discovery config referenced by `request.discovery_config`;
-        the file-handling parameters (`recurse`, `include`, `skip`, `encoding`, `workers`) and run
-        `options` are still accepted, since the discovery config does not own them.
+        All detection options, file-handling parameters, and run options come from the saved discovery
+        config referenced by `request.discovery_config`; no per-run overrides are accepted.
 
         Args:
-            request: A `FileDataDiscoveryV2Request` with the connection, saved discovery-config, and
-                optional file-handling parameters.
+            request: A `FileDataDiscoveryV2Request` with the connection and saved discovery-config.
 
         Returns:
             RunId: The ID of the started discovery run
