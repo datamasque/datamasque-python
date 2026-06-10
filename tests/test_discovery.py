@@ -746,14 +746,14 @@ def test_start_schema_discovery_run_raises_on_non_201(client):
 
 
 def test_schema_discovery_request_rejects_discovery_config():
-    """The v1 schema-discovery request no longer accepts `discovery_config` (it is v2-only)."""
-    with pytest.raises(ValidationError):
+    """The v1 schema-discovery request rejects `discovery_config` and points the user at the v2 method."""
+    with pytest.raises(ValidationError, match="start_schema_discovery_run_v2"):
         SchemaDiscoveryRequest(connection="conn-1", discovery_config=DiscoveryConfigId(DISCOVERY_CONFIG_ID))
 
 
 def test_file_data_discovery_request_rejects_discovery_config():
-    """The v1 file-data-discovery request no longer accepts `discovery_config` (it is v2-only)."""
-    with pytest.raises(ValidationError):
+    """The v1 file-data-discovery request rejects `discovery_config` and points the user at the v2 method."""
+    with pytest.raises(ValidationError, match="start_file_data_discovery_run_v2"):
         FileDataDiscoveryRequest(connection="conn-1", discovery_config=DiscoveryConfigId(DISCOVERY_CONFIG_ID))
 
 
