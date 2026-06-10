@@ -20,15 +20,15 @@ from datamasque.client.models.data_selection import (
     SelectedFileData,
 )
 from datamasque.client.models.discovery import (
+    FileDataDiscoveryFromConfigRequest,
     FileDataDiscoveryRequest,
-    FileDataDiscoveryV2Request,
     FileDiscoveryResult,
     FileRulesetGenerationRequest,
     RulesetGenerationRequest,
+    SchemaDiscoveryFromConfigRequest,
     SchemaDiscoveryPage,
     SchemaDiscoveryRequest,
     SchemaDiscoveryResult,
-    SchemaDiscoveryV2Request,
 )
 from datamasque.client.models.ruleset import Ruleset
 from datamasque.client.models.runs import RunId
@@ -270,16 +270,12 @@ class DiscoveryClient(BaseClient):
             response=response,
         )
 
-    def start_schema_discovery_run_v2(self, request: SchemaDiscoveryV2Request) -> RunId:
+    def start_schema_discovery_run_from_config(self, request: SchemaDiscoveryFromConfigRequest) -> RunId:
         """
-        Starts a schema discovery run from a saved discovery config (v2 API).
-
-        All detection options come from the saved discovery config referenced by `request.discovery_config`;
-        the legacy keyword/schema/in-data-discovery options accepted by `start_schema_discovery_run`
-        are not accepted here.
+        Starts a schema discovery run from a saved discovery config.
 
         Args:
-            request: A `SchemaDiscoveryV2Request` with the connection and saved discovery-config.
+            request: A `SchemaDiscoveryFromConfigRequest` with the connection and an optional saved discovery-config.
 
         Returns:
             RunId: The ID of the started discovery run
@@ -311,15 +307,13 @@ class DiscoveryClient(BaseClient):
             response=response,
         )
 
-    def start_file_data_discovery_run_v2(self, request: FileDataDiscoveryV2Request) -> RunId:
+    def start_file_data_discovery_run_from_config(self, request: FileDataDiscoveryFromConfigRequest) -> RunId:
         """
-        Starts a file data discovery run from a saved discovery config (v2 API).
-
-        All detection options, file-handling parameters, and run options come from the saved discovery
-        config referenced by `request.discovery_config`; no per-run overrides are accepted.
+        Starts a file data discovery run from a saved discovery config.
 
         Args:
-            request: A `FileDataDiscoveryV2Request` with the connection and saved discovery-config.
+            request: A `FileDataDiscoveryFromConfigRequest` with the connection,
+                an optional saved discovery-config, and optional run `options`.
 
         Returns:
             RunId: The ID of the started discovery run
