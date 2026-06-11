@@ -39,7 +39,7 @@ class SchemaDiscoveryRequest(BaseModel):
 
     `connection` accepts either a `ConnectionId` or a full `ConnectionConfig`
     returned by an earlier client call.
-    This request does not accept a `discovery_config`
+    This request does not accept a `discovery_config`.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -152,7 +152,6 @@ class FileDataDiscoveryOptions(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    dry_run: Optional[bool] = None
     diagnostic_logging: Optional[bool] = None
 
 
@@ -206,7 +205,7 @@ class FileDataDiscoveryFromConfigRequest(BaseModel):
     returned by an earlier client call.
     `discovery_config` accepts either a `DiscoveryConfigId` or a full `DiscoveryConfig`,
     or `None` to run with the server's default discovery options.
-    `options` carries run-time toggles (`dry_run`, `diagnostic_logging`);
+    `options` carries the `diagnostic_logging` run-time toggle;
     detection and file-handling settings come from the discovery config, not the request.
     """
 

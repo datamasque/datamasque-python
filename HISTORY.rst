@@ -5,10 +5,12 @@ History
 1.1.0 (unreleased)
 ------------------
 
-* Added discovery-config management APIs on ``DataMasqueClient`` (``list_discovery_configs``, ``get_discovery_config``, ``create_discovery_config``, ``update_discovery_config``, and friends), backed by the ``DiscoveryConfig`` / ``DiscoveryConfigId`` models.
-* Added ``start_schema_discovery_run_from_config`` and ``start_file_data_discovery_run_from_config`` for starting discovery runs from a saved discovery config, via the ``/api/schema-discovery/v2/`` and ``/api/run-file-data-discovery/v2/`` endpoints. Their request models (``SchemaDiscoveryFromConfigRequest``, ``FileDataDiscoveryFromConfigRequest``) take a ``connection`` and an optional ``discovery_config`` (``None`` runs with the server's default discovery options); the legacy keyword/schema/in-data-discovery fields and the file-handling parameters (``recurse``, ``include``, ``skip``, ``encoding``, ``workers``) are rejected because the config owns them. ``FileDataDiscoveryFromConfigRequest`` also accepts run ``options`` (``dry_run``, ``diagnostic_logging``).
-* The v1 ``start_schema_discovery_run`` and ``start_file_data_discovery_run`` endpoints are unchanged and do not accept a discovery config; ``start_file_data_discovery_run`` (with ``FileDataDiscoveryRequest``, the ``FileFilter`` include/skip model, and ``FileDataDiscoveryOptions``) is newly exposed for ad-hoc file data discovery.
-* Added ``InvalidDiscoveryConfigError``, raised by the from-config run-start methods when the referenced config is missing, archived, or not in a ``valid`` validation state.
+* Added discovery-config management APIs (``list_discovery_configs``, ``create_discovery_config``, and friends).
+* Added schema-discovery and file-data-discovery APIs that take a saved discovery configuration
+  (``start_schema_discovery_run_from_config`` / ``start_file_data_discovery_run_from_config``).
+  Adoption is recommended; the older APIs that take individual options will be deprecated in a future release.
+* Corrected the file-data-discovery ``include``/``skip`` filter syntax and added ``ignore_rules`` support.
+* Added ``InvalidDiscoveryConfigError``, raised when a discovery run can't start due to an invalid discovery config.
 
 1.0.5 (2026-06-18)
 ------------------

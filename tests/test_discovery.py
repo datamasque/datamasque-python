@@ -775,7 +775,7 @@ def test_start_file_data_discovery_run_full(client):
     """All legacy FDD request fields populate the wire payload and pass through unwrap helpers."""
     req = FileDataDiscoveryRequest(
         connection="conn-1",
-        options=FileDataDiscoveryOptions(dry_run=True, diagnostic_logging=True),
+        options=FileDataDiscoveryOptions(diagnostic_logging=True),
         custom_keywords=["foo"],
         ignored_keywords=["bar"],
         disable_built_in_keywords=True,
@@ -799,7 +799,7 @@ def test_start_file_data_discovery_run_full(client):
     body = m.last_request.json()
     assert body == {
         "connection": "conn-1",
-        "options": {"dry_run": True, "diagnostic_logging": True},
+        "options": {"diagnostic_logging": True},
         "custom_keywords": ["foo"],
         "ignored_keywords": ["bar"],
         "disable_built_in_keywords": True,
@@ -955,11 +955,11 @@ def test_start_file_data_discovery_run_from_config_sends_discovery_config(client
 
 
 def test_start_file_data_discovery_run_from_config_sends_options(client):
-    """`options` (dry_run / diagnostic_logging) is posted alongside the config on the file from-config trigger."""
+    """`options` (diagnostic_logging) is posted alongside the config on the file from-config trigger."""
     req = FileDataDiscoveryFromConfigRequest(
         connection="conn-1",
         discovery_config=DiscoveryConfigId(DISCOVERY_CONFIG_ID),
-        options=FileDataDiscoveryOptions(dry_run=True, diagnostic_logging=True),
+        options=FileDataDiscoveryOptions(diagnostic_logging=True),
     )
     with requests_mock.Mocker() as m:
         m.post("http://test-server/api/run-file-data-discovery/v2/", json={"id": 77}, status_code=201)
@@ -968,7 +968,7 @@ def test_start_file_data_discovery_run_from_config_sends_options(client):
     assert m.last_request.json() == {
         "connection": "conn-1",
         "discovery_config": DISCOVERY_CONFIG_ID,
-        "options": {"dry_run": True, "diagnostic_logging": True},
+        "options": {"diagnostic_logging": True},
     }
 
 
