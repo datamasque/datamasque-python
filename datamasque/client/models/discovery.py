@@ -76,14 +76,14 @@ class SchemaDiscoveryFromConfigRequest(BaseModel):
 
     `connection` accepts either a `ConnectionId` or a full `ConnectionConfig`
     returned by an earlier client call.
-    `discovery_config` accepts either a `DiscoveryConfigId` or a full `DiscoveryConfig`,
+    `discovery_config` is required: pass a `DiscoveryConfigId`, a full `DiscoveryConfig`,
     or `None` to run with the server's default discovery options.
     """
 
     model_config = ConfigDict(extra="forbid")
 
     connection: Union[ConnectionId, ConnectionConfig]
-    discovery_config: Optional[Union[DiscoveryConfigId, DiscoveryConfig]] = None
+    discovery_config: Optional[Union[DiscoveryConfigId, DiscoveryConfig]]
 
     @field_validator("connection", mode="before")
     @classmethod
@@ -203,7 +203,7 @@ class FileDataDiscoveryFromConfigRequest(BaseModel):
 
     `connection` accepts either a `ConnectionId` or a full `ConnectionConfig`
     returned by an earlier client call.
-    `discovery_config` accepts either a `DiscoveryConfigId` or a full `DiscoveryConfig`,
+    `discovery_config` is required: pass a `DiscoveryConfigId`, a full `DiscoveryConfig`,
     or `None` to run with the server's default discovery options.
     `options` carries the `diagnostic_logging` run-time toggle;
     detection and file-handling settings come from the discovery config, not the request.
@@ -212,7 +212,7 @@ class FileDataDiscoveryFromConfigRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     connection: Union[ConnectionId, ConnectionConfig]
-    discovery_config: Optional[Union[DiscoveryConfigId, DiscoveryConfig]] = None
+    discovery_config: Optional[Union[DiscoveryConfigId, DiscoveryConfig]]
     options: Optional[FileDataDiscoveryOptions] = None
 
     @field_validator("connection", mode="before")
