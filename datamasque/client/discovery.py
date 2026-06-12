@@ -275,7 +275,8 @@ class DiscoveryClient(BaseClient):
         Starts a schema discovery run from a saved discovery config.
 
         Args:
-            request: A `SchemaDiscoveryFromConfigRequest` with the connection and an optional saved discovery-config.
+            request: A `SchemaDiscoveryFromConfigRequest` with the `connection` and a required `discovery_config`
+                (a saved config, or `None` for the server's defaults).
 
         Returns:
             RunId: The ID of the started discovery run
@@ -287,6 +288,9 @@ class DiscoveryClient(BaseClient):
         """
 
         data = request.model_dump(exclude_none=True, mode="json")
+        # The server requires `discovery_config` to be present; a null selects its built-in defaults,
+        # so send it explicitly rather than letting `exclude_none` drop a None.
+        data.setdefault("discovery_config", None)
         response = self.make_request(
             "POST",
             "/api/schema-discovery/v2/",
@@ -312,8 +316,9 @@ class DiscoveryClient(BaseClient):
         Starts a file data discovery run from a saved discovery config.
 
         Args:
-            request: A `FileDataDiscoveryFromConfigRequest` with the connection,
-                an optional saved discovery-config, and optional run `options`.
+            request: A `FileDataDiscoveryFromConfigRequest` with the `connection`,
+                a required `discovery_config` (a saved config, or `None` for the server's defaults),
+                and optional run `options`.
 
         Returns:
             RunId: The ID of the started discovery run
@@ -325,6 +330,9 @@ class DiscoveryClient(BaseClient):
         """
 
         data = request.model_dump(exclude_none=True, mode="json")
+        # The server requires `discovery_config` to be present; a null selects its built-in defaults,
+        # so send it explicitly rather than letting `exclude_none` drop a None.
+        data.setdefault("discovery_config", None)
         response = self.make_request(
             "POST",
             "/api/run-file-data-discovery/v2/",

@@ -908,20 +908,28 @@ def test_file_data_discovery_from_config_request_rejects_non_config_fields(extra
         )
 
 
-def test_schema_discovery_from_config_request_allows_none_discovery_config():
-    """`discovery_config` may be omitted or None; it is dropped from the payload so the server uses its defaults."""
-    omitted = SchemaDiscoveryFromConfigRequest(connection="conn-1")
-    explicit_none = SchemaDiscoveryFromConfigRequest(connection="conn-1", discovery_config=None)
-    assert omitted.model_dump(exclude_none=True, mode="json") == {"connection": "conn-1"}
-    assert explicit_none.model_dump(exclude_none=True, mode="json") == {"connection": "conn-1"}
+def test_schema_discovery_from_config_request_requires_discovery_config():
+    """`discovery_config` must be set explicitly; omitting it is a validation error (it may be None, but not absent)."""
+    with pytest.raises(ValidationError, match="discovery_config"):
+        SchemaDiscoveryFromConfigRequest(connection="conn-1")
 
 
-def test_file_data_discovery_from_config_request_allows_none_discovery_config():
-    """`discovery_config` may be omitted or None; it is dropped from the payload so the server uses its defaults."""
-    omitted = FileDataDiscoveryFromConfigRequest(connection="conn-1")
-    explicit_none = FileDataDiscoveryFromConfigRequest(connection="conn-1", discovery_config=None)
-    assert omitted.model_dump(exclude_none=True, mode="json") == {"connection": "conn-1"}
-    assert explicit_none.model_dump(exclude_none=True, mode="json") == {"connection": "conn-1"}
+def test_schema_discovery_from_config_request_accepts_none_discovery_config():
+    """An explicit None is accepted and means the server uses its built-in defaults."""
+    req = SchemaDiscoveryFromConfigRequest(connection="conn-1", discovery_config=None)
+    assert req.discovery_config is None
+
+
+def test_file_data_discovery_from_config_request_requires_discovery_config():
+    """`discovery_config` must be set explicitly; omitting it is a validation error (it may be None, but not absent)."""
+    with pytest.raises(ValidationError, match="discovery_config"):
+        FileDataDiscoveryFromConfigRequest(connection="conn-1")
+
+
+def test_file_data_discovery_from_config_request_accepts_none_discovery_config():
+    """An explicit None is accepted and means the server uses its built-in defaults."""
+    req = FileDataDiscoveryFromConfigRequest(connection="conn-1", discovery_config=None)
+    assert req.discovery_config is None
 
 
 def test_start_schema_discovery_run_from_config_sends_discovery_config(client):
@@ -963,14 +971,24 @@ def test_start_file_data_discovery_run_from_config_sends_options(client):
     }
 
 
-def test_start_schema_discovery_run_from_config_none_omits_discovery_config(client):
-    """With `discovery_config=None` the client posts only the connection; the server falls back to its defaults."""
+def test_start_schema_discovery_run_from_config_none_sends_null_discovery_config(client):
+    """With `discovery_config=None` the client posts an explicit null so the server applies its defaults."""
     req = SchemaDiscoveryFromConfigRequest(connection="conn-1", discovery_config=None)
     with requests_mock.Mocker() as m:
         m.post("http://test-server/api/schema-discovery/v2/", json={"id": 13}, status_code=201)
         assert client.start_schema_discovery_run_from_config(req) == 13
 
-    assert m.last_request.json() == {"connection": "conn-1"}
+    assert m.last_request.json() == {"connection": "conn-1", "discovery_config": None}
+
+
+def test_start_file_data_discovery_run_from_config_none_sends_null_discovery_config(client):
+    """With `discovery_config=None` the file-data trigger posts an explicit null so the server applies its defaults."""
+    req = FileDataDiscoveryFromConfigRequest(connection="conn-1", discovery_config=None)
+    with requests_mock.Mocker() as m:
+        m.post("http://test-server/api/run-file-data-discovery/v2/", json={"id": 21}, status_code=201)
+        assert client.start_file_data_discovery_run_from_config(req) == 21
+
+    assert m.last_request.json() == {"connection": "conn-1", "discovery_config": None}
 
 
 def test_start_schema_discovery_run_from_config_raises_invalid_discovery_config_when_not_valid(client):
