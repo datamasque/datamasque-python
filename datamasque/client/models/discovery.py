@@ -77,13 +77,15 @@ class SchemaDiscoveryFromConfigRequest(BaseModel):
     `connection` accepts either a `ConnectionId` or a full `ConnectionConfig`
     returned by an earlier client call.
     `discovery_config` is required: pass a `DiscoveryConfigId`, a full `DiscoveryConfig`,
-    or `None` to run with the server's default discovery options.
+    or `None` to run with the default discovery options.
+    `schemas` optionally scopes the run to specific schemas; omit it to scan the connection's default schema.
     """
 
     model_config = ConfigDict(extra="forbid")
 
     connection: Union[ConnectionId, ConnectionConfig]
     discovery_config: Optional[Union[DiscoveryConfigId, DiscoveryConfig]]
+    schemas: Optional[list[str]] = None
 
     @field_validator("connection", mode="before")
     @classmethod

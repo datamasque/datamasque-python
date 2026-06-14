@@ -886,13 +886,27 @@ def test_schema_discovery_from_config_request_rejects_unsaved_discovery_config()
 
 
 def test_schema_discovery_from_config_request_rejects_legacy_fields():
-    """The saved-config request rejects any legacy detection options — they live in the config."""
+    """The saved-config request rejects legacy detection options — they live in the config."""
     with pytest.raises(ValidationError):
         SchemaDiscoveryFromConfigRequest(
             connection="conn-1",
             discovery_config=DiscoveryConfigId(DISCOVERY_CONFIG_ID),
-            schemas=["public"],
+            custom_keywords=["foo"],
         )
+
+
+def test_schema_discovery_from_config_request_accepts_schemas():
+    """`schemas` scopes the saved-config schema run to specific schemas and is forwarded as-is."""
+    req = SchemaDiscoveryFromConfigRequest(
+        connection="conn-1",
+        discovery_config=DiscoveryConfigId(DISCOVERY_CONFIG_ID),
+        schemas=["public", "sales"],
+    )
+    assert req.model_dump(exclude_none=True, mode="json") == {
+        "connection": "conn-1",
+        "discovery_config": DISCOVERY_CONFIG_ID,
+        "schemas": ["public", "sales"],
+    }
 
 
 @pytest.mark.parametrize(
@@ -949,6 +963,22 @@ def test_start_schema_discovery_run_from_config_sends_discovery_config(client):
         assert client.start_schema_discovery_run_from_config(req) == 11
 
     assert m.last_request.json() == {"connection": "conn-1", "discovery_config": DISCOVERY_CONFIG_ID}
+
+
+def test_start_schema_discovery_run_from_config_sends_schemas(client):
+    """`start_schema_discovery_run_from_config` forwards a `schemas` scope to the saved-config endpoint."""
+    req = SchemaDiscoveryFromConfigRequest(
+        connection="conn-1", discovery_config=DiscoveryConfigId(DISCOVERY_CONFIG_ID), schemas=["public"]
+    )
+    with requests_mock.Mocker() as m:
+        m.post("http://test-server/api/schema-discovery/v2/", json={"id": 12}, status_code=201)
+        assert client.start_schema_discovery_run_from_config(req) == 12
+
+    assert m.last_request.json() == {
+        "connection": "conn-1",
+        "discovery_config": DISCOVERY_CONFIG_ID,
+        "schemas": ["public"],
+    }
 
 
 def test_start_file_data_discovery_run_from_config_sends_discovery_config(client):
