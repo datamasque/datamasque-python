@@ -40,6 +40,12 @@ class DataMasqueFile(BaseModel):
 
         raise NotImplementedError  # pragma: no cover
 
+    @classmethod
+    def get_extra_form_data(cls) -> dict[str, str]:
+        """Extra multipart form fields to send alongside the file on upload. Empty by default."""
+
+        return {}
+
 
 class SeedFile(DataMasqueFile):
     """Represents a seed file (CSV file)."""
@@ -75,6 +81,11 @@ class SslZipFile(DataMasqueFile):
     @classmethod
     def get_content_param_name(cls) -> str:
         return "zip_archive"
+
+    @classmethod
+    def get_extra_form_data(cls) -> dict[str, str]:
+        # The connection-filesets endpoint requires a database_type; SSL filesets are MySQL-only today.
+        return {"database_type": "mysql"}
 
 
 class SnowflakeKeyFile(DataMasqueFile):

@@ -3,7 +3,6 @@ import logging
 from datamasque.client.base import BaseClient
 from datamasque.client.exceptions import DataMasqueException
 from datamasque.client.models.ruleset import Ruleset, RulesetId
-from datamasque.client.models.status import ValidationStatus
 
 logger = logging.getLogger(__name__)
 
@@ -21,17 +20,18 @@ class RulesetClient(BaseClient):
         """
         Creates or updates a ruleset.
 
-        Populates the given ruleset's `id` and `is_valid` fields from the server response,
-        and returns the same ruleset instance for convenience.
+        Populates the given ruleset's `id`, `is_valid`, `validation_error`, `validation_error_type`,
+        and `git` fields from the server response, and returns the same ruleset instance for convenience.
         """
 
         data = ruleset.model_dump(exclude_none=True, by_alias=True, mode="json")
         response = self.make_request("POST", "/api/rulesets/", data=data, params={"upsert": "true"})
-        response_data = response.json()
-        ruleset.id = RulesetId(response_data["id"])
-        is_valid = response_data.get("is_valid")
-        if is_valid is not None:
-            ruleset.is_valid = ValidationStatus(is_valid)
+        created = Ruleset.model_validate(response.json())
+        ruleset.id = created.id
+        ruleset.is_valid = created.is_valid
+        ruleset.validation_error = created.validation_error
+        ruleset.validation_error_type = created.validation_error_type
+        ruleset.git = created.git
 
         if response.status_code == 201:
             logger.info('Creation of ruleset "%s" successful', ruleset.name)
