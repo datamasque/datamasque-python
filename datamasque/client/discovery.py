@@ -20,10 +20,12 @@ from datamasque.client.models.data_selection import (
     SelectedFileData,
 )
 from datamasque.client.models.discovery import (
+    FileDataDiscoveryFromConfigRequest,
     FileDataDiscoveryRequest,
     FileDiscoveryResult,
     FileRulesetGenerationRequest,
     RulesetGenerationRequest,
+    SchemaDiscoveryFromConfigRequest,
     SchemaDiscoveryPage,
     SchemaDiscoveryRequest,
     SchemaDiscoveryResult,
@@ -211,9 +213,7 @@ class DiscoveryClient(BaseClient):
             RunId: The ID of the started discovery run
 
         Raises:
-            InvalidDiscoveryConfigError: the run failed to start because the referenced
-                discovery config is missing, archived, or not in a `valid` validation state.
-            FailedToStartError: the run failed to start for any other reason.
+            FailedToStartError: If run fails to start
         """
 
         data = discovery_config.model_dump(exclude_none=True, mode="json")
@@ -223,14 +223,13 @@ class DiscoveryClient(BaseClient):
             data=data,
             require_status_check=False,
         )
-        run_data = response.json() if response.content else {}
+        run_data = response.json()
 
         if response.status_code == 201:
             logger.info("Schema discovery run %s started successfully", run_data["id"])
             return RunId(run_data["id"])
 
         logger.error("Schema discovery run failed to start: %s", run_data)
-        self._maybe_raise_discovery_config_error(run_data, response, "Schema discovery")
         raise FailedToStartError(
             f"Schema discovery run failed to start "
             f"(server responded with status {response.status_code}: {response.text}).",
@@ -248,15 +247,95 @@ class DiscoveryClient(BaseClient):
             RunId: The ID of the started discovery run
 
         Raises:
-            InvalidDiscoveryConfigError: the run failed to start because the referenced
-                discovery config is missing, archived, or not in a `valid` validation state.
-            FailedToStartError: the run failed to start for any other reason.
+            FailedToStartError: If run fails to start
         """
 
         data = request.model_dump(exclude_none=True, mode="json")
         response = self.make_request(
             "POST",
             "/api/run-file-data-discovery/",
+            data=data,
+            require_status_check=False,
+        )
+        run_data = response.json()
+
+        if response.status_code == 201:
+            logger.info("File data discovery run %s started successfully", run_data["id"])
+            return RunId(run_data["id"])
+
+        logger.error("File data discovery run failed to start: %s", run_data)
+        raise FailedToStartError(
+            f"File data discovery run failed to start "
+            f"(server responded with status {response.status_code}: {response.text}).",
+            response=response,
+        )
+
+    def start_schema_discovery_run_from_config(self, request: SchemaDiscoveryFromConfigRequest) -> RunId:
+        """
+        Starts a schema discovery run from a saved discovery config.
+
+        Args:
+            request: A `SchemaDiscoveryFromConfigRequest` with the `connection` and a required `discovery_config`
+                (a saved config, or `None` for the server's defaults).
+
+        Returns:
+            RunId: The ID of the started discovery run
+
+        Raises:
+            InvalidDiscoveryConfigError: the run failed to start because the referenced
+                discovery config is missing, archived, or not in a `valid` validation state.
+            FailedToStartError: the run failed to start for any other reason.
+        """
+
+        data = request.model_dump(exclude_none=True, mode="json")
+        # The server requires `discovery_config` to be present; a null selects its built-in defaults,
+        # so send it explicitly rather than letting `exclude_none` drop a None.
+        data.setdefault("discovery_config", None)
+        response = self.make_request(
+            "POST",
+            "/api/schema-discovery/v2/",
+            data=data,
+            require_status_check=False,
+        )
+        run_data = response.json() if response.content else {}
+
+        if response.status_code == 201:
+            logger.info("Schema discovery run %s started successfully", run_data["id"])
+            return RunId(run_data["id"])
+
+        logger.error("Schema discovery run failed to start: %s", run_data)
+        self._maybe_raise_discovery_config_error(run_data, response, "Schema discovery")
+        raise FailedToStartError(
+            f"Schema discovery run failed to start "
+            f"(server responded with status {response.status_code}: {response.text}).",
+            response=response,
+        )
+
+    def start_file_data_discovery_run_from_config(self, request: FileDataDiscoveryFromConfigRequest) -> RunId:
+        """
+        Starts a file data discovery run from a saved discovery config.
+
+        Args:
+            request: A `FileDataDiscoveryFromConfigRequest` with the `connection`,
+                a required `discovery_config` (a saved config, or `None` for the server's defaults),
+                and optional run `options`.
+
+        Returns:
+            RunId: The ID of the started discovery run
+
+        Raises:
+            InvalidDiscoveryConfigError: the run failed to start because the referenced
+                discovery config is missing, archived, or not in a `valid` validation state.
+            FailedToStartError: the run failed to start for any other reason.
+        """
+
+        data = request.model_dump(exclude_none=True, mode="json")
+        # The server requires `discovery_config` to be present; a null selects its built-in defaults,
+        # so send it explicitly rather than letting `exclude_none` drop a None.
+        data.setdefault("discovery_config", None)
+        response = self.make_request(
+            "POST",
+            "/api/run-file-data-discovery/v2/",
             data=data,
             require_status_check=False,
         )
