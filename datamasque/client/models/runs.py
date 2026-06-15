@@ -30,6 +30,7 @@ class MaskingRunOptions(BaseModel):
     if supplied,
     must be 16–256 characters and is used as the per-run encryption key;
     the server auto-generates one when omitted.
+    Set `auto_pull` to refresh the run's ruleset from git before the run starts.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -41,6 +42,10 @@ class MaskingRunOptions(BaseModel):
     diagnostic_logging: Optional[bool] = None
     run_secret: Optional[str] = Field(default=None, min_length=16, max_length=256)
     disable_instance_secret: Optional[bool] = None
+    auto_pull: Optional[bool] = None
+    """When `True`, pull the run's ruleset from git before starting."""
+    auto_pull_branch: Optional[str] = None
+    """Branch to auto-pull from; omitted or empty uses the instance's configured branch."""
 
 
 class MaskingRunRequest(BaseModel):
@@ -50,6 +55,9 @@ class MaskingRunRequest(BaseModel):
     `connection`, `destination_connection`, and `ruleset` accept either the server-assigned ID
     or the corresponding object returned by an earlier client call (e.g. a `ConnectionConfig`
     or `Ruleset`); the object's `id` is extracted at construction time.
+
+    Set `is_user_subscribed=True` to subscribe the requesting user to the run's email notifications;
+    when omitted the server applies its default (no subscription).
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -60,6 +68,7 @@ class MaskingRunRequest(BaseModel):
     destination_connection: Optional[Union[ConnectionId, ConnectionConfig]] = None
     options: MaskingRunOptions = Field(default_factory=MaskingRunOptions)
     name: Optional[str] = None
+    is_user_subscribed: Optional[bool] = None
 
     @field_validator("connection", "destination_connection", mode="before")
     @classmethod

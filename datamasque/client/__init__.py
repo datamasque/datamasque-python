@@ -87,6 +87,7 @@ from datamasque.client.models.files import (
     SnowflakeKeyFile,
     SslZipFile,
 )
+from datamasque.client.models.git import GitSnapshot
 from datamasque.client.models.ifm import (
     DataMasqueIfmInstanceConfig,
     IfmLog,
@@ -112,7 +113,12 @@ from datamasque.client.models.runs import (
     RunInfo,
     UnfinishedRun,
 )
-from datamasque.client.models.status import AsyncRulesetGenerationTaskStatus, MaskingRunStatus, ValidationStatus
+from datamasque.client.models.status import (
+    AsyncRulesetGenerationTaskStatus,
+    MaskingRunStatus,
+    ValidationErrorType,
+    ValidationStatus,
+)
 from datamasque.client.models.user import User, UserId, UserRole
 
 __version__ = version("datamasque-python")
@@ -157,6 +163,7 @@ __all__ = [
     "FileOrContent",
     "FileRulesetGenerationRequest",
     "ForeignKeyRef",
+    "GitSnapshot",
     "HashColumnsTableConfig",
     "IfmAuthError",
     "IfmLog",
@@ -219,5 +226,6 @@ __all__ = [
     "UserId",
     "UserRole",
     "UserSelection",
+    "ValidationErrorType",
     "ValidationStatus",
 ]
