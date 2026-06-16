@@ -1,5 +1,6 @@
 import logging
 import re
+from typing import Union
 
 from datamasque.client.base import BaseClient
 from datamasque.client.exceptions import (
@@ -43,9 +44,12 @@ class RunClient(BaseClient):
         response = self.make_request("GET", f"api/runs/{run_id}/run-report/")
         return response.text
 
-    def get_db_discovery_result_report(self, run_id: RunId, include_selection_column: bool = True) -> str:
+    def get_db_discovery_result_report(self, run_id: RunId, include_selection_column: bool = True) -> Union[str, bytes]:
         """
-        Returns the database-discovery result report for the specified run as CSV.
+        Returns the database-discovery result report for the specified run.
+
+        Returns CSV text (`str`),
+        or a zip of numbered CSV parts as `bytes` when the server splits a large report.
 
         When `include_selection_column` is true (the default),
         the CSV includes a `selected` column suitable for feeding back into ruleset generation.
@@ -54,6 +58,9 @@ class RunClient(BaseClient):
         url = f"api/runs/{run_id}/db-discovery-results/report/"
         params = None if include_selection_column else {"include_selection_column": "false"}
         response = self.make_request("GET", url, params=params)
+
+        if response.headers.get("Content-Type", "").startswith("application/zip"):
+            return response.content
         return response.text
 
     def get_unfinished_runs(self) -> dict[str, UnfinishedRun]:
