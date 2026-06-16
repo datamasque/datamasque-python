@@ -105,10 +105,15 @@ class DiscoveryClient(BaseClient):
         """
 
         content: BufferedIOBase
+        filename = "ruleset.csv"
+        content_type = "text/csv"
         if isinstance(csv_content, str):
             content = BytesIO(csv_content.encode())
         elif isinstance(csv_content, bytes):
             content = BytesIO(csv_content)
+            if csv_content[:4] == b"PK\x03\x04":
+                filename = "ruleset.zip"
+                content_type = "application/zip"
         elif isinstance(csv_content, TextIOBase):
             content = BytesIO(csv_content.read().encode())
         else:
@@ -117,11 +122,12 @@ class DiscoveryClient(BaseClient):
         files = [
             UploadFile(
                 field_name="csv_or_zip_file",
-                filename="ruleset.csv",
+                filename=filename,
                 content=content,
-                content_type="text/csv",
+                content_type=content_type,
             ),
         ]
+
         self.make_request(
             method="POST",
             path=f"/api/async-generate-ruleset/{connection_id}/from-csv/",

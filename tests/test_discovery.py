@@ -108,6 +108,17 @@ def test_get_db_discovery_result_report(client):
         assert result == "db discovery report without selection column"
 
 
+def test_get_db_discovery_result_report_returns_zip_bytes_when_split(client):
+    run_id = RunId(1)
+    zip_bytes = b"PK\x03\x04 split report zip bytes"
+    with requests_mock.Mocker() as m:
+        url = f"http://test-server/api/runs/{run_id}/db-discovery-results/report/"
+        m.get(url, content=zip_bytes, headers={"X-DM-Download-Format": "zip"}, status_code=200)
+        result = client.get_db_discovery_result_report(run_id)
+        assert result == zip_bytes
+        assert isinstance(result, bytes)
+
+
 def test_poll_async_ruleset_generation(client):
     connection_id = ConnectionId("1")
     with requests_mock.Mocker() as m:
@@ -461,6 +472,24 @@ def test_start_async_ruleset_generation_from_csv_success(client, csv_content):
         assert form_data["csv_or_zip_file"]["filename"] == "ruleset.csv"
         assert form_data["csv_or_zip_file"]["content_type"] == "text/csv"
         assert form_data["csv_or_zip_file"]["content"] == b"schema,table,column,selected\npublic,users,email,true"
+
+
+def test_start_async_ruleset_generation_from_csv_uploads_zip_as_zip(client):
+    """A split report (zip bytes) is uploaded with a .zip filename and zip content-type."""
+    connection_id = ConnectionId("1")
+    zip_content = b"PK\x03\x04 zipped discovery report"
+
+    with requests_mock.Mocker() as m:
+        m.post(
+            f"http://test-server/api/async-generate-ruleset/{connection_id}/from-csv/",
+            status_code=201,
+        )
+        client.start_async_ruleset_generation_from_csv(connection_id, zip_content)
+
+        form_data = parse_multipart_form(m.last_request)
+        assert form_data["csv_or_zip_file"]["filename"] == "ruleset.zip"
+        assert form_data["csv_or_zip_file"]["content_type"] == "application/zip"
+        assert form_data["csv_or_zip_file"]["content"] == zip_content
 
 
 def test_start_async_ruleset_generation_from_csv_with_target_size(client):
