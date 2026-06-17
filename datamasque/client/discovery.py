@@ -283,7 +283,8 @@ class DiscoveryClient(BaseClient):
 
         Raises:
             InvalidDiscoveryConfigError: the run failed to start because the referenced
-                discovery config is missing, archived, or not in a `valid` validation state.
+                discovery config is missing, archived, not in a `valid` validation state,
+                or carries YAML the server rejects at trigger time.
             FailedToStartError: the run failed to start for any other reason.
         """
 
@@ -325,7 +326,8 @@ class DiscoveryClient(BaseClient):
 
         Raises:
             InvalidDiscoveryConfigError: the run failed to start because the referenced
-                discovery config is missing, archived, or not in a `valid` validation state.
+                discovery config is missing, archived, not in a `valid` validation state,
+                or carries YAML the server rejects at trigger time.
             FailedToStartError: the run failed to start for any other reason.
         """
 
@@ -353,18 +355,35 @@ class DiscoveryClient(BaseClient):
             response=response,
         )
 
-    @staticmethod
-    def _maybe_raise_discovery_config_error(run_data: object, response: Response, run_kind: str) -> None:
-        """Raise `InvalidDiscoveryConfigError` if the server's 400 body cites `discovery_config`."""
-        if not isinstance(run_data, dict) or "discovery_config" not in run_data:
+    # Server keys for a 400 that means the discovery config itself is unusable.
+    # `discovery_config` covers a missing/archived config or a non-`valid` validation state
+    # (string messages);
+    # `config_yaml` covers re-validation of broken saved-config YAML at trigger time
+    # (a `{"message", "line_number", "column_number"}` dict per error).
+    DISCOVERY_CONFIG_ERROR_FIELDS = ("discovery_config", "config_yaml")
+
+    @classmethod
+    def _maybe_raise_discovery_config_error(cls, run_data: object, response: Response, run_kind: str) -> None:
+        """Raise `InvalidDiscoveryConfigError` if the server's 400 body cites the discovery config."""
+        if not isinstance(run_data, dict):
             return
 
-        errors = run_data["discovery_config"]
-        detail = errors[0] if isinstance(errors, list) and errors else str(errors)
-        raise InvalidDiscoveryConfigError(
-            f"{run_kind} run failed to start due to discovery config error: {detail}",
-            response=response,
-        )
+        for field in cls.DISCOVERY_CONFIG_ERROR_FIELDS:
+            if field in run_data:
+                detail = cls._format_discovery_config_error(run_data[field])
+                raise InvalidDiscoveryConfigError(
+                    f"{run_kind} run failed to start due to discovery config error: {detail}",
+                    response=response,
+                )
+
+    @staticmethod
+    def _format_discovery_config_error(errors: object) -> str:
+        """Render the first server error, handling both string and `{message, ...}` dict items."""
+        first = errors[0] if isinstance(errors, list) and errors else errors
+        if isinstance(first, dict) and "message" in first:
+            return str(first["message"])
+
+        return str(first)
 
     def iter_schema_discovery_results(self, run_id: RunId) -> Iterator[SchemaDiscoveryResult]:
         """Lazily iterate all schema discovery results for a run via the paginated v2 endpoint."""

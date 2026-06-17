@@ -1058,6 +1058,33 @@ def test_start_schema_discovery_run_from_config_raises_invalid_discovery_config_
             )
 
 
+def test_start_schema_discovery_run_from_config_raises_invalid_discovery_config_on_broken_yaml(client):
+    """
+    A 400 keyed under `config_yaml` (trigger-time re-validation of broken saved YAML) is classified.
+
+    The server reports these as `{"message", "line_number", "column_number"}` dicts, not strings.
+    """
+    with requests_mock.Mocker() as m:
+        m.post(
+            "http://test-server/api/schema-discovery/v2/",
+            json={
+                "config_yaml": [
+                    {"message": "Unknown mask 'no_such_mask'.", "line_number": 4, "column_number": 7},
+                ],
+            },
+            status_code=400,
+        )
+        with pytest.raises(
+            InvalidDiscoveryConfigError,
+            match=r"Schema discovery run failed to start due to discovery config error: Unknown mask 'no_such_mask'\.",
+        ):
+            client.start_schema_discovery_run_from_config(
+                SchemaDiscoveryFromConfigRequest(
+                    connection="conn-1", discovery_config=DiscoveryConfigId(DISCOVERY_CONFIG_ID)
+                ),
+            )
+
+
 def test_start_file_data_discovery_run_from_config_raises_invalid_discovery_config(client):
     with requests_mock.Mocker() as m:
         m.post(
