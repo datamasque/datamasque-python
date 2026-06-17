@@ -616,3 +616,123 @@ def test_list_rulesets_using_library_pagination(client: DataMasqueClient) -> Non
     assert rulesets[0].name == "r1"
     assert rulesets[1].name == "r2"
     assert rulesets[2].name == "r3"
+
+
+def test_create_ruleset_library_populates_validation_error(
+    client: DataMasqueClient, ruleset_library: RulesetLibrary
+) -> None:
+    """The server's `validation_error` string is surfaced on the returned library."""
+    create_response = {
+        "id": LIBRARY_ID_1,
+        "name": "test_library",
+        "namespace": "test_ns",
+        "config_yaml": "version: '1.0'\nfunctions: []",
+        "is_valid": "invalid",
+        "validation_error": "Invalid function definition",
+        "created": "2025-06-01T10:00:00Z",
+        "modified": "2025-06-01T10:00:00Z",
+    }
+
+    with requests_mock.Mocker() as m:
+        m.post(
+            "http://test-server/api/ruleset-libraries/",
+            json=create_response,
+            status_code=201,
+        )
+        result = client.create_ruleset_library(ruleset_library)
+
+    assert result.validation_error == "Invalid function definition"
+
+
+def test_update_ruleset_library_populates_validation_error(
+    client: DataMasqueClient, ruleset_library: RulesetLibrary
+) -> None:
+    """A full update also surfaces the server's `validation_error` string."""
+    ruleset_library.id = RulesetLibraryId(LIBRARY_ID_1)
+    update_response = {
+        "id": LIBRARY_ID_1,
+        "name": "test_library",
+        "namespace": "test_ns",
+        "config_yaml": "version: '1.0'\nfunctions: []",
+        "is_valid": "invalid",
+        "validation_error": "Invalid function definition",
+        "created": "2025-06-01T10:00:00Z",
+        "modified": "2025-06-02T10:00:00Z",
+    }
+
+    with requests_mock.Mocker() as m:
+        m.put(
+            f"http://test-server/api/ruleset-libraries/{LIBRARY_ID_1}/",
+            json=update_response,
+            status_code=200,
+        )
+        result = client.update_ruleset_library(ruleset_library)
+
+    assert result.validation_error == "Invalid function definition"
+
+
+def test_create_ruleset_library_does_not_send_read_only_fields(
+    client: DataMasqueClient, ruleset_library: RulesetLibrary
+) -> None:
+    """Read-only server fields must never appear in the create request body."""
+    ruleset_library.id = RulesetLibraryId(LIBRARY_ID_1)
+    ruleset_library.is_valid = ValidationStatus.invalid
+    ruleset_library.validation_error = "stale error"
+    create_response = {
+        "id": LIBRARY_ID_1,
+        "name": "test_library",
+        "namespace": "test_ns",
+        "config_yaml": "version: '1.0'\nfunctions: []",
+        "is_valid": "invalid",
+        "validation_error": "Invalid function definition",
+        "created": "2025-06-01T10:00:00Z",
+        "modified": "2025-06-01T10:00:00Z",
+    }
+
+    with requests_mock.Mocker() as m:
+        m.post(
+            "http://test-server/api/ruleset-libraries/",
+            json=create_response,
+            status_code=201,
+        )
+        client.create_ruleset_library(ruleset_library)
+
+    body = m.last_request.json()
+    for read_only_field in ("id", "is_valid", "validation_error", "created", "modified"):
+        assert read_only_field not in body
+    # Input fields are still present.
+    assert body["name"] == "test_library"
+    assert body["config_yaml"] == "version: '1.0'\nfunctions: []"
+
+
+def test_create_ruleset_library_collapses_git_snapshot(
+    client: DataMasqueClient, ruleset_library: RulesetLibrary
+) -> None:
+    """The server's flat `git_*` fields are collapsed into a nested `git` snapshot on the library."""
+    create_response = {
+        "id": LIBRARY_ID_1,
+        "name": "test_library",
+        "namespace": "test_ns",
+        "config_yaml": "version: '1.0'\nfunctions: []",
+        "is_valid": "valid",
+        "git_branch": "main",
+        "git_commit_sha": "abc123",
+        "git_repo_url": "https://git.example.com/repo.git",
+        "git_synced_at": "2025-06-01T10:00:00Z",
+        "created": "2025-06-01T10:00:00Z",
+        "modified": "2025-06-01T10:00:00Z",
+    }
+
+    with requests_mock.Mocker() as m:
+        m.post(
+            "http://test-server/api/ruleset-libraries/",
+            json=create_response,
+            status_code=201,
+        )
+        result = client.create_ruleset_library(ruleset_library)
+
+    assert result.git is not None
+    assert result.git.branch == "main"
+    assert result.git.commit_sha == "abc123"
+    assert result.git.repo_url == "https://git.example.com/repo.git"
+    assert result.git.synced_at == datetime.fromisoformat("2025-06-01T10:00:00+00:00")

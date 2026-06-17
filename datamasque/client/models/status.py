@@ -10,6 +10,15 @@ class ValidationStatus(enum.Enum):
     unknown = "unknown"
 
 
+class ValidationErrorType(enum.Enum):
+    """Categorises why a ruleset failed validation (see `Ruleset.validation_error_type`)."""
+
+    ruleset = "ruleset"
+    library_missing = "library_missing"
+    library_invalid = "library_invalid"
+    expansion = "expansion"  # The ruleset is not valid once its library references are expanded.
+
+
 class MaskingRunStatus(enum.Enum):
     """List of valid masking run statuses."""
 

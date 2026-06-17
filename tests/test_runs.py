@@ -161,6 +161,53 @@ def test_start_masking_run(client):
         assert client.start_masking_run(MaskingRunRequest(connection="1", ruleset="rs-1", name=fake.word())) == "1"
 
 
+def test_start_masking_run_sends_is_user_subscribed_when_set(client):
+    """`is_user_subscribed=True` is sent top-level so the server subscribes the requesting user to the run."""
+    with requests_mock.Mocker() as m:
+        m.post("http://test-server/api/runs/", json={"id": "1", "name": "r"}, status_code=201)
+        client.start_masking_run(MaskingRunRequest(connection="1", ruleset="rs-1", name="r", is_user_subscribed=True))
+
+    assert m.last_request.json()["is_user_subscribed"] is True
+
+
+def test_start_masking_run_omits_is_user_subscribed_by_default(client):
+    """An unset `is_user_subscribed` is excluded from the request body rather than sent as null."""
+    with requests_mock.Mocker() as m:
+        m.post("http://test-server/api/runs/", json={"id": "1", "name": "r"}, status_code=201)
+        client.start_masking_run(MaskingRunRequest(connection="1", ruleset="rs-1", name="r"))
+
+    assert "is_user_subscribed" not in m.last_request.json()
+
+
+def test_start_masking_run_sends_auto_pull_options(client):
+    """`auto_pull` / `auto_pull_branch` are sent inside `options` so the server refreshes the ruleset from git."""
+    with requests_mock.Mocker() as m:
+        m.post("http://test-server/api/runs/", json={"id": "1", "name": "r"}, status_code=201)
+        client.start_masking_run(
+            MaskingRunRequest(
+                connection="1",
+                ruleset="rs-1",
+                name="r",
+                options=MaskingRunOptions(auto_pull=True, auto_pull_branch="main"),
+            )
+        )
+
+    options = m.last_request.json()["options"]
+    assert options["auto_pull"] is True
+    assert options["auto_pull_branch"] == "main"
+
+
+def test_start_masking_run_omits_auto_pull_options_by_default(client):
+    """Unset auto-pull options are excluded from the request body rather than sent as null."""
+    with requests_mock.Mocker() as m:
+        m.post("http://test-server/api/runs/", json={"id": "1", "name": "r"}, status_code=201)
+        client.start_masking_run(MaskingRunRequest(connection="1", ruleset="rs-1", name="r"))
+
+    options = m.last_request.json()["options"]
+    assert "auto_pull" not in options
+    assert "auto_pull_branch" not in options
+
+
 def test_start_masking_run_invalid_ruleset(client):
     with requests_mock.Mocker() as m:
         m.post(

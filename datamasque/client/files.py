@@ -30,7 +30,7 @@ class FileClient(BaseClient):
         response = self.make_request(
             "POST",
             file_type.get_url(),
-            data={"name": file_name},
+            data={"name": file_name, **file_type.get_extra_form_data()},
             files=[
                 UploadFile(
                     field_name=file_type.get_content_param_name(),

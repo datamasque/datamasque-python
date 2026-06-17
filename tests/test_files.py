@@ -271,3 +271,42 @@ def test_upload_file_retries_on_401(config):
             second_form = parse_multipart_form(m_request.request_history[1])
             assert first_form["seed_file"]["content"] == b"seed content"
             assert second_form["seed_file"]["content"] == b"seed content"
+
+
+def test_upload_ssl_zip_file_sends_mysql_database_type(client):
+    """`SslZipFile` uploads must include `database_type=mysql`; the connection-filesets endpoint requires it."""
+    with requests_mock.Mocker() as m_request:
+        m_request.post(
+            f"http://test-server/{SslZipFile.get_url()}",
+            status_code=201,
+            json={
+                "id": str(uuid.uuid4()),
+                "name": "certs.zip",
+                "created_date": "2024-01-01T00:00:00.000000Z",
+                "modified_date": "2024-01-01T00:00:00.000000Z",
+            },
+        )
+        client.upload_file(SslZipFile, "certs.zip", b"zip bytes")
+
+    form = parse_multipart_form(m_request.request_history[0])
+    assert form["database_type"] == "mysql"
+
+
+@pytest.mark.parametrize("file_type", [SeedFile, OracleWalletFile, SnowflakeKeyFile])
+def test_upload_non_ssl_zip_file_omits_database_type(client, file_type):
+    """Only `SslZipFile` carries the `database_type` form field; other file types must not send it."""
+    with requests_mock.Mocker() as m_request:
+        m_request.post(
+            f"http://test-server/{file_type.get_url()}",
+            status_code=201,
+            json={
+                "id": str(uuid.uuid4()),
+                "name": "file.bin",
+                "created_date": "2024-01-01T00:00:00.000000Z",
+                "modified_date": "2024-01-01T00:00:00.000000Z",
+            },
+        )
+        client.upload_file(file_type, "file.bin", b"content")
+
+    form = parse_multipart_form(m_request.request_history[0])
+    assert "database_type" not in form
