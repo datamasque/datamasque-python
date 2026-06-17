@@ -2,6 +2,11 @@
 History
 =======
 
+1.0.5 (2026-06-18)
+------------------
+
+* Renamed the ``DatabaseType.sql_server`` member to ``DatabaseType.mssql`` to match the DataMasque server's wire value and the sibling ``mssql_linked`` member. The value is unchanged (``"mssql"``).
+
 1.0.4 (2026-06-09)
 ------------------
 
