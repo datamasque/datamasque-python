@@ -36,7 +36,7 @@ class DatabaseType(Enum):
     mysql = "mysql"
     oracle = "oracle"
     mariadb = "mariadb"
-    sql_server = "mssql"
+    mssql = "mssql"
     redshift = "redshift"
     dynamodb = "dynamo_db"
     db2_luw = "db2_luw"
