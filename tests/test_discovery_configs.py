@@ -29,6 +29,7 @@ def sample_config_list_response() -> dict[str, Any]:
             {
                 "id": CONFIG_ID_1,
                 "name": "my_config",
+                "config_type": "database",
                 "archived": False,
                 "created": "2025-01-01T12:00:00Z",
                 "modified": "2025-01-02T12:00:00Z",
@@ -36,6 +37,7 @@ def sample_config_list_response() -> dict[str, Any]:
             {
                 "id": CONFIG_ID_2,
                 "name": "another_config",
+                "config_type": "database",
                 "archived": False,
                 "created": "2025-02-01T12:00:00Z",
                 "modified": "2025-02-02T12:00:00Z",
@@ -50,6 +52,7 @@ def sample_config_detail_response() -> dict[str, Any]:
         "id": CONFIG_ID_1,
         "name": "my_config",
         "config_yaml": "labels: []\nmetadata_rules: []\nidd_rules: []\n",
+        "config_type": "database",
         "archived": False,
         "created": "2025-01-01T12:00:00Z",
         "modified": "2025-01-02T12:00:00Z",
@@ -61,6 +64,7 @@ def discovery_config() -> DiscoveryConfig:
     return DiscoveryConfig(
         name="test_config",
         yaml="labels: []\nmetadata_rules: []\nidd_rules: []\n",
+        config_type="database",
     )
 
 
@@ -89,6 +93,7 @@ def test_list_discovery_configs_pagination(client: DataMasqueClient) -> None:
             {
                 "id": CONFIG_ID_1,
                 "name": "c1",
+                "config_type": "database",
                 "archived": False,
                 "created": "2025-01-01T12:00:00Z",
                 "modified": "2025-01-01T12:00:00Z",
@@ -96,6 +101,7 @@ def test_list_discovery_configs_pagination(client: DataMasqueClient) -> None:
             {
                 "id": CONFIG_ID_2,
                 "name": "c2",
+                "config_type": "database",
                 "archived": False,
                 "created": "2025-01-01T12:00:00Z",
                 "modified": "2025-01-01T12:00:00Z",
@@ -110,6 +116,7 @@ def test_list_discovery_configs_pagination(client: DataMasqueClient) -> None:
             {
                 "id": "cccccccc-1111-2222-3333-444444444444",
                 "name": "c3",
+                "config_type": "database",
                 "archived": False,
                 "created": "2025-01-01T12:00:00Z",
                 "modified": "2025-01-01T12:00:00Z",
@@ -162,6 +169,7 @@ def test_get_discovery_config_by_name_found(
             {
                 "id": CONFIG_ID_1,
                 "name": "my_config",
+                "config_type": "database",
                 "archived": False,
                 "created": "2025-01-01T12:00:00Z",
                 "modified": "2025-01-02T12:00:00Z",
@@ -209,6 +217,7 @@ def test_get_discovery_config_by_name_raises_when_server_omits_id(client: DataMa
         "results": [
             {
                 "name": "my_config",
+                "config_type": "database",
                 "archived": False,
                 "created": "2025-01-01T12:00:00Z",
                 "modified": "2025-01-02T12:00:00Z",
@@ -231,6 +240,7 @@ def test_create_discovery_config(client: DataMasqueClient, discovery_config: Dis
         "id": CONFIG_ID_1,
         "name": "test_config",
         "config_yaml": "labels: []\nmetadata_rules: []\nidd_rules: []\n",
+        "config_type": "database",
         "archived": False,
         "created": "2025-06-01T10:00:00Z",
         "modified": "2025-06-01T10:00:00Z",
@@ -252,6 +262,7 @@ def test_create_discovery_config(client: DataMasqueClient, discovery_config: Dis
     request_body = m.last_request.json()
     assert request_body["name"] == "test_config"
     assert request_body["config_yaml"] == "labels: []\nmetadata_rules: []\nidd_rules: []\n"
+    assert request_body["config_type"] == "database"
 
 
 def test_update_discovery_config(client: DataMasqueClient, discovery_config: DiscoveryConfig) -> None:
@@ -261,6 +272,7 @@ def test_update_discovery_config(client: DataMasqueClient, discovery_config: Dis
         "id": CONFIG_ID_1,
         "name": "test_config",
         "config_yaml": "labels: []\nmetadata_rules: []\nidd_rules: []\n",
+        "config_type": "database",
         "archived": False,
         "created": "2025-06-01T10:00:00Z",
         "modified": "2025-06-02T10:00:00Z",
@@ -293,6 +305,7 @@ def test_create_or_update_discovery_config_create(client: DataMasqueClient, disc
         "id": CONFIG_ID_1,
         "name": "test_config",
         "config_yaml": "labels: []\nmetadata_rules: []\nidd_rules: []\n",
+        "config_type": "database",
         "archived": False,
         "created": "2025-06-01T10:00:00Z",
         "modified": "2025-06-01T10:00:00Z",
@@ -317,6 +330,7 @@ def test_create_or_update_discovery_config_update(client: DataMasqueClient, disc
             {
                 "id": CONFIG_ID_1,
                 "name": "test_config",
+                "config_type": "database",
                 "archived": False,
                 "created": "2025-06-01T10:00:00Z",
                 "modified": "2025-06-01T10:00:00Z",
@@ -327,6 +341,7 @@ def test_create_or_update_discovery_config_update(client: DataMasqueClient, disc
         "id": CONFIG_ID_1,
         "name": "test_config",
         "config_yaml": "labels: []",
+        "config_type": "database",
         "archived": False,
         "created": "2025-06-01T10:00:00Z",
         "modified": "2025-06-01T10:00:00Z",
@@ -335,6 +350,7 @@ def test_create_or_update_discovery_config_update(client: DataMasqueClient, disc
         "id": CONFIG_ID_1,
         "name": "test_config",
         "config_yaml": "labels: []\nmetadata_rules: []\nidd_rules: []\n",
+        "config_type": "database",
         "archived": False,
         "created": "2025-06-01T10:00:00Z",
         "modified": "2025-06-02T10:00:00Z",
@@ -403,6 +419,7 @@ def test_delete_discovery_config_by_name_raises_when_server_omits_id(client: Dat
         "results": [
             {
                 "name": "my_config",
+                "config_type": "database",
                 "archived": False,
                 "created": "2025-01-01T12:00:00Z",
                 "modified": "2025-01-02T12:00:00Z",
@@ -441,6 +458,7 @@ def test_discovery_config_parses_validation_fields() -> None:
         {
             "id": CONFIG_ID_1,
             "name": "my_config",
+            "config_type": "database",
             "config_yaml": "labels: []",
             "is_valid": "invalid",
             "validation_error": "bad shape on line 3",
@@ -459,6 +477,7 @@ def test_discovery_config_validation_fields_optional() -> None:
         {
             "id": CONFIG_ID_1,
             "name": "my_config",
+            "config_type": "database",
             "created": "2025-01-01T12:00:00Z",
             "modified": "2025-01-02T12:00:00Z",
         }
@@ -474,11 +493,11 @@ def test_unwrap_discovery_config_id_passes_through_strings() -> None:
 
 
 def test_unwrap_discovery_config_id_extracts_id_from_model() -> None:
-    config = DiscoveryConfig(name="x", id=DiscoveryConfigId(CONFIG_ID_1))
+    config = DiscoveryConfig(name="x", config_type="database", id=DiscoveryConfigId(CONFIG_ID_1))
     assert unwrap_discovery_config_id(config) == CONFIG_ID_1
 
 
 def test_unwrap_discovery_config_id_raises_without_id() -> None:
-    config = DiscoveryConfig(name="x")
+    config = DiscoveryConfig(name="x", config_type="database")
     with pytest.raises(ValueError, match="id is None"):
         unwrap_discovery_config_id(config)

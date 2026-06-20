@@ -1,3 +1,4 @@
+import enum
 from datetime import datetime
 from typing import Any, NewType, Optional
 
@@ -6,6 +7,13 @@ from pydantic import BaseModel, ConfigDict, Field
 from datamasque.client.models.status import ValidationStatus
 
 DiscoveryConfigId = NewType("DiscoveryConfigId", str)
+
+
+class DiscoveryConfigType(enum.Enum):
+    """Which discovery config variant a config targets: database (qualified columns) or file (locators)."""
+
+    database = "database"
+    file = "file"
 
 
 def unwrap_discovery_config_id(value: Any) -> Any:
@@ -33,11 +41,13 @@ class DiscoveryConfig(BaseModel):
 
     name: str
     yaml: Optional[str] = Field(default=None, alias="config_yaml")
-    id: Optional[DiscoveryConfigId] = None
-    # Server-managed validation surface, populated by the DataMasque server.
-    # `is_valid` may be `in_progress` immediately after creating a large config,
-    # transitioning to `valid` or `invalid` once the server finishes validating.
-    is_valid: Optional[ValidationStatus] = None
-    validation_error: Optional[str] = None
-    created: Optional[datetime] = None
-    modified: Optional[datetime] = None
+    config_type: DiscoveryConfigType
+
+    # Server-populated read-only fields, excluded from request bodies.
+    id: Optional[DiscoveryConfigId] = Field(default=None, exclude=True)
+    is_valid: Optional[ValidationStatus] = Field(default=None, exclude=True)
+    """Validation status; may be `in_progress` briefly after creating a large config."""
+    validation_error: Optional[str] = Field(default=None, exclude=True)
+    """Human-readable validation error, or `None` when valid."""
+    created: Optional[datetime] = Field(default=None, exclude=True)
+    modified: Optional[datetime] = Field(default=None, exclude=True)

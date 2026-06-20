@@ -10,6 +10,7 @@ from datamasque.client.base import BaseClient, UploadFile
 from datamasque.client.exceptions import (
     AsyncRulesetGenerationInProgressError,
     DataMasqueException,
+    DiscoveryConfigNotFoundError,
     FailedToStartError,
     InvalidDiscoveryConfigError,
 )
@@ -282,9 +283,10 @@ class DiscoveryClient(BaseClient):
             RunId: The ID of the started discovery run
 
         Raises:
-            InvalidDiscoveryConfigError: the run failed to start because the referenced
-                discovery config is missing, archived, not in a `valid` validation state,
-                or carries YAML the server rejects at trigger time.
+            DiscoveryConfigNotFoundError: the referenced discovery config cannot be found
+                (it does not exist or is the wrong type for the run).
+            InvalidDiscoveryConfigError: the config is present but not in a `valid` validation state,
+                or its YAML is rejected when the run starts.
             FailedToStartError: the run failed to start for any other reason.
         """
 
@@ -325,9 +327,10 @@ class DiscoveryClient(BaseClient):
             RunId: The ID of the started discovery run
 
         Raises:
-            InvalidDiscoveryConfigError: the run failed to start because the referenced
-                discovery config is missing, archived, not in a `valid` validation state,
-                or carries YAML the server rejects at trigger time.
+            DiscoveryConfigNotFoundError: the referenced discovery config cannot be found
+                (it does not exist or is the wrong type for the run).
+            InvalidDiscoveryConfigError: the config is present but not in a `valid` validation state,
+                or its YAML is rejected when the run starts.
             FailedToStartError: the run failed to start for any other reason.
         """
 
@@ -355,26 +358,35 @@ class DiscoveryClient(BaseClient):
             response=response,
         )
 
-    # Server key for a 400 that means the discovery config itself is unusable.
-    # `discovery_config` covers a missing/archived config or a non-`valid` validation state
-    # (string messages),
-    # and re-validation of broken saved-config YAML at trigger time
-    # (a `{"message", "line_number", "column_number"}` dict per error).
-    DISCOVERY_CONFIG_ERROR_FIELDS = ("discovery_config",)
+    # Server key for a 400 that means the discovery config itself is unusable:
+    # a missing or wrong-type config, or one not in a `valid` validation state (string messages),
+    # or re-validation of broken saved-config YAML when the run starts
+    # (a `{"message", "line_number", "column_number"}` dict).
+    DISCOVERY_CONFIG_ERROR_FIELD = "discovery_config"
+
+    # The phrase the server uses when the config id cannot be resolved (a missing or wrong-type config).
+    MISSING_DISCOVERY_CONFIG_SIGNATURE = "object does not exist"
 
     @classmethod
     def _maybe_raise_discovery_config_error(cls, run_data: object, response: Response, run_kind: str) -> None:
-        """Raise `InvalidDiscoveryConfigError` if the server's 400 body cites the discovery config."""
+        """Raise a discovery-config error if the server's 400 body cites the discovery config."""
         if not isinstance(run_data, dict):
             return
 
-        for field in cls.DISCOVERY_CONFIG_ERROR_FIELDS:
-            if field in run_data:
-                detail = cls._format_discovery_config_error(run_data[field])
-                raise InvalidDiscoveryConfigError(
-                    f"{run_kind} run failed to start due to discovery config error: {detail}",
-                    response=response,
-                )
+        if not (errors := run_data.get(cls.DISCOVERY_CONFIG_ERROR_FIELD)):
+            return
+
+        detail = cls._format_discovery_config_error(errors)
+        if cls.MISSING_DISCOVERY_CONFIG_SIGNATURE in detail:
+            raise DiscoveryConfigNotFoundError(
+                f"{run_kind} run failed to start: the referenced discovery config could not be found: {detail}",
+                response=response,
+            )
+
+        raise InvalidDiscoveryConfigError(
+            f"{run_kind} run failed to start due to discovery config error: {detail}",
+            response=response,
+        )
 
     @staticmethod
     def _format_discovery_config_error(errors: object) -> str:

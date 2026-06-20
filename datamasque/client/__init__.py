@@ -17,6 +17,7 @@ from datamasque.client.exceptions import (
     DataMasqueNotReadyError,
     DataMasqueTransportError,
     DataMasqueUserError,
+    DiscoveryConfigNotFoundError,
     FailedToStartError,
     IfmAuthError,
     InvalidDiscoveryConfigError,
@@ -77,7 +78,7 @@ from datamasque.client.models.discovery import (
     SchemaDiscoveryResult,
     TableConstraints,
 )
-from datamasque.client.models.discovery_config import DiscoveryConfig, DiscoveryConfigId
+from datamasque.client.models.discovery_config import DiscoveryConfig, DiscoveryConfigId, DiscoveryConfigType
 from datamasque.client.models.dm_instance import DataMasqueInstanceConfig
 from datamasque.client.models.files import (
     DataMasqueFile,
@@ -146,6 +147,8 @@ __all__ = [
     "DatabricksConnectionConfig",
     "DiscoveryConfig",
     "DiscoveryConfigId",
+    "DiscoveryConfigNotFoundError",
+    "DiscoveryConfigType",
     "DiscoveryMatch",
     "DynamoConnectionConfig",
     "FailedToStartError",

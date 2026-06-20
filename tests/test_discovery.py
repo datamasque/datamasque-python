@@ -30,6 +30,7 @@ from datamasque.client.exceptions import (
     AsyncRulesetGenerationInProgressError,
     DataMasqueApiError,
     DataMasqueException,
+    DiscoveryConfigNotFoundError,
     FailedToStartError,
     InvalidDiscoveryConfigError,
 )
@@ -873,14 +874,14 @@ def test_schema_discovery_from_config_request_accepts_discovery_config_id():
 
 def test_schema_discovery_from_config_request_unwraps_discovery_config_model():
     """Passing a full `DiscoveryConfig` object substitutes its `id` for the wire payload."""
-    config = DiscoveryConfig(name="my_cfg", id=DiscoveryConfigId(DISCOVERY_CONFIG_ID))
+    config = DiscoveryConfig(name="my_cfg", config_type="database", id=DiscoveryConfigId(DISCOVERY_CONFIG_ID))
     req = SchemaDiscoveryFromConfigRequest(connection="conn-1", discovery_config=config)
     assert req.model_dump(exclude_none=True, mode="json")["discovery_config"] == DISCOVERY_CONFIG_ID
 
 
 def test_schema_discovery_from_config_request_rejects_unsaved_discovery_config():
     """A `DiscoveryConfig` without an `id` cannot be used yet — raises immediately."""
-    config = DiscoveryConfig(name="my_cfg")
+    config = DiscoveryConfig(name="my_cfg", config_type="database")
     with pytest.raises(ValueError, match="id is None"):
         SchemaDiscoveryFromConfigRequest(connection="conn-1", discovery_config=config)
 
@@ -983,7 +984,7 @@ def test_start_schema_discovery_run_from_config_sends_schemas(client):
 
 def test_start_file_data_discovery_run_from_config_sends_discovery_config(client):
     """`start_file_data_discovery_run_from_config` posts only the connection and discovery_config id."""
-    config = DiscoveryConfig(name="my_cfg", id=DiscoveryConfigId(DISCOVERY_CONFIG_ID))
+    config = DiscoveryConfig(name="my_cfg", config_type="file", id=DiscoveryConfigId(DISCOVERY_CONFIG_ID))
     req = FileDataDiscoveryFromConfigRequest(connection="conn-1", discovery_config=config)
     with requests_mock.Mocker() as m:
         m.post("http://test-server/api/run-file-data-discovery/v2/", json={"id": 99}, status_code=201)
@@ -1051,17 +1052,41 @@ def test_start_schema_discovery_run_from_config_raises_invalid_discovery_config_
             )
 
 
-def test_start_schema_discovery_run_from_config_raises_invalid_discovery_config_when_missing(client):
-    """A 400 from DRF's PrimaryKeyRelatedField (config not found / archived) is also classified."""
+def test_start_schema_discovery_run_from_config_raises_not_found_when_missing(client):
+    """
+    A 400 for a config that cannot be found raises `DiscoveryConfigNotFoundError`.
+
+    This is a bad reference rather than an unusable-but-present config,
+    so it must not be conflated with `InvalidDiscoveryConfigError`.
+    The not-found subclass still inherits `FailedToStartError` for callers that catch the base.
+    """
     with requests_mock.Mocker() as m:
         m.post(
             "http://test-server/api/schema-discovery/v2/",
             json={"discovery_config": [f'Invalid pk "{DISCOVERY_CONFIG_ID}" - object does not exist.']},
             status_code=400,
         )
-        with pytest.raises(InvalidDiscoveryConfigError, match="object does not exist"):
+        with pytest.raises(DiscoveryConfigNotFoundError, match="object does not exist") as exc_info:
             client.start_schema_discovery_run_from_config(
                 SchemaDiscoveryFromConfigRequest(
+                    connection="conn-1", discovery_config=DiscoveryConfigId(DISCOVERY_CONFIG_ID)
+                ),
+            )
+
+    assert isinstance(exc_info.value, FailedToStartError)
+
+
+def test_start_file_data_discovery_run_from_config_raises_not_found_when_missing(client):
+    """A not-found saved config on the file-data trigger also raises `DiscoveryConfigNotFoundError`."""
+    with requests_mock.Mocker() as m:
+        m.post(
+            "http://test-server/api/run-file-data-discovery/v2/",
+            json={"discovery_config": [f'Invalid pk "{DISCOVERY_CONFIG_ID}" - object does not exist.']},
+            status_code=400,
+        )
+        with pytest.raises(DiscoveryConfigNotFoundError, match="object does not exist"):
+            client.start_file_data_discovery_run_from_config(
+                FileDataDiscoveryFromConfigRequest(
                     connection="conn-1", discovery_config=DiscoveryConfigId(DISCOVERY_CONFIG_ID)
                 ),
             )
