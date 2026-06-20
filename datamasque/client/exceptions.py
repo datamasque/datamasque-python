@@ -43,9 +43,24 @@ class InvalidLibraryError(FailedToStartError):
 
 class InvalidDiscoveryConfigError(FailedToStartError):
     """
-    Raised when a discovery run fails to start due to an unusable discovery config.
+    Raised when a discovery run fails to start because the referenced config exists but is unusable.
 
-    The referenced config is missing, archived, or not in a `valid` validation state.
+    The config is present but not in a `valid` validation state,
+    is the wrong type for the connection,
+    or carries YAML the server rejects at trigger time.
+    A config that cannot be found at all raises `DiscoveryConfigNotFoundError` instead.
+    """
+
+
+class DiscoveryConfigNotFoundError(FailedToStartError):
+    """
+    Raised when a discovery run references a discovery config that the server cannot find.
+
+    The config does not exist — it was never created, or it has since been deleted.
+    Unlike `InvalidDiscoveryConfigError`,
+    this signals a bad reference (a deleted or mistyped id)
+    rather than a present but unusable config,
+    so callers can treat it as a caller/setup error.
     """
 
 

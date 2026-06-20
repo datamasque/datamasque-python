@@ -10,6 +10,7 @@ from datamasque.client.base import BaseClient, UploadFile
 from datamasque.client.exceptions import (
     AsyncRulesetGenerationInProgressError,
     DataMasqueException,
+    DiscoveryConfigNotFoundError,
     FailedToStartError,
     InvalidDiscoveryConfigError,
 )
@@ -362,15 +363,29 @@ class DiscoveryClient(BaseClient):
     # (a `{"message", "line_number", "column_number"}` dict per error).
     DISCOVERY_CONFIG_ERROR_FIELDS = ("discovery_config", "config_yaml")
 
+    # The server emits this phrase when the referenced config id cannot be found
+    # (it was never created, or it has since been deleted).
+    # There is no structured error code in the body,
+    # so this stable message is the only signal
+    # that separates a bad reference from a present-but-unusable config
+    # (e.g. a non-`valid` validation state, which is also a string under `discovery_config`).
+    MISSING_DISCOVERY_CONFIG_SIGNATURE = "object does not exist"
+
     @classmethod
     def _maybe_raise_discovery_config_error(cls, run_data: object, response: Response, run_kind: str) -> None:
-        """Raise `InvalidDiscoveryConfigError` if the server's 400 body cites the discovery config."""
+        """Raise a discovery-config error if the server's 400 body cites the discovery config."""
         if not isinstance(run_data, dict):
             return
 
         for field in cls.DISCOVERY_CONFIG_ERROR_FIELDS:
             if field in run_data:
                 detail = cls._format_discovery_config_error(run_data[field])
+                if cls.MISSING_DISCOVERY_CONFIG_SIGNATURE in detail:
+                    raise DiscoveryConfigNotFoundError(
+                        f"{run_kind} run failed to start: the referenced discovery config does not exist: {detail}",
+                        response=response,
+                    )
+
                 raise InvalidDiscoveryConfigError(
                     f"{run_kind} run failed to start due to discovery config error: {detail}",
                     response=response,

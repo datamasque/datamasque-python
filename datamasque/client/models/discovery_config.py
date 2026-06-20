@@ -1,3 +1,4 @@
+import enum
 from datetime import datetime
 from typing import Any, NewType, Optional
 
@@ -6,6 +7,13 @@ from pydantic import BaseModel, ConfigDict, Field
 from datamasque.client.models.status import ValidationStatus
 
 DiscoveryConfigId = NewType("DiscoveryConfigId", str)
+
+
+class DiscoveryConfigType(enum.Enum):
+    """Which discovery config variant a config targets: database (qualified columns) or file (locators)."""
+
+    database = "database"
+    file = "file"
 
 
 def unwrap_discovery_config_id(value: Any) -> Any:
@@ -33,6 +41,7 @@ class DiscoveryConfig(BaseModel):
 
     name: str
     yaml: Optional[str] = Field(default=None, alias="config_yaml")
+    config_type: DiscoveryConfigType
     id: Optional[DiscoveryConfigId] = None
     # Server-managed validation surface, populated by the DataMasque server.
     # `is_valid` may be `in_progress` immediately after creating a large config,
