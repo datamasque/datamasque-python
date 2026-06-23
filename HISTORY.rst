@@ -21,6 +21,8 @@ History
 * Read-only fields (``id``, ``is_valid``, ``validation_error``, etc.)
   are no longer echoed back in ``Ruleset`` / ``RulesetLibrary`` create/update request bodies.
 * Fixed ``SslZipFile`` uploads to send the required ``database_type=mysql`` form field.
+* **Breaking:** ``delete_ruleset_by_name_if_exists`` now requires a ``ruleset_type`` argument,
+  since ruleset names are unique only per type.
 
 1.0.5 (2026-06-18)
 ------------------

@@ -11,6 +11,7 @@ from datamasque.client.exceptions import DataMasqueApiError, DataMasqueException
 from datamasque.client.models.discovery_config import (
     DiscoveryConfig,
     DiscoveryConfigId,
+    DiscoveryConfigType,
     unwrap_discovery_config_id,
 )
 from datamasque.client.models.status import ValidationStatus
@@ -188,11 +189,12 @@ def test_get_discovery_config_by_name_found(
             json=sample_config_detail_response,
             status_code=200,
         )
-        config = client.get_discovery_config_by_name("my_config")
+        config = client.get_discovery_config_by_name("my_config", DiscoveryConfigType.database)
 
     assert config is not None
     assert config.name == "my_config"
     assert "name_exact=my_config" in m.request_history[0].url
+    assert "config_type=database" in m.request_history[0].url
 
 
 def test_get_discovery_config_by_name_not_found(client: DataMasqueClient) -> None:
@@ -204,7 +206,7 @@ def test_get_discovery_config_by_name_not_found(client: DataMasqueClient) -> Non
             json=empty_response,
             status_code=200,
         )
-        config = client.get_discovery_config_by_name("nonexistent")
+        config = client.get_discovery_config_by_name("nonexistent", DiscoveryConfigType.database)
 
     assert config is None
 
@@ -232,7 +234,7 @@ def test_get_discovery_config_by_name_raises_when_server_omits_id(client: DataMa
             status_code=200,
         )
         with pytest.raises(DataMasqueApiError, match="without an `id`"):
-            client.get_discovery_config_by_name("my_config")
+            client.get_discovery_config_by_name("my_config", DiscoveryConfigType.database)
 
 
 def test_create_discovery_config(client: DataMasqueClient, discovery_config: DiscoveryConfig) -> None:
@@ -394,7 +396,7 @@ def test_delete_discovery_config_by_name(client: DataMasqueClient, sample_config
     with requests_mock.Mocker() as m:
         m.get("http://test-server/api/discovery/configs/", json=sample_config_list_response, status_code=200)
         m.delete(f"http://test-server/api/discovery/configs/{CONFIG_ID_1}/", status_code=204)
-        client.delete_discovery_config_by_name_if_exists("my_config")
+        client.delete_discovery_config_by_name_if_exists("my_config", DiscoveryConfigType.database)
 
     assert m.request_history[0].method == "GET"
     assert m.request_history[1].method == "DELETE"
@@ -405,7 +407,7 @@ def test_delete_discovery_config_by_name_not_found(
 ) -> None:
     with requests_mock.Mocker() as m:
         m.get("http://test-server/api/discovery/configs/", json=sample_config_list_response, status_code=200)
-        client.delete_discovery_config_by_name_if_exists("nonexistent")
+        client.delete_discovery_config_by_name_if_exists("nonexistent", DiscoveryConfigType.database)
 
     assert m.call_count == 1
     assert m.request_history[0].method == "GET"
@@ -434,7 +436,28 @@ def test_delete_discovery_config_by_name_raises_when_server_omits_id(client: Dat
             status_code=200,
         )
         with pytest.raises(DataMasqueException, match="without an `id`"):
-            client.delete_discovery_config_by_name_if_exists("my_config")
+            client.delete_discovery_config_by_name_if_exists("my_config", DiscoveryConfigType.database)
+
+
+def test_delete_discovery_config_by_name_only_deletes_matching_type(client: DataMasqueClient) -> None:
+    shared_name_response = {
+        "count": 2,
+        "next": None,
+        "previous": None,
+        "results": [
+            {"id": CONFIG_ID_1, "name": "shared", "config_type": "database", "archived": False},
+            {"id": CONFIG_ID_2, "name": "shared", "config_type": "file", "archived": False},
+        ],
+    }
+
+    with requests_mock.Mocker() as m:
+        m.get("http://test-server/api/discovery/configs/", json=shared_name_response, status_code=200)
+        m.delete(f"http://test-server/api/discovery/configs/{CONFIG_ID_2}/", status_code=204)
+        client.delete_discovery_config_by_name_if_exists("shared", DiscoveryConfigType.file)
+
+    assert m.request_history[-1].method == "DELETE"
+    assert CONFIG_ID_2 in m.request_history[-1].url
+    assert CONFIG_ID_1 not in m.request_history[-1].url
 
 
 def test_get_default_discovery_config_yaml(client: DataMasqueClient) -> None:

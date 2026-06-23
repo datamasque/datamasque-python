@@ -3,7 +3,7 @@ from typing import Iterator, Optional
 
 from datamasque.client.base import BaseClient
 from datamasque.client.exceptions import DataMasqueApiError, DataMasqueException
-from datamasque.client.models.discovery_config import DiscoveryConfig, DiscoveryConfigId
+from datamasque.client.models.discovery_config import DiscoveryConfig, DiscoveryConfigId, DiscoveryConfigType
 from datamasque.client.models.pagination import Page
 
 logger = logging.getLogger(__name__)
@@ -33,17 +33,18 @@ class DiscoveryConfigClient(BaseClient):
         response = self.make_request("GET", f"/api/discovery/configs/{config_id}/")
         return DiscoveryConfig.model_validate(response.json())
 
-    def get_discovery_config_by_name(self, name: str) -> Optional[DiscoveryConfig]:
+    def get_discovery_config_by_name(self, name: str, config_type: DiscoveryConfigType) -> Optional[DiscoveryConfig]:
         """
-        Looks for a discovery config matching the given name (case-sensitive, exact match).
+        Looks for a discovery config matching the given name and type (case-sensitive, exact match).
 
+        Config names are unique per type, so a type is required to identify a single config.
         Returns it if found, otherwise `None`.
         """
 
         response = self.make_request(
             "GET",
             "/api/discovery/configs/",
-            params={"name_exact": name, "limit": 1},
+            params={"name_exact": name, "config_type": config_type.value, "limit": 1},
         )
         page = Page[DiscoveryConfig].model_validate(response.json())
         if not page.results:
@@ -99,7 +100,7 @@ class DiscoveryConfigClient(BaseClient):
         Sets the config's `id` property.
         """
 
-        existing = self.get_discovery_config_by_name(config.name)
+        existing = self.get_discovery_config_by_name(config.name, config.config_type)
         if existing is not None:
             config.id = existing.id
             return self.update_discovery_config(config)
@@ -115,15 +116,19 @@ class DiscoveryConfigClient(BaseClient):
 
         self._delete_if_exists(f"/api/discovery/configs/{config_id}/")
 
-    def delete_discovery_config_by_name_if_exists(self, name: str) -> None:
+    def delete_discovery_config_by_name_if_exists(self, name: str, config_type: DiscoveryConfigType) -> None:
         """
-        Archives the discovery config with the given name.
+        Archives the discovery config with the given name and type.
 
-        No-op if the config does not exist.
+        Config names are unique per type, so a type is required to identify a single config.
+        No-op if no such config exists.
         """
 
-        all_configs = self.list_discovery_configs()
-        matching = [config for config in all_configs if config.name == name]
+        matching = [
+            config
+            for config in self.list_discovery_configs()
+            if config.name == name and config.config_type is config_type
+        ]
         for config in matching:
             if config.id is None:
                 raise DataMasqueException(f'Server returned a discovery config named "{config.name}" without an `id`.')

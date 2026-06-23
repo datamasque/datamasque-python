@@ -101,11 +101,24 @@ def test_delete_ruleset_by_name(client, existing_rulesets_json):
             status_code=200,
         )
         m.delete("http://test-server/api/rulesets/2/", status_code=204)
-        client.delete_ruleset_by_name_if_exists("file_masking_ruleset")
+        client.delete_ruleset_by_name_if_exists("file_masking_ruleset", RulesetType.file)
 
     assert m.call_count == 2
     assert m.request_history[0].method == "GET"
     assert m.request_history[1].method == "DELETE"
+
+
+def test_delete_ruleset_by_name_skips_other_type(client, existing_rulesets_json):
+    with requests_mock.Mocker() as m:
+        m.get(
+            "http://test-server/api/v2/rulesets/",
+            json=existing_rulesets_json,
+            status_code=200,
+        )
+        client.delete_ruleset_by_name_if_exists("file_masking_ruleset", RulesetType.database)
+
+    assert m.call_count == 1
+    assert m.request_history[0].method == "GET"
 
 
 def test_delete_ruleset_that_does_not_exist(client, existing_rulesets_json):
@@ -115,7 +128,7 @@ def test_delete_ruleset_that_does_not_exist(client, existing_rulesets_json):
             json=existing_rulesets_json,
             status_code=200,
         )
-        client.delete_ruleset_by_name_if_exists("not_a_ruleset")
+        client.delete_ruleset_by_name_if_exists("not_a_ruleset", RulesetType.database)
 
     assert m.call_count == 1
     assert m.request_history[0].method == "GET"

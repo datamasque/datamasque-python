@@ -2,7 +2,7 @@ import logging
 
 from datamasque.client.base import BaseClient
 from datamasque.client.exceptions import DataMasqueException
-from datamasque.client.models.ruleset import Ruleset, RulesetId
+from datamasque.client.models.ruleset import Ruleset, RulesetId, RulesetType
 
 logger = logging.getLogger(__name__)
 
@@ -45,12 +45,20 @@ class RulesetClient(BaseClient):
 
         self._delete_if_exists(f"/api/rulesets/{ruleset_id}/")
 
-    def delete_ruleset_by_name_if_exists(self, ruleset_name: str) -> None:
-        """Deletes the ruleset with the given name. No-op if the ruleset does not exist."""
+    def delete_ruleset_by_name_if_exists(self, ruleset_name: str, ruleset_type: RulesetType) -> None:
+        """
+        Deletes the ruleset with the given name and type.
 
-        all_rulesets = self.list_rulesets()
-        rulesets_matching_name = [ruleset for ruleset in all_rulesets if ruleset.name == ruleset_name]
-        for ruleset in rulesets_matching_name:
+        Ruleset names are unique per type, so a type is required to identify a single ruleset.
+        No-op if no such ruleset exists.
+        """
+
+        matching = [
+            ruleset
+            for ruleset in self.list_rulesets()
+            if ruleset.name == ruleset_name and ruleset.ruleset_type is ruleset_type
+        ]
+        for ruleset in matching:
             if ruleset.id is None:
                 raise DataMasqueException(f'Server returned a ruleset named "{ruleset.name}" without an `id`.')
 
