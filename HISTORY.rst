@@ -5,18 +5,17 @@ History
 1.1.0 (unreleased)
 ------------------
 
-* Added discovery-config management APIs (``list_discovery_configs``, ``create_discovery_config``, and friends).
+* Added discovery configuration models and management APIs.
 * Added schema-discovery and file-data-discovery APIs that take a saved discovery configuration
   (``start_schema_discovery_run_from_config`` / ``start_file_data_discovery_run_from_config``).
   Adoption is recommended; the older APIs that take individual options will be deprecated in a future release.
 * Corrected the file-data-discovery ``include``/``skip`` filter syntax and added ``ignore_rules`` support.
-* Added ``InvalidDiscoveryConfigError``, raised when a discovery run can't start due to an invalid discovery config.
-* Added ``is_user_subscribed`` to ``MaskingRunRequest``
-  to subscribe the requesting user to a run's email notifications.
+* Added ``InvalidDiscoveryConfigError`` and ``DiscoveryConfigNotFoundError``,
+  raised when a discovery run can't start due to an unusable or missing discovery config.
+* Added ``is_user_subscribed`` to ``MaskingRunRequest`` to subscribe the requesting user to a run's email notifications.
 * Added ``auto_pull`` / ``auto_pull_branch`` to ``MaskingRunOptions``
   to refresh the run's ruleset from git before starting.
-* Added ``validation_error`` (and ``validation_error_type`` for rulesets)
-  to ``Ruleset`` and ``RulesetLibrary``.
+* Added ``validation_error`` (and ``validation_error_type`` for rulesets) to ``Ruleset`` and ``RulesetLibrary``.
 * Exposed git provenance on ``Ruleset`` and ``RulesetLibrary`` as a nested ``git`` field (``GitSnapshot``).
 * Read-only fields (``id``, ``is_valid``, ``validation_error``, etc.)
   are no longer echoed back in ``Ruleset`` / ``RulesetLibrary`` create/update request bodies.
