@@ -9,6 +9,7 @@ from datamasque.client.models.connection import ConnectionConfig, ConnectionId, 
 from datamasque.client.models.data_selection import HashColumnsTableConfig, Locator, UserSelection
 from datamasque.client.models.discovery_config import DiscoveryConfig, DiscoveryConfigId, unwrap_discovery_config_id
 from datamasque.client.models.pagination import Page
+from datamasque.client.models.runs import RunConnectionRef
 
 
 class InDataDiscoveryRule(BaseModel):
@@ -340,11 +341,11 @@ class FileDiscoveryMatch(BaseModel):
 
     model_config = ConfigDict(extra="allow")
 
-    categories: Optional[list[str]] = None
-    flagged_by: Optional[str] = None
-    description: Optional[str] = None
-    label: Optional[str] = None
-    hit_ratio: Optional[int] = None
+    flagged_by: str
+    description: str
+    label: Optional[str] = None  # Omitted for non-sensitive and ignored matches.
+    categories: Optional[list[str]] = None  # Omitted for ignored matches.
+    hit_ratio: Optional[int] = None  # None for metadata matches, percentage 0-100 for IDD matches.
 
 
 class FileDiscoveryLocatorResult(BaseModel):
@@ -352,9 +353,9 @@ class FileDiscoveryLocatorResult(BaseModel):
 
     model_config = ConfigDict(extra="allow")
 
-    locator: Optional[Locator] = None
-    matches: Optional[list[FileDiscoveryMatch]] = None
-    data_types: Optional[list[str]] = None
+    locator: Locator
+    matches: list[FileDiscoveryMatch]
+    data_types: list[str]
 
 
 class FileDiscoveryFile(BaseModel):
@@ -362,8 +363,8 @@ class FileDiscoveryFile(BaseModel):
 
     model_config = ConfigDict(extra="allow")
 
-    path: Optional[str] = None
-    file_type: Optional[str] = None
+    path: str
+    file_type: str
     delimiter: Optional[str] = None
     encoding: Optional[str] = None
 
@@ -373,8 +374,8 @@ class FileDiscoveryResult(BaseModel):
 
     model_config = ConfigDict(extra="allow")
 
-    id: Optional[int] = None
-    connection: Optional[Any] = None
-    file_type: Optional[str] = None
-    files: Optional[list[FileDiscoveryFile]] = None
-    results: Optional[list[FileDiscoveryLocatorResult]] = None
+    id: int
+    connection: RunConnectionRef
+    file_type: str
+    files: list[FileDiscoveryFile]
+    results: list[FileDiscoveryLocatorResult]

@@ -48,12 +48,21 @@ def test_get_file_data_discovery_report(client):
     with requests_mock.Mocker() as m:
         m.get(
             "http://test-server/api/runs/1/file-discovery-results/",
-            json=[{"id": 1, "file_type": "csv", "files": [], "results": []}],
+            json=[
+                {
+                    "id": 1,
+                    "connection": {"id": "conn-1", "name": "files"},
+                    "file_type": "csv",
+                    "files": [],
+                    "results": [],
+                }
+            ],
             status_code=200,
         )
         results = client.get_file_data_discovery_report(RunId(1))
         assert len(results) == 1
         assert results[0].id == 1
+        assert results[0].connection.name == "files"
 
 
 def test_unfinished_run_str_with_destination():

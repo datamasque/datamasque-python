@@ -15,6 +15,7 @@ from datamasque.client import (
     FileDataDiscoveryFromConfigRequest,
     FileDataDiscoveryOptions,
     FileDataDiscoveryRequest,
+    FileDiscoveryResult,
     FileFilter,
     FileFilterMatchAgainst,
     FileRulesetGenerationRequest,
@@ -835,6 +836,35 @@ def test_file_filter_rejects_empty_pattern():
 
     with pytest.raises(ValidationError):
         FileFilter(regex="", glob="*.csv")
+
+
+def test_file_discovery_result_parses_server_response():
+    """A file-discovery-results record parses; match label/categories stay optional for non-sensitive matches."""
+    result = FileDiscoveryResult.model_validate(
+        {
+            "id": 7,
+            "connection": {"id": "conn-1", "name": "my files"},
+            "file_type": "csv",
+            "files": [{"path": "data/people.csv", "file_type": "csv", "delimiter": ",", "encoding": "utf-8"}],
+            "results": [
+                {
+                    "locator": "email",
+                    "data_types": ["string"],
+                    "matches": [
+                        {"flagged_by": "MDD", "description": "Email", "label": "email", "categories": ["PII"]},
+                        {"flagged_by": "MDD", "description": "Not sensitive"},
+                    ],
+                }
+            ],
+        }
+    )
+
+    assert result.id == 7
+    assert result.connection.name == "my files"
+    assert result.files[0].path == "data/people.csv"
+    non_sensitive_match = result.results[0].matches[1]
+    assert non_sensitive_match.label is None
+    assert non_sensitive_match.categories is None
 
 
 def test_file_data_discovery_ignore_rules_serialize():
