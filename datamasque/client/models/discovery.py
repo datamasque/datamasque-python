@@ -252,7 +252,7 @@ class DiscoveryMatch(BaseModel):
 
     model_config = ConfigDict(extra="allow")
 
-    label: str
+    label: Optional[str] = None
     categories: list[str]
     flagged_by: str
     description: str
