@@ -19,7 +19,7 @@ class DiscoveryConfigClient(BaseClient):
 
     def list_discovery_configs(self) -> list[DiscoveryConfig]:
         """
-        Lists all (non-archived) discovery configs.
+        Lists all discovery configs.
 
         Note: the YAML content is not included in the list response for performance.
         Use `get_discovery_config` to retrieve the full config with its YAML body.
@@ -125,7 +125,7 @@ class DiscoveryConfigClient(BaseClient):
 
     def delete_discovery_config_by_id_if_exists(self, config_id: DiscoveryConfigId) -> None:
         """
-        Archives the discovery config with the given ID.
+        Deletes the discovery config with the given ID.
 
         No-op if the config does not exist.
         """
@@ -134,7 +134,7 @@ class DiscoveryConfigClient(BaseClient):
 
     def delete_discovery_config_by_name_if_exists(self, name: str, config_type: DiscoveryConfigType) -> None:
         """
-        Archives the discovery config with the given name and type.
+        Deletes the discovery config with the given name and type.
 
         Config names are unique per type, so a type is required to identify a single config.
         No-op if no such config exists.
