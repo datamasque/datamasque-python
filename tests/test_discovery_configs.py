@@ -243,6 +243,7 @@ def test_create_discovery_config(client: DataMasqueClient, discovery_config: Dis
         "name": "test_config",
         "config_yaml": "labels: []\nmetadata_rules: []\nidd_rules: []\n",
         "config_type": "database",
+        "is_valid": "in_progress",
         "archived": False,
         "created": "2025-06-01T10:00:00Z",
         "modified": "2025-06-01T10:00:00Z",
@@ -258,6 +259,7 @@ def test_create_discovery_config(client: DataMasqueClient, discovery_config: Dis
 
     assert result is discovery_config
     assert result.id == DiscoveryConfigId(CONFIG_ID_1)
+    assert result.is_valid is ValidationStatus.in_progress
     assert result.created == datetime.fromisoformat("2025-06-01T10:00:00+00:00")
     assert result.modified == datetime.fromisoformat("2025-06-01T10:00:00+00:00")
 
@@ -265,6 +267,11 @@ def test_create_discovery_config(client: DataMasqueClient, discovery_config: Dis
     assert request_body["name"] == "test_config"
     assert request_body["config_yaml"] == "labels: []\nmetadata_rules: []\nidd_rules: []\n"
     assert request_body["config_type"] == "database"
+    # Server-managed read-only fields must not be echoed back in the request body.
+    assert "id" not in request_body
+    assert "is_valid" not in request_body
+    assert "created" not in request_body
+    assert "modified" not in request_body
 
 
 def test_update_discovery_config(client: DataMasqueClient, discovery_config: DiscoveryConfig) -> None:
@@ -294,6 +301,8 @@ def test_update_discovery_config(client: DataMasqueClient, discovery_config: Dis
     request_body = m.last_request.json()
     assert request_body["name"] == "test_config"
     assert request_body["config_yaml"] == "labels: []\nmetadata_rules: []\nidd_rules: []\n"
+    # The id identifies the config in the URL, not the request body.
+    assert "id" not in request_body
 
 
 def test_update_discovery_config_no_id_raises(client: DataMasqueClient, discovery_config: DiscoveryConfig) -> None:
@@ -339,15 +348,6 @@ def test_create_or_update_discovery_config_update(client: DataMasqueClient, disc
             },
         ],
     }
-    detail_response = {
-        "id": CONFIG_ID_1,
-        "name": "test_config",
-        "config_yaml": "labels: []",
-        "config_type": "database",
-        "archived": False,
-        "created": "2025-06-01T10:00:00Z",
-        "modified": "2025-06-01T10:00:00Z",
-    }
     update_response = {
         "id": CONFIG_ID_1,
         "name": "test_config",
@@ -360,11 +360,6 @@ def test_create_or_update_discovery_config_update(client: DataMasqueClient, disc
 
     with requests_mock.Mocker() as m:
         m.get("http://test-server/api/discovery/configs/", json=list_response, status_code=200)
-        m.get(
-            f"http://test-server/api/discovery/configs/{CONFIG_ID_1}/",
-            json=detail_response,
-            status_code=200,
-        )
         m.put(
             f"http://test-server/api/discovery/configs/{CONFIG_ID_1}/",
             json=update_response,
@@ -373,9 +368,8 @@ def test_create_or_update_discovery_config_update(client: DataMasqueClient, disc
         result = client.create_or_update_discovery_config(discovery_config)
 
     assert result.id == DiscoveryConfigId(CONFIG_ID_1)
-    assert m.request_history[0].method == "GET"
-    assert m.request_history[1].method == "GET"
-    assert m.request_history[2].method == "PUT"
+    # The upsert resolves the id from the list response alone — no detail GET before the PUT.
+    assert [r.method for r in m.request_history] == ["GET", "PUT"]
 
 
 def test_delete_discovery_config_by_id(client: DataMasqueClient) -> None:
