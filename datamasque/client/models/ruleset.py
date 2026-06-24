@@ -1,9 +1,10 @@
 import enum
 from typing import Any, NewType, Optional
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import Field
 
-from datamasque.client.models.status import ValidationStatus
+from datamasque.client.models.git import GitTrackedEntity
+from datamasque.client.models.status import ValidationErrorType, ValidationStatus
 
 RulesetId = NewType("RulesetId", str)
 
@@ -33,13 +34,17 @@ class RulesetType(enum.Enum):
     database = "database"
 
 
-class Ruleset(BaseModel):
+class Ruleset(GitTrackedEntity):
     """Represents a ruleset."""
-
-    model_config = ConfigDict(extra="allow", populate_by_name=True)
 
     name: str
     yaml: str = Field(default="", alias="config_yaml")
     ruleset_type: RulesetType = Field(default=RulesetType.database, alias="mask_type")
-    id: Optional[RulesetId] = None
-    is_valid: Optional[ValidationStatus] = None
+
+    # Server-populated read-only fields, excluded from request bodies.
+    id: Optional[RulesetId] = Field(default=None, exclude=True)
+    is_valid: Optional[ValidationStatus] = Field(default=None, exclude=True)
+    validation_error: Optional[str] = Field(default=None, exclude=True)
+    """Human-readable validation error, or `None` when valid."""
+    validation_error_type: Optional[ValidationErrorType] = Field(default=None, exclude=True)
+    """Category of the validation failure, or `None` when valid."""

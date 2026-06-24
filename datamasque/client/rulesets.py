@@ -2,8 +2,7 @@ import logging
 
 from datamasque.client.base import BaseClient
 from datamasque.client.exceptions import DataMasqueException
-from datamasque.client.models.ruleset import Ruleset, RulesetId
-from datamasque.client.models.status import ValidationStatus
+from datamasque.client.models.ruleset import Ruleset, RulesetId, RulesetType
 
 logger = logging.getLogger(__name__)
 
@@ -21,17 +20,18 @@ class RulesetClient(BaseClient):
         """
         Creates or updates a ruleset.
 
-        Populates the given ruleset's `id` and `is_valid` fields from the server response,
-        and returns the same ruleset instance for convenience.
+        Populates the given ruleset's `id`, `is_valid`, `validation_error`, `validation_error_type`,
+        and `git` fields from the server response, and returns the same ruleset instance for convenience.
         """
 
         data = ruleset.model_dump(exclude_none=True, by_alias=True, mode="json")
         response = self.make_request("POST", "/api/rulesets/", data=data, params={"upsert": "true"})
-        response_data = response.json()
-        ruleset.id = RulesetId(response_data["id"])
-        is_valid = response_data.get("is_valid")
-        if is_valid is not None:
-            ruleset.is_valid = ValidationStatus(is_valid)
+        created = Ruleset.model_validate(response.json())
+        ruleset.id = created.id
+        ruleset.is_valid = created.is_valid
+        ruleset.validation_error = created.validation_error
+        ruleset.validation_error_type = created.validation_error_type
+        ruleset.git = created.git
 
         if response.status_code == 201:
             logger.info('Creation of ruleset "%s" successful', ruleset.name)
@@ -45,12 +45,20 @@ class RulesetClient(BaseClient):
 
         self._delete_if_exists(f"/api/rulesets/{ruleset_id}/")
 
-    def delete_ruleset_by_name_if_exists(self, ruleset_name: str) -> None:
-        """Deletes the ruleset with the given name. No-op if the ruleset does not exist."""
+    def delete_ruleset_by_name_if_exists(self, ruleset_name: str, ruleset_type: RulesetType) -> None:
+        """
+        Deletes the ruleset with the given name and type.
 
-        all_rulesets = self.list_rulesets()
-        rulesets_matching_name = [ruleset for ruleset in all_rulesets if ruleset.name == ruleset_name]
-        for ruleset in rulesets_matching_name:
+        Ruleset names are unique per type, so a type is required to identify a single ruleset.
+        No-op if no such ruleset exists.
+        """
+
+        matching = [
+            ruleset
+            for ruleset in self.list_rulesets()
+            if ruleset.name == ruleset_name and ruleset.ruleset_type is ruleset_type
+        ]
+        for ruleset in matching:
             if ruleset.id is None:
                 raise DataMasqueException(f'Server returned a ruleset named "{ruleset.name}" without an `id`.')
 

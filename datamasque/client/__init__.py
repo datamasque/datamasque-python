@@ -17,8 +17,10 @@ from datamasque.client.exceptions import (
     DataMasqueNotReadyError,
     DataMasqueTransportError,
     DataMasqueUserError,
+    DiscoveryConfigNotFoundError,
     FailedToStartError,
     IfmAuthError,
+    InvalidDiscoveryConfigError,
     InvalidLibraryError,
     InvalidRulesetError,
     RunNotCancellableError,
@@ -54,10 +56,15 @@ from datamasque.client.models.data_selection import (
 from datamasque.client.models.discovery import (
     ConstraintColumns,
     DiscoveryMatch,
+    FileDataDiscoveryFromConfigRequest,
+    FileDataDiscoveryOptions,
+    FileDataDiscoveryRequest,
     FileDiscoveryFile,
     FileDiscoveryLocatorResult,
     FileDiscoveryMatch,
     FileDiscoveryResult,
+    FileFilter,
+    FileFilterMatchAgainst,
     FileRulesetGenerationRequest,
     ForeignKeyRef,
     InDataDiscoveryConfig,
@@ -65,11 +72,13 @@ from datamasque.client.models.discovery import (
     ReferencingForeignKey,
     RulesetGenerationRequest,
     SchemaDiscoveryColumn,
+    SchemaDiscoveryFromConfigRequest,
     SchemaDiscoveryPage,
     SchemaDiscoveryRequest,
     SchemaDiscoveryResult,
     TableConstraints,
 )
+from datamasque.client.models.discovery_config import DiscoveryConfig, DiscoveryConfigId, DiscoveryConfigType
 from datamasque.client.models.dm_instance import DataMasqueInstanceConfig
 from datamasque.client.models.files import (
     DataMasqueFile,
@@ -79,6 +88,7 @@ from datamasque.client.models.files import (
     SnowflakeKeyFile,
     SslZipFile,
 )
+from datamasque.client.models.git import GitSnapshot
 from datamasque.client.models.ifm import (
     DataMasqueIfmInstanceConfig,
     IfmLog,
@@ -104,7 +114,12 @@ from datamasque.client.models.runs import (
     RunInfo,
     UnfinishedRun,
 )
-from datamasque.client.models.status import AsyncRulesetGenerationTaskStatus, MaskingRunStatus, ValidationStatus
+from datamasque.client.models.status import (
+    AsyncRulesetGenerationTaskStatus,
+    MaskingRunStatus,
+    ValidationErrorType,
+    ValidationStatus,
+)
 from datamasque.client.models.user import User, UserId, UserRole
 
 __version__ = version("datamasque-python")
@@ -130,18 +145,28 @@ __all__ = [
     "DatabaseConnectionConfig",
     "DatabaseType",
     "DatabricksConnectionConfig",
+    "DiscoveryConfig",
+    "DiscoveryConfigId",
+    "DiscoveryConfigNotFoundError",
+    "DiscoveryConfigType",
     "DiscoveryMatch",
     "DynamoConnectionConfig",
     "FailedToStartError",
     "FileConnectionConfig",
+    "FileDataDiscoveryFromConfigRequest",
+    "FileDataDiscoveryOptions",
+    "FileDataDiscoveryRequest",
     "FileDiscoveryFile",
     "FileDiscoveryLocatorResult",
     "FileDiscoveryMatch",
     "FileDiscoveryResult",
+    "FileFilter",
+    "FileFilterMatchAgainst",
     "FileId",
     "FileOrContent",
     "FileRulesetGenerationRequest",
     "ForeignKeyRef",
+    "GitSnapshot",
     "HashColumnsTableConfig",
     "IfmAuthError",
     "IfmLog",
@@ -151,6 +176,7 @@ __all__ = [
     "IfmTokenInfo",
     "InDataDiscoveryConfig",
     "InDataDiscoveryRule",
+    "InvalidDiscoveryConfigError",
     "InvalidLibraryError",
     "InvalidRulesetError",
     "JsonPath",
@@ -182,6 +208,7 @@ __all__ = [
     "RunNotCancellableError",
     "S3ConnectionConfig",
     "SchemaDiscoveryColumn",
+    "SchemaDiscoveryFromConfigRequest",
     "SchemaDiscoveryPage",
     "SchemaDiscoveryRequest",
     "SchemaDiscoveryResult",
@@ -202,5 +229,6 @@ __all__ = [
     "UserId",
     "UserRole",
     "UserSelection",
+    "ValidationErrorType",
     "ValidationStatus",
 ]

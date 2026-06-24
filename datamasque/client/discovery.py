@@ -4,11 +4,15 @@ from io import BufferedIOBase, BytesIO, TextIOBase
 from pathlib import Path
 from typing import Iterator, Optional, Union
 
+from requests import Response
+
 from datamasque.client.base import BaseClient, UploadFile
 from datamasque.client.exceptions import (
     AsyncRulesetGenerationInProgressError,
     DataMasqueException,
+    DiscoveryConfigNotFoundError,
     FailedToStartError,
+    InvalidDiscoveryConfigError,
 )
 from datamasque.client.models.connection import ConnectionId
 from datamasque.client.models.data_selection import (
@@ -17,9 +21,12 @@ from datamasque.client.models.data_selection import (
     SelectedFileData,
 )
 from datamasque.client.models.discovery import (
+    FileDataDiscoveryFromConfigRequest,
+    FileDataDiscoveryRequest,
     FileDiscoveryResult,
     FileRulesetGenerationRequest,
     RulesetGenerationRequest,
+    SchemaDiscoveryFromConfigRequest,
     SchemaDiscoveryPage,
     SchemaDiscoveryRequest,
     SchemaDiscoveryResult,
@@ -185,6 +192,13 @@ class DiscoveryClient(BaseClient):
                         with zip_file.open(file_info) as file:
                             yaml_content = file.read().decode("utf-8")
                             rulesets.append(Ruleset(name=Path(file_info.filename).stem, yaml=yaml_content))
+
+            if not rulesets:
+                raise DataMasqueException(
+                    f"Ruleset generation for connection {connection_id} reported `finished` "
+                    f"but the downloaded archive contained no rulesets."
+                )
+
             return rulesets
 
         generated = response.json().get("generated_ruleset")
@@ -229,6 +243,148 @@ class DiscoveryClient(BaseClient):
             f"(server responded with status {response.status_code}: {response.text}).",
             response=response,
         )
+
+    def start_file_data_discovery_run(self, request: FileDataDiscoveryRequest) -> RunId:
+        """
+        Starts a file data discovery run with the given configuration.
+
+        Args:
+            request: A `FileDataDiscoveryRequest` with connection and optional settings.
+
+        Returns:
+            RunId: The ID of the started discovery run
+
+        Raises:
+            FailedToStartError: If run fails to start
+        """
+
+        data = request.model_dump(exclude_none=True, mode="json")
+        response = self.make_request(
+            "POST",
+            "/api/run-file-data-discovery/",
+            data=data,
+            require_status_check=False,
+        )
+        run_data = response.json()
+
+        if response.status_code == 201:
+            logger.info("File data discovery run %s started successfully", run_data["id"])
+            return RunId(run_data["id"])
+
+        logger.error("File data discovery run failed to start: %s", run_data)
+        raise FailedToStartError(
+            f"File data discovery run failed to start "
+            f"(server responded with status {response.status_code}: {response.text}).",
+            response=response,
+        )
+
+    def start_schema_discovery_run_from_config(self, request: SchemaDiscoveryFromConfigRequest) -> RunId:
+        """
+        Starts a schema discovery run from a saved discovery config.
+
+        Args:
+            request: A `SchemaDiscoveryFromConfigRequest` with the `connection` and a required `discovery_config`
+                (a saved config, or `None` for the server's defaults).
+
+        Returns:
+            RunId: The ID of the started discovery run
+
+        Raises:
+            DiscoveryConfigNotFoundError: the referenced discovery config cannot be found
+                (it does not exist or is the wrong type for the run).
+            InvalidDiscoveryConfigError: the config is present but not in a `valid` validation state,
+                or its YAML is rejected when the run starts.
+            FailedToStartError: the run failed to start for any other reason.
+        """
+
+        return self._start_discovery_run_from_config(request, "/api/schema-discovery/v2/", "Schema discovery")
+
+    def start_file_data_discovery_run_from_config(self, request: FileDataDiscoveryFromConfigRequest) -> RunId:
+        """
+        Starts a file data discovery run from a saved discovery config.
+
+        Args:
+            request: A `FileDataDiscoveryFromConfigRequest` with the `connection`,
+                a required `discovery_config` (a saved config, or `None` for the server's defaults),
+                and optional run `options`.
+
+        Returns:
+            RunId: The ID of the started discovery run
+
+        Raises:
+            DiscoveryConfigNotFoundError: the referenced discovery config cannot be found
+                (it does not exist or is the wrong type for the run).
+            InvalidDiscoveryConfigError: the config is present but not in a `valid` validation state,
+                or its YAML is rejected when the run starts.
+            FailedToStartError: the run failed to start for any other reason.
+        """
+
+        return self._start_discovery_run_from_config(request, "/api/run-file-data-discovery/v2/", "File data discovery")
+
+    def _start_discovery_run_from_config(
+        self,
+        request: Union[SchemaDiscoveryFromConfigRequest, FileDataDiscoveryFromConfigRequest],
+        path: str,
+        run_kind: str,
+    ) -> RunId:
+        """Post a saved-config discovery request and return its run id, classifying config errors on failure."""
+
+        data = request.model_dump(exclude_none=True, mode="json")
+        # The server requires `discovery_config` to be present; a null selects its built-in defaults,
+        # so send it explicitly rather than letting `exclude_none` drop a None.
+        data.setdefault("discovery_config", None)
+        response = self.make_request("POST", path, data=data, require_status_check=False)
+        run_data = response.json() if response.content else {}
+
+        if response.status_code == 201:
+            logger.info("%s run %s started successfully", run_kind, run_data["id"])
+            return RunId(run_data["id"])
+
+        logger.error("%s run failed to start: %s", run_kind, run_data)
+        self._maybe_raise_discovery_config_error(run_data, response, run_kind)
+        raise FailedToStartError(
+            f"{run_kind} run failed to start (server responded with status {response.status_code}: {response.text}).",
+            response=response,
+        )
+
+    # Server key for a 400 that means the discovery config itself is unusable:
+    # a missing or wrong-type config, or one not in a `valid` validation state (string messages),
+    # or re-validation of broken saved-config YAML when the run starts
+    # (a `{"message", "line_number", "column_number"}` dict).
+    DISCOVERY_CONFIG_ERROR_FIELD = "discovery_config"
+
+    # The phrase the server uses when the config id cannot be resolved (a missing or wrong-type config).
+    MISSING_DISCOVERY_CONFIG_SIGNATURE = "object does not exist"
+
+    @classmethod
+    def _maybe_raise_discovery_config_error(cls, run_data: object, response: Response, run_kind: str) -> None:
+        """Raise a discovery-config error if the server's 400 body cites the discovery config."""
+        if not isinstance(run_data, dict):
+            return
+
+        if not (errors := run_data.get(cls.DISCOVERY_CONFIG_ERROR_FIELD)):
+            return
+
+        detail = cls._format_discovery_config_error(errors)
+        if cls.MISSING_DISCOVERY_CONFIG_SIGNATURE in detail:
+            raise DiscoveryConfigNotFoundError(
+                f"{run_kind} run failed to start: the referenced discovery config could not be found: {detail}",
+                response=response,
+            )
+
+        raise InvalidDiscoveryConfigError(
+            f"{run_kind} run failed to start due to discovery config error: {detail}",
+            response=response,
+        )
+
+    @staticmethod
+    def _format_discovery_config_error(errors: object) -> str:
+        """Render the first server error, handling both string and `{message, ...}` dict items."""
+        first = errors[0] if isinstance(errors, list) and errors else errors
+        if isinstance(first, dict) and "message" in first:
+            return str(first["message"])
+
+        return str(first)
 
     def iter_schema_discovery_results(self, run_id: RunId) -> Iterator[SchemaDiscoveryResult]:
         """Lazily iterate all schema discovery results for a run via the paginated v2 endpoint."""
@@ -284,3 +440,22 @@ class DiscoveryClient(BaseClient):
 
         response = self.make_request("GET", f"api/runs/{run_id}/file-discovery-results/")
         return [FileDiscoveryResult.model_validate(d) for d in response.json()]
+
+    def get_discovery_run_config_snapshot_yaml(self, run_id: RunId, *, timezone: Optional[str] = None) -> str:
+        """
+        Returns the discovery-config YAML that was effective at the start of the given discovery run.
+
+        The YAML is prefixed with a commented provenance header naming the saved config
+        (or the built-in defaults) the run used, and whether it has since been modified or deleted.
+        `timezone`, a `±HH:MM` UTC offset, sets the timezone of the header timestamp; the server defaults to UTC.
+        """
+
+        params = {"timezone": timezone} if timezone is not None else None
+        response = self.make_request("GET", f"/api/discovery/runs/{run_id}/config-snapshot/", params=params)
+        with zipfile.ZipFile(BytesIO(response.content)) as zip_file:
+            names = zip_file.namelist()
+            if not names:
+                raise DataMasqueException(f"Discovery run {run_id} config snapshot archive contained no files.")
+
+            with zip_file.open(names[0]) as snapshot_file:
+                return snapshot_file.read().decode("utf-8")

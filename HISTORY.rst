@@ -2,6 +2,29 @@
 History
 =======
 
+1.1.0 (2026-06-24)
+------------------
+
+* Added discovery configuration models and management APIs.
+* Added schema-discovery and file-data-discovery APIs that take a saved discovery configuration
+  (``start_schema_discovery_run_from_config`` / ``start_file_data_discovery_run_from_config``).
+  Adoption is recommended; the older APIs that take individual options will be deprecated in a future release.
+* Corrected the file-data-discovery ``include``/``skip`` filter syntax and added ``ignore_rules`` support.
+* Added ``InvalidDiscoveryConfigError`` and ``DiscoveryConfigNotFoundError``,
+  raised when a discovery run can't start due to an unusable or missing discovery config.
+* Added ``get_discovery_run_config_snapshot_yaml`` to retrieve the discovery-config YAML
+  that was effective at the start of a given discovery run.
+* Added ``is_user_subscribed`` to ``MaskingRunRequest`` to subscribe the requesting user to a run's email notifications.
+* Added ``auto_pull`` / ``auto_pull_branch`` to ``MaskingRunOptions``
+  to refresh the run's ruleset from git before starting.
+* Added ``validation_error`` (and ``validation_error_type`` for rulesets) to ``Ruleset`` and ``RulesetLibrary``.
+* Exposed git provenance on ``Ruleset`` and ``RulesetLibrary`` as a nested ``git`` field (``GitSnapshot``).
+* Read-only fields (``id``, ``is_valid``, ``validation_error``, etc.)
+  are no longer echoed back in ``Ruleset`` / ``RulesetLibrary`` create/update request bodies.
+* Fixed ``SslZipFile`` uploads to send the required ``database_type=mysql`` form field.
+* **Breaking:** ``delete_ruleset_by_name_if_exists`` now requires a ``ruleset_type`` argument,
+  since ruleset names are unique only per type.
+
 1.0.5 (2026-06-18)
 ------------------
 

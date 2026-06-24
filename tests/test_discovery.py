@@ -6,12 +6,23 @@ from unittest.mock import patch
 
 import pytest
 import requests_mock
+from pydantic import ValidationError
 
 from datamasque.client import (
     DataMasqueClient,
+    DiscoveryConfig,
+    DiscoveryConfigId,
+    FileDataDiscoveryFromConfigRequest,
+    FileDataDiscoveryOptions,
+    FileDataDiscoveryRequest,
+    FileDiscoveryResult,
+    FileFilter,
+    FileFilterMatchAgainst,
     FileRulesetGenerationRequest,
+    InDataDiscoveryConfig,
     RulesetGenerationRequest,
     RunId,
+    SchemaDiscoveryFromConfigRequest,
     SchemaDiscoveryPage,
     SchemaDiscoveryRequest,
     SchemaDiscoveryResult,
@@ -20,12 +31,16 @@ from datamasque.client.exceptions import (
     AsyncRulesetGenerationInProgressError,
     DataMasqueApiError,
     DataMasqueException,
+    DiscoveryConfigNotFoundError,
     FailedToStartError,
+    InvalidDiscoveryConfigError,
 )
 from datamasque.client.models.connection import ConnectionId, DatabaseConnectionConfig, DatabaseType
 from datamasque.client.models.data_selection import SelectedColumns, SelectedFileData, UserSelection
 from datamasque.client.models.status import AsyncRulesetGenerationTaskStatus
 from tests.helpers import parse_multipart_form
+
+DISCOVERY_CONFIG_ID = "aaaaaaaa-1111-2222-3333-444444444444"
 
 
 def test_generate_ruleset(client):
@@ -176,6 +191,33 @@ def test_get_generated_rulesets_success(client):
         assert rulesets[0].yaml == yaml_content_1.decode("utf-8")
         assert rulesets[1].name == "ruleset2"
         assert rulesets[1].yaml == yaml_content_2.decode("utf-8")
+
+
+def test_get_generated_rulesets_empty_archive_raises(client):
+    """A finished task whose download archive contains no ruleset files raises a clear error."""
+    connection_id = ConnectionId("1")
+
+    with requests_mock.Mocker() as m:
+        m.get(
+            f"http://test-server/api/async-generate-ruleset/{connection_id}/",
+            json={"status": "finished"},
+            status_code=200,
+        )
+
+        zip_buffer = BytesIO()
+        with zipfile.ZipFile(zip_buffer, "w") as zip_file:
+            zip_file.writestr("README.txt", "no rulesets here")
+        zip_buffer.seek(0)
+
+        m.get(
+            f"http://test-server/api/async-generate-ruleset/{connection_id}/download-rulesets/",
+            content=zip_buffer.getvalue(),
+            headers={"Content-Disposition": 'attachment; filename="rulesets.zip"'},
+            status_code=200,
+        )
+
+        with pytest.raises(DataMasqueException, match="contained no rulesets"):
+            client.get_generated_rulesets(connection_id)
 
 
 def test_get_generated_rulesets_from_selection_success(client):
@@ -727,3 +769,497 @@ def test_start_schema_discovery_run_raises_on_non_201(client):
         )
         with pytest.raises(FailedToStartError, match="Schema discovery run failed to start"):
             client.start_schema_discovery_run(SchemaDiscoveryRequest(connection="nope"))
+
+
+def test_schema_discovery_request_rejects_discovery_config():
+    """The v1 schema-discovery request rejects `discovery_config` and points the user at the from-config method."""
+    with pytest.raises(ValidationError, match="start_schema_discovery_run_from_config"):
+        SchemaDiscoveryRequest(connection="conn-1", discovery_config=DiscoveryConfigId(DISCOVERY_CONFIG_ID))
+
+
+def test_file_data_discovery_request_rejects_discovery_config():
+    """The v1 file-data-discovery request rejects `discovery_config` and points the user at the from-config method."""
+    with pytest.raises(ValidationError, match="start_file_data_discovery_run_from_config"):
+        FileDataDiscoveryRequest(connection="conn-1", discovery_config=DiscoveryConfigId(DISCOVERY_CONFIG_ID))
+
+
+def test_start_file_data_discovery_run_minimal(client):
+    """A minimal FDD request — only `connection` set — round-trips through the server."""
+    req = FileDataDiscoveryRequest(connection="conn-1")
+    with requests_mock.Mocker() as m:
+        m.post(
+            "http://test-server/api/run-file-data-discovery/",
+            json={"id": 42},
+            status_code=201,
+        )
+        run_id = client.start_file_data_discovery_run(req)
+
+    assert run_id == 42
+    body = m.last_request.json()
+    assert body["connection"] == "conn-1"
+    assert "discovery_config" not in body
+
+
+def test_start_file_data_discovery_run_full(client):
+    """All legacy FDD request fields populate the wire payload and pass through unwrap helpers."""
+    req = FileDataDiscoveryRequest(
+        connection="conn-1",
+        options=FileDataDiscoveryOptions(diagnostic_logging=True),
+        custom_keywords=["foo"],
+        ignored_keywords=["bar"],
+        disable_built_in_keywords=True,
+        disable_global_custom_keywords=True,
+        disable_global_ignored_keywords=False,
+        in_data_discovery={"enabled": True, "row_sample_size": 50},
+        recurse=True,
+        include=[{"glob": "*.csv"}],
+        skip=[{"regex": r".*/tmp/.*", "match_against": "path"}],
+        encoding="utf-8",
+        workers=4,
+    )
+    with requests_mock.Mocker() as m:
+        m.post(
+            "http://test-server/api/run-file-data-discovery/",
+            json={"id": 99},
+            status_code=201,
+        )
+        assert client.start_file_data_discovery_run(req) == 99
+
+    body = m.last_request.json()
+    assert body == {
+        "connection": "conn-1",
+        "options": {"diagnostic_logging": True},
+        "custom_keywords": ["foo"],
+        "ignored_keywords": ["bar"],
+        "disable_built_in_keywords": True,
+        "disable_global_custom_keywords": True,
+        "disable_global_ignored_keywords": False,
+        "in_data_discovery": {"enabled": True, "row_sample_size": 50},
+        "recurse": True,
+        "include": [{"glob": "*.csv"}],
+        "skip": [{"regex": r".*/tmp/.*", "match_against": "path"}],
+        "encoding": "utf-8",
+        "workers": 4,
+    }
+
+
+def test_file_filter_requires_exactly_one_of_glob_or_regex():
+    """A `FileFilter` with neither, or both, of `glob`/`regex` is rejected."""
+    FileFilter(glob="*.csv")
+    FileFilter(regex=r".*\.csv")
+    FileFilter(glob="*.csv", match_against=FileFilterMatchAgainst.filename)
+
+    with pytest.raises(ValidationError, match="exactly one of `glob` or `regex`"):
+        FileFilter()
+
+    with pytest.raises(ValidationError, match="exactly one of `glob` or `regex`"):
+        FileFilter(glob="*.csv", regex=r".*\.csv")
+
+
+def test_file_filter_rejects_empty_pattern():
+    """An empty `glob`/`regex` is rejected rather than silently treated as unset."""
+    with pytest.raises(ValidationError):
+        FileFilter(glob="")
+
+    with pytest.raises(ValidationError):
+        FileFilter(regex="", glob="*.csv")
+
+
+def test_file_discovery_result_parses_server_response():
+    """A file-discovery-results record parses; match label/categories stay optional for non-sensitive matches."""
+    result = FileDiscoveryResult.model_validate(
+        {
+            "id": 7,
+            "connection": {"id": "conn-1", "name": "my files"},
+            "file_type": "csv",
+            "files": [{"path": "data/people.csv", "file_type": "csv", "delimiter": ",", "encoding": "utf-8"}],
+            "results": [
+                {
+                    "locator": "email",
+                    "data_types": ["string"],
+                    "matches": [
+                        {"flagged_by": "MDD", "description": "Email", "label": "email", "categories": ["PII"]},
+                        {"flagged_by": "MDD", "description": "Not sensitive"},
+                    ],
+                }
+            ],
+        }
+    )
+
+    assert result.id == 7
+    assert result.connection.name == "my files"
+    assert result.files[0].path == "data/people.csv"
+    non_sensitive_match = result.results[0].matches[1]
+    assert non_sensitive_match.label is None
+    assert non_sensitive_match.categories is None
+
+
+def test_file_data_discovery_ignore_rules_serialize():
+    """`in_data_discovery.ignore_rules` round-trips into the wire payload."""
+    req = FileDataDiscoveryRequest(
+        connection="conn-1",
+        in_data_discovery=InDataDiscoveryConfig(
+            enabled=True,
+            custom_rules=[{"name": "cc", "pattern": r"^1234"}],
+            non_sensitive_rules=[{"pattern": r"^5555"}],
+            ignore_rules=[{"pattern": r"^4321"}],
+        ),
+    )
+    dumped = req.model_dump(exclude_none=True, mode="json")
+    assert dumped["in_data_discovery"]["ignore_rules"] == [{"pattern": r"^4321"}]
+
+
+def test_start_file_data_discovery_run_raises_on_non_201(client):
+    with requests_mock.Mocker() as m:
+        m.post(
+            "http://test-server/api/run-file-data-discovery/",
+            json={"detail": "connection not found"},
+            status_code=400,
+        )
+        with pytest.raises(FailedToStartError, match="File data discovery run failed to start"):
+            client.start_file_data_discovery_run(FileDataDiscoveryRequest(connection="nope"))
+
+
+def test_schema_discovery_from_config_request_accepts_discovery_config_id():
+    """A `DiscoveryConfigId` string passes through unchanged in the v2 request body."""
+    req = SchemaDiscoveryFromConfigRequest(connection="conn-1", discovery_config=DiscoveryConfigId(DISCOVERY_CONFIG_ID))
+    assert req.model_dump(exclude_none=True, mode="json") == {
+        "connection": "conn-1",
+        "discovery_config": DISCOVERY_CONFIG_ID,
+    }
+
+
+def test_schema_discovery_from_config_request_unwraps_discovery_config_model():
+    """Passing a full `DiscoveryConfig` object substitutes its `id` for the wire payload."""
+    config = DiscoveryConfig(name="my_cfg", config_type="database", id=DiscoveryConfigId(DISCOVERY_CONFIG_ID))
+    req = SchemaDiscoveryFromConfigRequest(connection="conn-1", discovery_config=config)
+    assert req.model_dump(exclude_none=True, mode="json")["discovery_config"] == DISCOVERY_CONFIG_ID
+
+
+def test_schema_discovery_from_config_request_rejects_unsaved_discovery_config():
+    """A `DiscoveryConfig` without an `id` cannot be used yet — raises immediately."""
+    config = DiscoveryConfig(name="my_cfg", config_type="database")
+    with pytest.raises(ValueError, match="id is None"):
+        SchemaDiscoveryFromConfigRequest(connection="conn-1", discovery_config=config)
+
+
+def test_schema_discovery_from_config_request_rejects_legacy_fields():
+    """The saved-config request rejects legacy detection options — they live in the config."""
+    with pytest.raises(ValidationError):
+        SchemaDiscoveryFromConfigRequest(
+            connection="conn-1",
+            discovery_config=DiscoveryConfigId(DISCOVERY_CONFIG_ID),
+            custom_keywords=["foo"],
+        )
+
+
+def test_schema_discovery_from_config_request_accepts_schemas():
+    """`schemas` scopes the saved-config schema run to specific schemas and is forwarded as-is."""
+    req = SchemaDiscoveryFromConfigRequest(
+        connection="conn-1",
+        discovery_config=DiscoveryConfigId(DISCOVERY_CONFIG_ID),
+        schemas=["public", "sales"],
+    )
+    assert req.model_dump(exclude_none=True, mode="json") == {
+        "connection": "conn-1",
+        "discovery_config": DISCOVERY_CONFIG_ID,
+        "schemas": ["public", "sales"],
+    }
+
+
+@pytest.mark.parametrize(
+    "extra_field",
+    [
+        {"custom_keywords": ["foo"]},
+        {"in_data_discovery": {"enabled": True}},
+        {"recurse": True},
+        {"include": [{"glob": "*.csv"}]},
+        {"skip": [{"glob": "*.tmp"}]},
+        {"encoding": "utf-8"},
+        {"workers": 4},
+    ],
+)
+def test_file_data_discovery_from_config_request_rejects_non_config_fields(extra_field):
+    """Detection options and file-handling params are rejected — they live in the config, not the request."""
+    with pytest.raises(ValidationError):
+        FileDataDiscoveryFromConfigRequest(
+            connection="conn-1",
+            discovery_config=DiscoveryConfigId(DISCOVERY_CONFIG_ID),
+            **extra_field,
+        )
+
+
+def test_schema_discovery_from_config_request_requires_discovery_config():
+    """`discovery_config` must be set explicitly; omitting it is a validation error (it may be None, but not absent)."""
+    with pytest.raises(ValidationError, match="discovery_config"):
+        SchemaDiscoveryFromConfigRequest(connection="conn-1")
+
+
+def test_schema_discovery_from_config_request_accepts_none_discovery_config():
+    """An explicit None is accepted and means the server uses its built-in defaults."""
+    req = SchemaDiscoveryFromConfigRequest(connection="conn-1", discovery_config=None)
+    assert req.discovery_config is None
+
+
+def test_file_data_discovery_from_config_request_requires_discovery_config():
+    """`discovery_config` must be set explicitly; omitting it is a validation error (it may be None, but not absent)."""
+    with pytest.raises(ValidationError, match="discovery_config"):
+        FileDataDiscoveryFromConfigRequest(connection="conn-1")
+
+
+def test_file_data_discovery_from_config_request_accepts_none_discovery_config():
+    """An explicit None is accepted and means the server uses its built-in defaults."""
+    req = FileDataDiscoveryFromConfigRequest(connection="conn-1", discovery_config=None)
+    assert req.discovery_config is None
+
+
+def test_start_schema_discovery_run_from_config_sends_discovery_config(client):
+    """`start_schema_discovery_run_from_config` posts the discovery_config id to the saved-config endpoint."""
+    req = SchemaDiscoveryFromConfigRequest(connection="conn-1", discovery_config=DiscoveryConfigId(DISCOVERY_CONFIG_ID))
+    with requests_mock.Mocker() as m:
+        m.post("http://test-server/api/schema-discovery/v2/", json={"id": 11}, status_code=201)
+        assert client.start_schema_discovery_run_from_config(req) == 11
+
+    assert m.last_request.json() == {"connection": "conn-1", "discovery_config": DISCOVERY_CONFIG_ID}
+
+
+def test_start_schema_discovery_run_from_config_sends_schemas(client):
+    """`start_schema_discovery_run_from_config` forwards a `schemas` scope to the saved-config endpoint."""
+    req = SchemaDiscoveryFromConfigRequest(
+        connection="conn-1", discovery_config=DiscoveryConfigId(DISCOVERY_CONFIG_ID), schemas=["public"]
+    )
+    with requests_mock.Mocker() as m:
+        m.post("http://test-server/api/schema-discovery/v2/", json={"id": 12}, status_code=201)
+        assert client.start_schema_discovery_run_from_config(req) == 12
+
+    assert m.last_request.json() == {
+        "connection": "conn-1",
+        "discovery_config": DISCOVERY_CONFIG_ID,
+        "schemas": ["public"],
+    }
+
+
+def test_start_file_data_discovery_run_from_config_sends_discovery_config(client):
+    """`start_file_data_discovery_run_from_config` posts only the connection and discovery_config id."""
+    config = DiscoveryConfig(name="my_cfg", config_type="file", id=DiscoveryConfigId(DISCOVERY_CONFIG_ID))
+    req = FileDataDiscoveryFromConfigRequest(connection="conn-1", discovery_config=config)
+    with requests_mock.Mocker() as m:
+        m.post("http://test-server/api/run-file-data-discovery/v2/", json={"id": 99}, status_code=201)
+        assert client.start_file_data_discovery_run_from_config(req) == 99
+
+    assert m.last_request.json() == {"connection": "conn-1", "discovery_config": DISCOVERY_CONFIG_ID}
+
+
+def test_start_file_data_discovery_run_from_config_sends_options(client):
+    """`options` (diagnostic_logging) is posted alongside the config on the file from-config trigger."""
+    req = FileDataDiscoveryFromConfigRequest(
+        connection="conn-1",
+        discovery_config=DiscoveryConfigId(DISCOVERY_CONFIG_ID),
+        options=FileDataDiscoveryOptions(diagnostic_logging=True),
+    )
+    with requests_mock.Mocker() as m:
+        m.post("http://test-server/api/run-file-data-discovery/v2/", json={"id": 77}, status_code=201)
+        assert client.start_file_data_discovery_run_from_config(req) == 77
+
+    assert m.last_request.json() == {
+        "connection": "conn-1",
+        "discovery_config": DISCOVERY_CONFIG_ID,
+        "options": {"diagnostic_logging": True},
+    }
+
+
+def test_start_schema_discovery_run_from_config_none_sends_null_discovery_config(client):
+    """With `discovery_config=None` the client posts an explicit null so the server applies its defaults."""
+    req = SchemaDiscoveryFromConfigRequest(connection="conn-1", discovery_config=None)
+    with requests_mock.Mocker() as m:
+        m.post("http://test-server/api/schema-discovery/v2/", json={"id": 13}, status_code=201)
+        assert client.start_schema_discovery_run_from_config(req) == 13
+
+    assert m.last_request.json() == {"connection": "conn-1", "discovery_config": None}
+
+
+def test_start_file_data_discovery_run_from_config_none_sends_null_discovery_config(client):
+    """With `discovery_config=None` the file-data trigger posts an explicit null so the server applies its defaults."""
+    req = FileDataDiscoveryFromConfigRequest(connection="conn-1", discovery_config=None)
+    with requests_mock.Mocker() as m:
+        m.post("http://test-server/api/run-file-data-discovery/v2/", json={"id": 21}, status_code=201)
+        assert client.start_file_data_discovery_run_from_config(req) == 21
+
+    assert m.last_request.json() == {"connection": "conn-1", "discovery_config": None}
+
+
+def test_start_schema_discovery_run_from_config_raises_invalid_discovery_config_when_not_valid(client):
+    """A 400 with a `discovery_config` validation message raises the specific subclass."""
+    with requests_mock.Mocker() as m:
+        m.post(
+            "http://test-server/api/schema-discovery/v2/",
+            json={
+                "discovery_config": ['Discovery config "my_cfg" cannot be used: validation status is `invalid`.'],
+            },
+            status_code=400,
+        )
+        with pytest.raises(
+            InvalidDiscoveryConfigError,
+            match=r'Schema discovery run failed to start due to discovery config error: .*"my_cfg".*invalid',
+        ):
+            client.start_schema_discovery_run_from_config(
+                SchemaDiscoveryFromConfigRequest(
+                    connection="conn-1", discovery_config=DiscoveryConfigId(DISCOVERY_CONFIG_ID)
+                ),
+            )
+
+
+def test_start_schema_discovery_run_from_config_raises_not_found_when_missing(client):
+    """
+    A 400 for a config that cannot be found raises `DiscoveryConfigNotFoundError`.
+
+    This is a bad reference rather than an unusable-but-present config,
+    so it must not be conflated with `InvalidDiscoveryConfigError`.
+    The not-found subclass still inherits `FailedToStartError` for callers that catch the base.
+    """
+    with requests_mock.Mocker() as m:
+        m.post(
+            "http://test-server/api/schema-discovery/v2/",
+            json={"discovery_config": [f'Invalid pk "{DISCOVERY_CONFIG_ID}" - object does not exist.']},
+            status_code=400,
+        )
+        with pytest.raises(DiscoveryConfigNotFoundError, match="object does not exist") as exc_info:
+            client.start_schema_discovery_run_from_config(
+                SchemaDiscoveryFromConfigRequest(
+                    connection="conn-1", discovery_config=DiscoveryConfigId(DISCOVERY_CONFIG_ID)
+                ),
+            )
+
+    assert isinstance(exc_info.value, FailedToStartError)
+
+
+def test_start_file_data_discovery_run_from_config_raises_not_found_when_missing(client):
+    """A not-found saved config on the file-data trigger also raises `DiscoveryConfigNotFoundError`."""
+    with requests_mock.Mocker() as m:
+        m.post(
+            "http://test-server/api/run-file-data-discovery/v2/",
+            json={"discovery_config": [f'Invalid pk "{DISCOVERY_CONFIG_ID}" - object does not exist.']},
+            status_code=400,
+        )
+        with pytest.raises(DiscoveryConfigNotFoundError, match="object does not exist"):
+            client.start_file_data_discovery_run_from_config(
+                FileDataDiscoveryFromConfigRequest(
+                    connection="conn-1", discovery_config=DiscoveryConfigId(DISCOVERY_CONFIG_ID)
+                ),
+            )
+
+
+def test_start_schema_discovery_run_from_config_raises_invalid_discovery_config_on_broken_yaml(client):
+    """
+    A 400 carrying trigger-time re-validation of broken saved YAML is classified.
+
+    The server reports these under `discovery_config` as `{"message", "line_number", "column_number"}` dicts,
+    not strings.
+    """
+    with requests_mock.Mocker() as m:
+        m.post(
+            "http://test-server/api/schema-discovery/v2/",
+            json={
+                "discovery_config": [
+                    {"message": "Unknown mask 'no_such_mask'.", "line_number": 4, "column_number": 7},
+                ],
+            },
+            status_code=400,
+        )
+        with pytest.raises(
+            InvalidDiscoveryConfigError,
+            match=r"Schema discovery run failed to start due to discovery config error: Unknown mask 'no_such_mask'\.",
+        ):
+            client.start_schema_discovery_run_from_config(
+                SchemaDiscoveryFromConfigRequest(
+                    connection="conn-1", discovery_config=DiscoveryConfigId(DISCOVERY_CONFIG_ID)
+                ),
+            )
+
+
+def test_start_file_data_discovery_run_from_config_raises_invalid_discovery_config(client):
+    with requests_mock.Mocker() as m:
+        m.post(
+            "http://test-server/api/run-file-data-discovery/v2/",
+            json={
+                "discovery_config": ['Discovery config "my_cfg" cannot be used: validation status is `in_progress`.'],
+            },
+            status_code=400,
+        )
+        with pytest.raises(
+            InvalidDiscoveryConfigError,
+            match=r"File data discovery run failed to start due to discovery config error: .*in_progress",
+        ):
+            client.start_file_data_discovery_run_from_config(
+                FileDataDiscoveryFromConfigRequest(
+                    connection="conn-1",
+                    discovery_config=DiscoveryConfigId(DISCOVERY_CONFIG_ID),
+                ),
+            )
+
+
+def test_start_schema_discovery_run_from_config_non_discovery_config_400_still_raises_generic_error(client):
+    """Other 400s (e.g. unknown connection) keep raising the base FailedToStartError, not the config subclass."""
+    with requests_mock.Mocker() as m:
+        m.post(
+            "http://test-server/api/schema-discovery/v2/",
+            json={"connection": ['Invalid pk "nope" - object does not exist.']},
+            status_code=400,
+        )
+        with pytest.raises(FailedToStartError) as exc_info:
+            client.start_schema_discovery_run_from_config(
+                SchemaDiscoveryFromConfigRequest(
+                    connection="nope", discovery_config=DiscoveryConfigId(DISCOVERY_CONFIG_ID)
+                ),
+            )
+        assert not isinstance(exc_info.value, InvalidDiscoveryConfigError)
+
+
+def _zip_bytes(*members: tuple[str, str]) -> bytes:
+    buffer = BytesIO()
+    with zipfile.ZipFile(buffer, "w") as zip_file:
+        for name, content in members:
+            zip_file.writestr(name, content)
+
+    return buffer.getvalue()
+
+
+def test_get_discovery_run_config_snapshot_yaml_returns_yaml(client):
+    """The single zipped snapshot member is unzipped and returned as a YAML string."""
+    snapshot = "# Discovery configuration: my_cfg.\nlabels: []\nmetadata_rules: []\n"
+    with requests_mock.Mocker() as m:
+        m.get(
+            "http://test-server/api/discovery/runs/7/config-snapshot/",
+            content=_zip_bytes(("config-7.yaml", snapshot)),
+            headers={"Content-Disposition": 'attachment; filename="config-7.yaml.zip"'},
+            status_code=200,
+        )
+        result = client.get_discovery_run_config_snapshot_yaml(RunId(7))
+
+    assert result == snapshot
+    assert "timezone" not in (m.last_request.qs or {})
+
+
+def test_get_discovery_run_config_snapshot_yaml_forwards_timezone(client):
+    """An explicit `timezone` is forwarded as a query param for the provenance-header timestamp."""
+    with requests_mock.Mocker() as m:
+        m.get(
+            "http://test-server/api/discovery/runs/7/config-snapshot/",
+            content=_zip_bytes(("config-7.yaml", "labels: []\n")),
+            status_code=200,
+        )
+        client.get_discovery_run_config_snapshot_yaml(RunId(7), timezone="+12:00")
+
+    assert m.last_request.qs["timezone"] == ["+12:00"]
+
+
+def test_get_discovery_run_config_snapshot_yaml_empty_archive_raises(client):
+    """An archive with no members raises a clear error rather than an IndexError."""
+    with requests_mock.Mocker() as m:
+        m.get(
+            "http://test-server/api/discovery/runs/7/config-snapshot/",
+            content=_zip_bytes(),
+            status_code=200,
+        )
+        with pytest.raises(DataMasqueException, match="contained no files"):
+            client.get_discovery_run_config_snapshot_yaml(RunId(7))

@@ -41,6 +41,23 @@ class InvalidLibraryError(FailedToStartError):
     """Specific error for when runs fail to start due to having an invalid ruleset library."""
 
 
+class InvalidDiscoveryConfigError(FailedToStartError):
+    """
+    Raised when a discovery run fails to start because the referenced config is present but unusable.
+
+    The config exists but is not in a `valid` validation state, or its YAML is rejected when the run starts.
+    A config that cannot be found raises `DiscoveryConfigNotFoundError` instead.
+    """
+
+
+class DiscoveryConfigNotFoundError(FailedToStartError):
+    """
+    Raised when a discovery run references a discovery config that cannot be found.
+
+    The config does not exist or is the wrong type for the run.
+    """
+
+
 class DataMasqueTransportError(DataMasqueException):
     """
     Raised when a request to the DataMasque server fails before any response is received.
