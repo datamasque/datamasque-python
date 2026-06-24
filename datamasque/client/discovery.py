@@ -440,3 +440,22 @@ class DiscoveryClient(BaseClient):
 
         response = self.make_request("GET", f"api/runs/{run_id}/file-discovery-results/")
         return [FileDiscoveryResult.model_validate(d) for d in response.json()]
+
+    def get_discovery_run_config_snapshot_yaml(self, run_id: RunId, *, timezone: Optional[str] = None) -> str:
+        """
+        Returns the discovery-config YAML that was effective at the start of the given discovery run.
+
+        The YAML is prefixed with a commented provenance header naming the saved config
+        (or the built-in defaults) the run used, and whether it has since been modified or deleted.
+        `timezone`, a `±HH:MM` UTC offset, sets the timezone of the header timestamp; the server defaults to UTC.
+        """
+
+        params = {"timezone": timezone} if timezone is not None else None
+        response = self.make_request("GET", f"/api/discovery/runs/{run_id}/config-snapshot/", params=params)
+        with zipfile.ZipFile(BytesIO(response.content)) as zip_file:
+            names = zip_file.namelist()
+            if not names:
+                raise DataMasqueException(f"Discovery run {run_id} config snapshot archive contained no files.")
+
+            with zip_file.open(names[0]) as snapshot_file:
+                return snapshot_file.read().decode("utf-8")

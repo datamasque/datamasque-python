@@ -1213,3 +1213,53 @@ def test_start_schema_discovery_run_from_config_non_discovery_config_400_still_r
                 ),
             )
         assert not isinstance(exc_info.value, InvalidDiscoveryConfigError)
+
+
+def _zip_bytes(*members: tuple[str, str]) -> bytes:
+    buffer = BytesIO()
+    with zipfile.ZipFile(buffer, "w") as zip_file:
+        for name, content in members:
+            zip_file.writestr(name, content)
+
+    return buffer.getvalue()
+
+
+def test_get_discovery_run_config_snapshot_yaml_returns_yaml(client):
+    """The single zipped snapshot member is unzipped and returned as a YAML string."""
+    snapshot = "# Discovery configuration: my_cfg.\nlabels: []\nmetadata_rules: []\n"
+    with requests_mock.Mocker() as m:
+        m.get(
+            "http://test-server/api/discovery/runs/7/config-snapshot/",
+            content=_zip_bytes(("config-7.yaml", snapshot)),
+            headers={"Content-Disposition": 'attachment; filename="config-7.yaml.zip"'},
+            status_code=200,
+        )
+        result = client.get_discovery_run_config_snapshot_yaml(RunId(7))
+
+    assert result == snapshot
+    assert "timezone" not in (m.last_request.qs or {})
+
+
+def test_get_discovery_run_config_snapshot_yaml_forwards_timezone(client):
+    """An explicit `timezone` is forwarded as a query param for the provenance-header timestamp."""
+    with requests_mock.Mocker() as m:
+        m.get(
+            "http://test-server/api/discovery/runs/7/config-snapshot/",
+            content=_zip_bytes(("config-7.yaml", "labels: []\n")),
+            status_code=200,
+        )
+        client.get_discovery_run_config_snapshot_yaml(RunId(7), timezone="+12:00")
+
+    assert m.last_request.qs["timezone"] == ["+12:00"]
+
+
+def test_get_discovery_run_config_snapshot_yaml_empty_archive_raises(client):
+    """An archive with no members raises a clear error rather than an IndexError."""
+    with requests_mock.Mocker() as m:
+        m.get(
+            "http://test-server/api/discovery/runs/7/config-snapshot/",
+            content=_zip_bytes(),
+            status_code=200,
+        )
+        with pytest.raises(DataMasqueException, match="contained no files"):
+            client.get_discovery_run_config_snapshot_yaml(RunId(7))

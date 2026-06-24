@@ -12,6 +12,8 @@ History
 * Corrected the file-data-discovery ``include``/``skip`` filter syntax and added ``ignore_rules`` support.
 * Added ``InvalidDiscoveryConfigError`` and ``DiscoveryConfigNotFoundError``,
   raised when a discovery run can't start due to an unusable or missing discovery config.
+* Added ``get_discovery_run_config_snapshot_yaml`` to retrieve the discovery-config YAML
+  that was effective at the start of a given discovery run.
 * Added ``is_user_subscribed`` to ``MaskingRunRequest`` to subscribe the requesting user to a run's email notifications.
 * Added ``auto_pull`` / ``auto_pull_branch`` to ``MaskingRunOptions``
   to refresh the run's ruleset from git before starting.
