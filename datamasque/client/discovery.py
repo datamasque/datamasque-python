@@ -297,29 +297,7 @@ class DiscoveryClient(BaseClient):
             FailedToStartError: the run failed to start for any other reason.
         """
 
-        data = request.model_dump(exclude_none=True, mode="json")
-        # The server requires `discovery_config` to be present; a null selects its built-in defaults,
-        # so send it explicitly rather than letting `exclude_none` drop a None.
-        data.setdefault("discovery_config", None)
-        response = self.make_request(
-            "POST",
-            "/api/schema-discovery/v2/",
-            data=data,
-            require_status_check=False,
-        )
-        run_data = response.json() if response.content else {}
-
-        if response.status_code == 201:
-            logger.info("Schema discovery run %s started successfully", run_data["id"])
-            return RunId(run_data["id"])
-
-        logger.error("Schema discovery run failed to start: %s", run_data)
-        self._maybe_raise_discovery_config_error(run_data, response, "Schema discovery")
-        raise FailedToStartError(
-            f"Schema discovery run failed to start "
-            f"(server responded with status {response.status_code}: {response.text}).",
-            response=response,
-        )
+        return self._start_discovery_run_from_config(request, "/api/schema-discovery/v2/", "Schema discovery")
 
     def start_file_data_discovery_run_from_config(self, request: FileDataDiscoveryFromConfigRequest) -> RunId:
         """
@@ -341,27 +319,31 @@ class DiscoveryClient(BaseClient):
             FailedToStartError: the run failed to start for any other reason.
         """
 
+        return self._start_discovery_run_from_config(request, "/api/run-file-data-discovery/v2/", "File data discovery")
+
+    def _start_discovery_run_from_config(
+        self,
+        request: Union[SchemaDiscoveryFromConfigRequest, FileDataDiscoveryFromConfigRequest],
+        path: str,
+        run_kind: str,
+    ) -> RunId:
+        """Post a saved-config discovery request and return its run id, classifying config errors on failure."""
+
         data = request.model_dump(exclude_none=True, mode="json")
         # The server requires `discovery_config` to be present; a null selects its built-in defaults,
         # so send it explicitly rather than letting `exclude_none` drop a None.
         data.setdefault("discovery_config", None)
-        response = self.make_request(
-            "POST",
-            "/api/run-file-data-discovery/v2/",
-            data=data,
-            require_status_check=False,
-        )
+        response = self.make_request("POST", path, data=data, require_status_check=False)
         run_data = response.json() if response.content else {}
 
         if response.status_code == 201:
-            logger.info("File data discovery run %s started successfully", run_data["id"])
+            logger.info("%s run %s started successfully", run_kind, run_data["id"])
             return RunId(run_data["id"])
 
-        logger.error("File data discovery run failed to start: %s", run_data)
-        self._maybe_raise_discovery_config_error(run_data, response, "File data discovery")
+        logger.error("%s run failed to start: %s", run_kind, run_data)
+        self._maybe_raise_discovery_config_error(run_data, response, run_kind)
         raise FailedToStartError(
-            f"File data discovery run failed to start "
-            f"(server responded with status {response.status_code}: {response.text}).",
+            f"{run_kind} run failed to start (server responded with status {response.status_code}: {response.text}).",
             response=response,
         )
 
