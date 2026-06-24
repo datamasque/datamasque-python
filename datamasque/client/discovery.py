@@ -192,6 +192,13 @@ class DiscoveryClient(BaseClient):
                         with zip_file.open(file_info) as file:
                             yaml_content = file.read().decode("utf-8")
                             rulesets.append(Ruleset(name=Path(file_info.filename).stem, yaml=yaml_content))
+
+            if not rulesets:
+                raise DataMasqueException(
+                    f"Ruleset generation for connection {connection_id} reported `finished` "
+                    f"but the downloaded archive contained no rulesets."
+                )
+
             return rulesets
 
         generated = response.json().get("generated_ruleset")

@@ -193,6 +193,33 @@ def test_get_generated_rulesets_success(client):
         assert rulesets[1].yaml == yaml_content_2.decode("utf-8")
 
 
+def test_get_generated_rulesets_empty_archive_raises(client):
+    """A finished task whose download archive contains no ruleset files raises a clear error."""
+    connection_id = ConnectionId("1")
+
+    with requests_mock.Mocker() as m:
+        m.get(
+            f"http://test-server/api/async-generate-ruleset/{connection_id}/",
+            json={"status": "finished"},
+            status_code=200,
+        )
+
+        zip_buffer = BytesIO()
+        with zipfile.ZipFile(zip_buffer, "w") as zip_file:
+            zip_file.writestr("README.txt", "no rulesets here")
+        zip_buffer.seek(0)
+
+        m.get(
+            f"http://test-server/api/async-generate-ruleset/{connection_id}/download-rulesets/",
+            content=zip_buffer.getvalue(),
+            headers={"Content-Disposition": 'attachment; filename="rulesets.zip"'},
+            status_code=200,
+        )
+
+        with pytest.raises(DataMasqueException, match="contained no rulesets"):
+            client.get_generated_rulesets(connection_id)
+
+
 def test_get_generated_rulesets_from_selection_success(client):
     """Non-CSV async RG: server 303s to the task-status endpoint, whose JSON body carries `generated_ruleset`."""
     connection_id = ConnectionId("1")
