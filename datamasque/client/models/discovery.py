@@ -252,7 +252,7 @@ class DiscoveryMatch(BaseModel):
 
     model_config = ConfigDict(extra="allow")
 
-    label: str
+    label: Optional[str] = None
     categories: list[str]
     flagged_by: str
     description: str
@@ -343,8 +343,8 @@ class FileDiscoveryMatch(BaseModel):
 
     flagged_by: str
     description: str
-    label: Optional[str] = None  # Omitted for non-sensitive and ignored matches.
-    categories: Optional[list[str]] = None  # Omitted for ignored matches.
+    label: Optional[str] = None  # Omitted for non-sensitive matches.
+    categories: Optional[list[str]] = None
     hit_ratio: Optional[int] = None  # None for metadata matches, percentage 0-100 for IDD matches.
 
 

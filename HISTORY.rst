@@ -2,6 +2,15 @@
 History
 =======
 
+1.1.1 (2026-06-25)
+------------------
+
+* Made ``DiscoveryMatch.label`` optional (it is absent for non-sensitive/ignore matches).
+* Added the ``finished_with_warnings`` status to ``AsyncRulesetGenerationTaskStatus``.
+* ``get_db_discovery_result_report`` may now return ``bytes`` (a zip)
+  when the server splits a large DB-discovery report,
+  and ruleset generation from CSV now detects and forwards zip uploads.
+
 1.1.0 (2026-06-24)
 ------------------
 

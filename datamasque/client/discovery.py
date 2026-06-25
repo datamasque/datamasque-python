@@ -98,6 +98,10 @@ class DiscoveryClient(BaseClient):
         - A text file handle (e.g. `open(path)`)
         - A binary file handle (e.g. `open(path, 'rb')`)
 
+        If the content is a zip (for example a split report from `get_db_discovery_result_report()`),
+        it is detected by its magic bytes and uploaded as a zip;
+        otherwise it is uploaded as CSV.
+
         Generation runs asynchronously on the server.
         Poll `get_async_ruleset_generation_task_status` until it returns
         `AsyncRulesetGenerationTaskStatus.finished`,
@@ -114,14 +118,22 @@ class DiscoveryClient(BaseClient):
         else:
             content = csv_content
 
+        is_zip = False
+        if content.seekable():
+            is_zip = content.read(4) == b"PK\x03\x04"
+            content.seek(0)
+        filename = "ruleset.zip" if is_zip else "ruleset.csv"
+        content_type = "application/zip" if is_zip else "text/csv"
+
         files = [
             UploadFile(
                 field_name="csv_or_zip_file",
-                filename="ruleset.csv",
+                filename=filename,
                 content=content,
-                content_type="text/csv",
+                content_type=content_type,
             ),
         ]
+
         self.make_request(
             method="POST",
             path=f"/api/async-generate-ruleset/{connection_id}/from-csv/",

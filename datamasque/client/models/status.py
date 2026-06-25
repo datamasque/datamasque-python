@@ -60,6 +60,7 @@ class AsyncRulesetGenerationTaskStatus(enum.Enum):
     """List of statuses of async ruleset generation tasks."""
 
     finished = "finished"
+    finished_with_warnings = "finished_with_warnings"
     failed = "failed"
     running = "running"
     queued = "queued"
