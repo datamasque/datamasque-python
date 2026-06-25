@@ -64,15 +64,28 @@ class AsyncRulesetGenerationTaskStatus(enum.Enum):
     failed = "failed"
     running = "running"
     queued = "queued"
+    cancelled = "cancelled"
 
     @classmethod
     def get_final_states(cls) -> set["AsyncRulesetGenerationTaskStatus"]:
         """Returns the list of final statuses, i.e. the ruleset generation has completed, successfully or otherwise."""
 
-        return {cls.finished, cls.failed}
+        return {cls.finished, cls.finished_with_warnings, cls.failed, cls.cancelled}
+
+    @classmethod
+    def get_finished_states(cls) -> set["AsyncRulesetGenerationTaskStatus"]:
+        """Returns the list of statuses that indicate the ruleset generation completed successfully."""
+
+        return {cls.finished, cls.finished_with_warnings}
 
     @property
     def is_in_final_state(self) -> bool:
         """Returns True if this status is a final status."""
 
         return self in self.get_final_states()
+
+    @property
+    def is_finished(self) -> bool:
+        """Returns True if this status is a finished status."""
+
+        return self in self.get_finished_states()
