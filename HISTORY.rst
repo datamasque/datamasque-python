@@ -2,6 +2,12 @@
 History
 =======
 
+1.1.2 (2026-06-26)
+------------------
+
+* Completed wiring of the ``finished_with_warnings`` status for ``AsyncRulesetGenerationTaskStatus``.
+* Added the ``cancelled`` status to ``AsyncRulesetGenerationTaskStatus``.
+
 1.1.1 (2026-06-25)
 ------------------
 

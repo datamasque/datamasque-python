@@ -204,6 +204,47 @@ def test_get_generated_rulesets_success(client):
         assert rulesets[1].yaml == yaml_content_2.decode("utf-8")
 
 
+def test_get_generated_rulesets_finished_with_warnings_success(client):
+    """A task that finishes with warnings is still successful: its rulesets are returned, not treated as in-progress."""
+    connection_id = ConnectionId("1")
+    yaml_content = b"""
+    version: "1.0"
+    tasks:
+    - type: mask_table
+      table: table1
+      key: id
+      rules:
+      - column: col1
+        masks:
+        - type: do_nothing
+    """
+
+    with requests_mock.Mocker() as m:
+        m.get(
+            f"http://test-server/api/async-generate-ruleset/{connection_id}/",
+            json={"status": "finished_with_warnings"},
+            status_code=200,
+        )
+
+        zip_buffer = BytesIO()
+        with zipfile.ZipFile(zip_buffer, "w") as zip_file:
+            zip_file.writestr("ruleset1.yml", yaml_content.decode("utf-8"))
+        zip_buffer.seek(0)
+
+        m.get(
+            f"http://test-server/api/async-generate-ruleset/{connection_id}/download-rulesets/",
+            content=zip_buffer.getvalue(),
+            headers={"Content-Disposition": 'attachment; filename="rulesets.zip"'},
+            status_code=200,
+        )
+
+        rulesets = client.get_generated_rulesets(connection_id)
+
+        assert len(rulesets) == 1
+        assert rulesets[0].name == "ruleset1"
+        assert rulesets[0].yaml == yaml_content.decode("utf-8")
+
+
 def test_get_generated_rulesets_empty_archive_raises(client):
     """A finished task whose download archive contains no ruleset files raises a clear error."""
     connection_id = ConnectionId("1")
@@ -287,6 +328,21 @@ def test_get_generated_rulesets_failed(client):
         )
 
         with pytest.raises(DataMasqueException, match="Ruleset generation failed for connection"):
+            client.get_generated_rulesets(connection_id)
+
+
+def test_get_generated_rulesets_cancelled(client):
+    """A cancelled task is terminal, so it raises a non-retryable DataMasqueException, not the in-progress error."""
+    connection_id = ConnectionId("1")
+
+    with requests_mock.Mocker() as m:
+        m.get(
+            f"http://test-server/api/async-generate-ruleset/{connection_id}/",
+            json={"status": "cancelled"},
+            status_code=200,
+        )
+
+        with pytest.raises(DataMasqueException, match="Ruleset generation was cancelled for connection"):
             client.get_generated_rulesets(connection_id)
 
 
