@@ -42,6 +42,13 @@ Authentication is performed on the first request if ``authenticate()`` is not ca
 and is automatically retried once on a 401 response.
 ``client.healthcheck()`` is available as a lightweight readiness probe that does not consume credentials.
 
+For a DataMasque instance hosted behind Snowflake SPCS (Snowpark Container Services) app ingress
+(a ``*.snowflakecomputing.app`` ``base_url``),
+pass a Snowflake Programmatic Access Token as ``spcs_pat`` on ``DataMasqueInstanceConfig``;
+the client sends it on the ``X-SF-SPCS-Authorization`` header to clear the Snowflake gateway,
+which strips it before forwarding so your DataMasque auth is unaffected.
+See the `usage docs <https://datamasque-python.readthedocs.io/en/latest/usage.html>`_ for details.
+
 Error handling
 ==============
 
@@ -60,6 +67,9 @@ All methods raise subclasses of ``DataMasqueException`` on failure:
   raised by ``start_masking_run`` when the server rejects the run.
 - ``DataMasqueUserError`` —
   raised by user-management methods when the input is invalid.
+- ``SpcsGatewayAuthError`` —
+  raised when a Snowflake SPCS app gateway rejects the configured ``spcs_pat``
+  before the request reaches DataMasque.
 
 Documentation
 =============

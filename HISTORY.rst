@@ -2,6 +2,15 @@
 History
 =======
 
+1.1.5 (2026-06-29)
+------------------
+
+* Added ``spcs_pat`` to ``DataMasqueInstanceConfig`` for authenticating when
+  DataMasque is in Snowflake SPCS (Native App).
+* Added ``SpcsGatewayAuthError``, raised when the SPCS gateway rejects the PAT
+  before the request reaches DataMasque (with the Snowflake detail and a hint at
+  the likely cause).
+
 1.1.4 (2026-06-29)
 ------------------
 

@@ -84,6 +84,22 @@ class IfmAuthError(DataMasqueIfmError):
     """Raised when the IFM client cannot obtain or refresh a JWT (e.g. invalid credentials, missing scope)."""
 
 
+class SpcsGatewayAuthError(DataMasqueException):
+    """
+    Raised when a Snowflake SPCS app gateway rejects the configured ``spcs_pat``.
+
+    Only relevant when the client is configured with ``spcs_pat`` for an
+    instance behind Snowflake SPCS app ingress. The message includes the
+    Snowflake-provided detail, request id, and a hint at the likely cause
+    (e.g. an expired PAT or a network policy that excludes your IP).
+
+    Deliberately a direct subclass of `DataMasqueException` rather than
+    `DataMasqueApiError`: the client's 401 re-authenticate-and-retry path keys
+    off `DataMasqueApiError`/HTTP status, so keeping this outside that subtree
+    ensures a gateway rejection aborts immediately instead of looping.
+    """
+
+
 class RunNotCancellableError(DataMasqueUserError):
     """
     Raised when `cancel_run` is called against a run that is no longer eligible for cancellation.
