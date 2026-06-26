@@ -10,6 +10,10 @@ History
 * Added ``SpcsGatewayAuthError``, raised when the SPCS gateway rejects the PAT
   before the request reaches DataMasque (with the Snowflake detail and a hint at
   the likely cause).
+* Added ``spcs`` to ``SnowflakeStageLocation`` so connections staged inside
+  Snowflake SPCS deserialise correctly. Previously, listing connections on an
+  instance that held an SPCS-staged Snowflake connection raised a
+  ``ValidationError`` on the unknown stage value.
 
 1.1.4 (2026-06-29)
 ------------------

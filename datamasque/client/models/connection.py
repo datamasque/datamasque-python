@@ -57,6 +57,7 @@ class SnowflakeStageLocation(str, Enum):
     local = "local"  # Not supported for production use
     aws_s3 = "aws_s3"
     azure_blob_storage = "azure_blob_storage"
+    spcs = "spcs"  # DataMasque running inside Snowflake SPCS; staged on the container's own storage
 
 
 class SseSelection(Enum):
