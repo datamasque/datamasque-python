@@ -44,6 +44,7 @@ class DatabaseType(Enum):
     mssql_linked = "mssql_linked"
     snowflake = "snowflake"
     mongodb = "mongodb"
+    documentdb = "documentdb"
     databricks_lakebase = "databricks_lakebase"
     databricks = "databricks"
     informix = "informix"
@@ -160,6 +161,8 @@ class MongoConnectionConfig(ConnectionConfig):
     password: Optional[str] = None
     auth_source: str = "admin"
     tls: bool = False
+    tls_ca_file: str = ""
+    tls_allow_invalid_certificates: bool = False
     direct_connection: bool = False
     replica_set: str = ""
     is_read_only: bool = False
@@ -180,6 +183,13 @@ class MongoConnectionConfig(ConnectionConfig):
             d["dbpassword"] = password
         if not d.get("tls"):
             d.pop("tls", None)
+            d.pop("tls_ca_file", None)
+            d.pop("tls_allow_invalid_certificates", None)
+        else:
+            if not d.get("tls_ca_file"):
+                d.pop("tls_ca_file", None)
+            if not d.get("tls_allow_invalid_certificates"):
+                d.pop("tls_allow_invalid_certificates", None)
         if not d.get("direct_connection"):
             d.pop("direct_connection", None)
         if not d.get("replica_set"):
@@ -195,6 +205,23 @@ class MongoConnectionConfig(ConnectionConfig):
             for key in ("password_encrypted", "dbpassword"):
                 data.pop(key, None)
         return data
+
+
+class DocumentDbConnectionConfig(MongoConnectionConfig):
+    """
+    Connection configuration for an AWS DocumentDB cluster.
+
+    DocumentDB is MongoDB wire-compatible,
+    so it reuses `MongoConnectionConfig` (including the TLS handling)
+    and only differs by `db_type`/`database_type`.
+    """
+
+    # Narrowing the inherited Literal is a deliberate Pydantic discriminator override.
+    db_type: Literal["documentdb"] = "documentdb"  # type: ignore[assignment]
+
+    @property
+    def database_type(self) -> DatabaseType:
+        return DatabaseType.documentdb
 
 
 class SnowflakeConnectionConfig(ConnectionConfig):
@@ -430,6 +457,7 @@ FILE_TYPE_MAP: dict[str, type[FileConnectionConfig]] = {
 DB_TYPE_MAP: dict[str, type[ConnectionConfig]] = {
     DatabaseType.dynamodb.value: DynamoConnectionConfig,
     DatabaseType.mongodb.value: MongoConnectionConfig,
+    DatabaseType.documentdb.value: DocumentDbConnectionConfig,
     DatabaseType.snowflake.value: SnowflakeConnectionConfig,
     DatabaseType.mssql_linked.value: MssqlLinkedServerConnectionConfig,
     DatabaseType.databricks.value: DatabricksConnectionConfig,
