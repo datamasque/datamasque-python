@@ -2,6 +2,15 @@
 History
 =======
 
+1.1.3 (2026-06-26)
+------------------
+
+* Added ``tls_ca_file`` and ``tls_allow_invalid_certificates`` to ``MongoConnectionConfig``,
+  serialized only when TLS is enabled (``tls_ca_file`` only when set,
+  ``tls_allow_invalid_certificates`` only when ``True``).
+* Added ``DatabaseType.documentdb`` and ``DocumentDbConnectionConfig`` for AWS DocumentDB,
+  which is MongoDB wire-compatible and reuses ``MongoConnectionConfig`` (differing only by ``db_type``).
+
 1.1.2 (2026-06-26)
 ------------------
 

@@ -10,6 +10,7 @@ from datamasque.client.models.connection import (
     DatabaseConnectionConfig,
     DatabaseType,
     DatabricksConnectionConfig,
+    DocumentDbConnectionConfig,
     DynamoConnectionConfig,
     MongoConnectionConfig,
     MountedShareConnectionConfig,
@@ -1199,6 +1200,111 @@ def test_connection_config_dispatch_picks_mongo_subclass():
         "database": "people",
     }
     assert isinstance(validate_connection(payload), MongoConnectionConfig)
+
+
+def test_mongo_tls_ca_fields_emitted_when_tls_enabled():
+    conn = MongoConnectionConfig(
+        name="mongo",
+        host="mongo.example",
+        database="people",
+        tls=True,
+        tls_ca_file="/certs/rds-ca.pem",
+        tls_allow_invalid_certificates=True,
+    )
+    d = conn.model_dump(exclude_none=True, by_alias=True, mode="json")
+    assert d["tls"] is True
+    assert d["tls_ca_file"] == "/certs/rds-ca.pem"
+    assert d["tls_allow_invalid_certificates"] is True
+
+
+def test_mongo_tls_ca_fields_omitted_when_unset_but_tls_enabled():
+    conn = MongoConnectionConfig(name="mongo", host="mongo.example", database="people", tls=True)
+    d = conn.model_dump(exclude_none=True, by_alias=True, mode="json")
+    assert d["tls"] is True
+    assert "tls_ca_file" not in d
+    assert "tls_allow_invalid_certificates" not in d
+
+
+def test_mongo_tls_ca_fields_omitted_when_tls_disabled():
+    """Even when set, the TLS-dependent fields are not sent while TLS is disabled."""
+    conn = MongoConnectionConfig(
+        name="mongo",
+        host="mongo.example",
+        database="people",
+        tls=False,
+        tls_ca_file="/certs/rds-ca.pem",
+        tls_allow_invalid_certificates=True,
+    )
+    d = conn.model_dump(exclude_none=True, by_alias=True, mode="json")
+    for absent in ("tls", "tls_ca_file", "tls_allow_invalid_certificates"):
+        assert absent not in d
+
+
+def test_mongo_tls_ca_fields_roundtrip():
+    payload = {
+        "id": "mongo-tls-1",
+        "name": "mongo",
+        "mask_type": "database",
+        "db_type": "mongodb",
+        "host": "mongo.example",
+        "database": "people",
+        "tls": True,
+        "tls_ca_file": "/certs/rds-ca.pem",
+        "tls_allow_invalid_certificates": True,
+    }
+    conn = MongoConnectionConfig.model_validate(payload)
+    assert conn.tls is True
+    assert conn.tls_ca_file == "/certs/rds-ca.pem"
+    assert conn.tls_allow_invalid_certificates is True
+
+
+def test_mongo_tls_ca_fields_default_when_missing():
+    payload = {
+        "id": "mongo-tls-2",
+        "name": "mongo",
+        "mask_type": "database",
+        "db_type": "mongodb",
+        "host": "mongo.example",
+        "database": "people",
+    }
+    conn = MongoConnectionConfig.model_validate(payload)
+    assert conn.tls_ca_file == ""
+    assert conn.tls_allow_invalid_certificates is False
+
+
+def test_documentdb_connection_model_dump():
+    conn = DocumentDbConnectionConfig(
+        name="docdb",
+        host="dtq-documentdb.cluster.example",
+        database="people",
+        user="dmadmin",
+        password="hunter2",
+        tls=True,
+        tls_ca_file="/certs/rds-ca.pem",
+        retry_writes=False,
+    )
+    d = conn.model_dump(exclude_none=True, by_alias=True, mode="json")
+    assert d["db_type"] == "documentdb"
+    assert d["mask_type"] == "database"
+    assert d["dbpassword"] == "hunter2"
+    assert d["tls"] is True
+    assert d["tls_ca_file"] == "/certs/rds-ca.pem"
+    assert d["retry_writes"] is False
+    assert conn.database_type is DatabaseType.documentdb
+
+
+def test_connection_config_dispatch_picks_documentdb_subclass():
+    payload = {
+        "id": "docdb-id-1",
+        "name": "docdb",
+        "mask_type": "database",
+        "db_type": "documentdb",
+        "host": "dtq-documentdb.cluster.example",
+        "database": "people",
+    }
+    conn = validate_connection(payload)
+    assert isinstance(conn, DocumentDbConnectionConfig)
+    assert conn.database_type is DatabaseType.documentdb
 
 
 def test_database_connection_config_rejects_mongodb_database_type():
