@@ -21,6 +21,7 @@ from datamasque.client.exceptions import (
     DataMasqueTransportError,
 )
 from datamasque.client.models.dm_instance import DataMasqueInstanceConfig
+from datamasque.client.spcs import install_spcs_gateway_auth
 
 logger = logging.getLogger(__name__)
 
@@ -137,6 +138,8 @@ class BaseClient:
         self.verify_ssl = connection_config.verify_ssl
         self.token_source = connection_config.token_source
         self._session = _build_session(self.verify_ssl)
+        if connection_config.spcs_pat:
+            install_spcs_gateway_auth(self._session, connection_config.spcs_pat)
 
     @contextmanager
     def _maybe_suppress_insecure_warning(self) -> Iterator[None]:

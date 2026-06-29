@@ -20,6 +20,11 @@ class DataMasqueInstanceConfig(BaseModel):
     the client prepends it with `Token ` when sending the `Authorization` header.
     The client calls `token_source` on each authentication attempt,
     so the callable is free to fetch and refresh tokens out-of-band (e.g. from a secrets manager).
+
+    `spcs_pat` is an optional Snowflake Programmatic Access Token
+    for reaching a DataMasque instance hosted on Snowpark Container Services (SPCS).
+    It layers underneath whichever DataMasque auth method
+    (`password` or `token_source`) you choose.
     """
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
@@ -29,6 +34,14 @@ class DataMasqueInstanceConfig(BaseModel):
     password: Optional[str] = None
     verify_ssl: bool = True
     token_source: Optional[Callable[[], str]] = None
+    spcs_pat: Optional[str] = None
+    """Snowflake Programmatic Access Token
+    for a DataMasque instance hosted on Snowpark Container Services (SPCS),
+    where `base_url` ends in `.snowflakecomputing.app`.
+
+    Create the token in Snowsight (User profile → Programmatic access tokens)
+    for an account that can reach the SPCS app.
+    Leave unset for instances that are not hosted on SPCS."""
 
     @model_validator(mode="after")
     def _validate_auth_source(self) -> "DataMasqueInstanceConfig":

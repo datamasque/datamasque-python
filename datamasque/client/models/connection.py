@@ -57,6 +57,7 @@ class SnowflakeStageLocation(str, Enum):
     local = "local"  # Not supported for production use
     aws_s3 = "aws_s3"
     azure_blob_storage = "azure_blob_storage"
+    spcs = "spcs"  # DataMasque running inside Snowflake SPCS; staged on the container's own storage
 
 
 class SseSelection(Enum):
@@ -234,10 +235,14 @@ class SnowflakeConnectionConfig(ConnectionConfig):
     """
 
     database: str
-    user: str
-    snowflake_account_id: str
-    snowflake_warehouse: str
-    snowflake_storage_integration_name: str
+    # Optional because DataMasque-in-SPCS connections leave these unset: the agent uses the
+    # container's OAuth token + SNOWFLAKE_HOST/SNOWFLAKE_ACCOUNT env and the app-owned QUERY_WAREHOUSE,
+    # so user/account/storage-integration/warehouse are null for stage_location=spcs. Mirrors the app's
+    # canonical model (agent .../schemas/connection/connection.py), which types these `| None = None`.
+    user: Optional[str] = None
+    snowflake_account_id: Optional[str] = None
+    snowflake_warehouse: Optional[str] = None
+    snowflake_storage_integration_name: Optional[str] = None
     host: str = ""
     port: Optional[int] = None
     db_schema: Optional[str] = Field(default=None, alias="schema")

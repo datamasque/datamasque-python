@@ -2,6 +2,16 @@
 History
 =======
 
+1.1.5 (2026-06-29)
+------------------
+
+* Added support for DataMasque deployments on Snowpark Container Services (SPCS):
+
+  * Added ``spcs_pat`` to ``DataMasqueInstanceConfig`` for authenticating through the SPCS app gateway.
+  * Added ``SpcsGatewayAuthError``, raised when the gateway rejects the PAT.
+  * Added the ``spcs`` option to ``SnowflakeStageLocation``.
+  * Made several ``SnowflakeConnectionConfig`` fields optional, since SPCS-staged connections leave them unset.
+
 1.1.4 (2026-06-29)
 ------------------
 

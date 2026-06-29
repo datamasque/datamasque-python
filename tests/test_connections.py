@@ -952,6 +952,36 @@ def test_snowflake_connection_model_validate_with_stage_location():
     assert conn.password is None
 
 
+def test_snowflake_connection_model_validate_with_spcs_stage_location():
+    """
+    A Snowflake connection staged in SPCS must deserialise (regression for ui-testing MR !185).
+
+    When DataMasque runs inside Snowflake SPCS it saves connections with
+    `snowflake_stage_location=spcs`. Listing connections deserialises every
+    one, so an unknown stage value used to raise `ValidationError` and break
+    `create_or_update_connection` for unrelated connections on a shared instance.
+    """
+    payload = {
+        "id": "a1b2c3d4-0000-0000-0000-000000000000",
+        "name": "snowflake_spcs",
+        "mask_type": "database",
+        "db_type": "snowflake",
+        "user": "snowman",
+        "database": "icicle",
+        "snowflake_account_id": "ABCDEF-123456",
+        "snowflake_warehouse": "warehouse1",
+        "snowflake_storage_integration_name": "mysi",
+        "snowflake_stage_location": "spcs",
+    }
+
+    conn = SnowflakeConnectionConfig.model_validate(payload)
+
+    assert conn.snowflake_stage_location is SnowflakeStageLocation.spcs
+    # SPCS staging carries no external-storage fields.
+    assert conn.s3_bucket_name is None
+    assert conn.snowflake_azure_container_name is None
+
+
 def test_snowflake_connection_model_validate_without_stage_location():
     payload = {
         "id": "id-3",

@@ -42,6 +42,11 @@ Authentication is performed on the first request if ``authenticate()`` is not ca
 and is automatically retried once on a 401 response.
 ``client.healthcheck()`` is available as a lightweight readiness probe that does not consume credentials.
 
+For a DataMasque instance hosted on Snowpark Container Services (SPCS)
+(a ``*.snowflakecomputing.app`` ``base_url``),
+pass a Snowflake Programmatic Access Token as ``spcs_pat`` on ``DataMasqueInstanceConfig``.
+See the `usage docs <https://datamasque-python.readthedocs.io/en/latest/usage.html>`_ for details.
+
 Error handling
 ==============
 
