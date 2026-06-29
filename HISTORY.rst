@@ -2,6 +2,11 @@
 History
 =======
 
+1.1.4 (2026-06-29)
+------------------
+
+* Added ``DatabaseType.saphana`` for SAP HANA support.
+
 1.1.3 (2026-06-26)
 ------------------
 
