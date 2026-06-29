@@ -48,6 +48,7 @@ class DatabaseType(Enum):
     databricks_lakebase = "databricks_lakebase"
     databricks = "databricks"
     informix = "informix"
+    saphana = "saphana"
 
 
 class SnowflakeStageLocation(str, Enum):
