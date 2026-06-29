@@ -86,16 +86,16 @@ class IfmAuthError(DataMasqueIfmError):
 
 class SpcsGatewayAuthError(DataMasqueException):
     """
-    Raised when a Snowflake SPCS app gateway rejects the configured ``spcs_pat``.
+    Raised when a Snowflake SPCS app gateway rejects the configured `spcs_pat`.
 
-    Only relevant when the client is configured with ``spcs_pat`` for an
-    instance behind Snowflake SPCS app ingress. The message includes the
-    Snowflake-provided detail, request id, and a hint at the likely cause
-    (e.g. an expired PAT or a network policy that excludes your IP).
+    The message includes the Snowflake-provided detail, request id,
+    and a hint at the likely cause
+    (for example an expired token, or a network policy that excludes your IP).
 
     Deliberately a direct subclass of `DataMasqueException` rather than
-    `DataMasqueApiError`: the client's 401 re-authenticate-and-retry path keys
-    off `DataMasqueApiError`/HTTP status, so keeping this outside that subtree
+    `DataMasqueApiError`:
+    the client's 401 re-authenticate-and-retry path keys off `DataMasqueApiError`,
+    so keeping this outside that subtree
     ensures a gateway rejection aborts immediately instead of looping.
     """
 

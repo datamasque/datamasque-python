@@ -5,20 +5,12 @@ History
 1.1.5 (2026-06-29)
 ------------------
 
-* Added ``spcs_pat`` to ``DataMasqueInstanceConfig`` for authenticating when
-  DataMasque is in Snowflake SPCS (Native App).
-* Added ``SpcsGatewayAuthError``, raised when the SPCS gateway rejects the PAT
-  before the request reaches DataMasque (with the Snowflake detail and a hint at
-  the likely cause).
-* Added ``spcs`` to ``SnowflakeStageLocation`` so connections staged inside
-  Snowflake SPCS deserialise correctly. Previously, listing connections on an
-  instance that held an SPCS-staged Snowflake connection raised a
-  ``ValidationError`` on the unknown stage value.
-* Made ``user``, ``snowflake_account_id``, ``snowflake_warehouse``, and
-  ``snowflake_storage_integration_name`` optional on ``SnowflakeConnectionConfig``.
-  DataMasque hosted inside Snowflake SPCS leaves these unset (it uses the
-  container's own OAuth token, host/account environment, and app-owned
-  warehouse), so requiring them made such connections fail to deserialise.
+* Added support for DataMasque deployments on Snowpark Container Services (SPCS):
+
+  * Added ``spcs_pat`` to ``DataMasqueInstanceConfig`` for authenticating through the SPCS app gateway.
+  * Added ``SpcsGatewayAuthError``, raised when the gateway rejects the PAT.
+  * Added the ``spcs`` option to ``SnowflakeStageLocation``.
+  * Made several ``SnowflakeConnectionConfig`` fields optional, since SPCS-staged connections leave them unset.
 
 1.1.4 (2026-06-29)
 ------------------
