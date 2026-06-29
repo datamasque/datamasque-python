@@ -14,6 +14,11 @@ History
   Snowflake SPCS deserialise correctly. Previously, listing connections on an
   instance that held an SPCS-staged Snowflake connection raised a
   ``ValidationError`` on the unknown stage value.
+* Made ``user``, ``snowflake_account_id``, ``snowflake_warehouse``, and
+  ``snowflake_storage_integration_name`` optional on ``SnowflakeConnectionConfig``.
+  DataMasque hosted inside Snowflake SPCS leaves these unset (it uses the
+  container's own OAuth token, host/account environment, and app-owned
+  warehouse), so requiring them made such connections fail to deserialise.
 
 1.1.4 (2026-06-29)
 ------------------
