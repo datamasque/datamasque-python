@@ -2,6 +2,12 @@
 History
 =======
 
+1.1.7 (unreleased)
+------------------
+
+* Added ``retry_writes`` to ``MongoConnectionConfig`` (default ``True``), serialized only when
+  disabled. Set it to ``False`` for AWS DocumentDB, which rejects retryable writes.
+
 1.1.6 (2026-07-13)
 ------------------
 
