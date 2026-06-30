@@ -166,6 +166,7 @@ class MongoConnectionConfig(ConnectionConfig):
     tls_ca_file: str = ""
     tls_allow_invalid_certificates: bool = False
     direct_connection: bool = False
+    retry_writes: bool = True
     replica_set: str = ""
     is_read_only: bool = False
 
@@ -194,6 +195,8 @@ class MongoConnectionConfig(ConnectionConfig):
                 d.pop("tls_allow_invalid_certificates", None)
         if not d.get("direct_connection"):
             d.pop("direct_connection", None)
+        if d.get("retry_writes", True):
+            d.pop("retry_writes", None)
         if not d.get("replica_set"):
             d.pop("replica_set", None)
         if not d.get("user"):

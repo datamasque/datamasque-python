@@ -1169,6 +1169,29 @@ def test_mongo_connection_model_dump_omits_falsy_optional_flags():
         assert absent not in api_dict
 
 
+def test_mongo_connection_retry_writes_defaults_true_and_is_omitted():
+    """retry_writes defaults to True (matching the server default), so it is left out of the payload."""
+    conn = MongoConnectionConfig(name="mongo", host="mongo.example", database="people")
+    assert conn.retry_writes is True
+    api_dict = conn.model_dump(exclude_none=True, by_alias=True, mode="json")
+    assert "retry_writes" not in api_dict
+
+
+def test_mongo_connection_sends_retry_writes_when_disabled():
+    """retry_writes is sent only when explicitly disabled (e.g. AWS DocumentDB rejects retryable writes)."""
+    conn = MongoConnectionConfig(name="mongo", host="mongo.example", database="people", retry_writes=False)
+    api_dict = conn.model_dump(exclude_none=True, by_alias=True, mode="json")
+    assert api_dict["retry_writes"] is False
+
+
+def test_documentdb_connection_sends_retry_writes_when_disabled():
+    """A DocumentDB connection inherits retry_writes and sends it when disabled."""
+    conn = DocumentDbConnectionConfig(name="docdb", host="docdb.example", database="people", retry_writes=False)
+    api_dict = conn.model_dump(exclude_none=True, by_alias=True, mode="json")
+    assert api_dict["db_type"] == "documentdb"
+    assert api_dict["retry_writes"] is False
+
+
 def test_mongo_connection_model_validate_blanks_encrypted_password():
     payload = {
         "id": "mongo-id-1",
