@@ -2,6 +2,11 @@
 History
 =======
 
+1.1.6 (unreleased)
+------------------
+
+* Added discovery-config-library management APIs (``list_discovery_config_libraries``, ``create_discovery_config_library``, and friends).
+
 1.1.5 (2026-06-29)
 ------------------
 
