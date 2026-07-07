@@ -3,17 +3,24 @@ from typing import NewType, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from datamasque.client.models.discovery_config import DiscoveryConfigType
 from datamasque.client.models.status import ValidationStatus
 
 DiscoveryConfigLibraryId = NewType("DiscoveryConfigLibraryId", str)
 
 
 class DiscoveryConfigLibrary(BaseModel):
-    """Represents a named, namespaced, persisted YAML discovery config library."""
+    """
+    Represents a named, namespaced, persisted YAML discovery config library.
+
+    A database and a file library may share a name;
+    uniqueness on the server is scoped to (`namespace`, `name`, `config_type`).
+    """
 
     model_config = ConfigDict(extra="allow", populate_by_name=True)
 
     name: str
+    config_type: DiscoveryConfigType
     namespace: str = ""
     yaml: Optional[str] = Field(default=None, alias="config_yaml")
     id: Optional[DiscoveryConfigLibraryId] = None
