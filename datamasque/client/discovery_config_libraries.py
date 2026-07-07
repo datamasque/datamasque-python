@@ -2,7 +2,7 @@ import logging
 from typing import Optional
 
 from datamasque.client.base import BaseClient
-from datamasque.client.exceptions import DataMasqueApiError, DataMasqueException
+from datamasque.client.exceptions import DataMasqueApiError
 from datamasque.client.models.discovery_config import DiscoveryConfigType
 from datamasque.client.models.discovery_config_library import DiscoveryConfigLibrary, DiscoveryConfigLibraryId
 
@@ -14,7 +14,7 @@ class DiscoveryConfigLibraryClient(BaseClient):
 
     def list_discovery_config_libraries(self) -> list[DiscoveryConfigLibrary]:
         """
-        Lists all (non-archived) discovery config libraries.
+        Lists all discovery config libraries.
 
         Unlike most list endpoints, this one is not paginated;
         the server returns every library in a single response.
@@ -31,16 +31,15 @@ class DiscoveryConfigLibraryClient(BaseClient):
         response = self.make_request("GET", f"/api/discovery/config-libraries/{library_id}/")
         return DiscoveryConfigLibrary.model_validate(response.json())
 
-    def find_discovery_config_library_ids(
-        self, name: str, namespace: str, config_type: Optional[DiscoveryConfigType]
-    ) -> list[DiscoveryConfigLibraryId]:
+    def _get_discovery_config_library_id_by_name(
+        self, name: str, config_type: DiscoveryConfigType, namespace: str
+    ) -> Optional[DiscoveryConfigLibraryId]:
         """
-        Returns the IDs of libraries matching the given name, namespace, and (optionally) config type.
+        Returns the ID of the library with the given name, type, and namespace, or `None` if there is none.
 
-        The name is filtered server-side via `name_exact` to keep the response small,
-        but all three fields are matched client-side:
-        the server's `namespace_exact` filter ignores empty strings (the default namespace),
-        and delete-by-name must not trust a filter param the server may ignore.
+        The listing is filtered by name to keep the response small;
+        type and namespace are matched client-side,
+        since the API's namespace filter cannot select the default (empty) namespace.
         """
 
         response = self.make_request(
@@ -52,45 +51,35 @@ class DiscoveryConfigLibraryClient(BaseClient):
         matches = [
             entry
             for entry in entries
-            if entry.name == name
-            and entry.namespace == namespace
-            and (config_type is None or entry.config_type is config_type)
+            if entry.name == name and entry.namespace == namespace and entry.config_type is config_type
         ]
-
-        library_ids = []
-        for entry in matches:
-            if entry.id is None:
-                raise DataMasqueApiError(
-                    "Server returned a discovery config library list entry without an `id`.",
-                    response=response,
-                )
-            library_ids.append(entry.id)
-
-        return library_ids
-
-    def get_discovery_config_library_by_name(
-        self, name: str, namespace: str = "", config_type: Optional[DiscoveryConfigType] = None
-    ) -> Optional[DiscoveryConfigLibrary]:
-        """
-        Looks for a discovery config library matching the given name and namespace (case-sensitive, exact match).
-
-        Returns it (with full YAML content) if found, otherwise `None`.
-
-        A database and a file library may share a name;
-        pass `config_type` to disambiguate.
-        Raises `DataMasqueException` if `config_type` was not given and both exist.
-        """
-
-        library_ids = self.find_discovery_config_library_ids(name, namespace, config_type)
-        if not library_ids:
+        if not matches:
             return None
 
-        if len(library_ids) > 1:
-            raise DataMasqueException(
-                f'Multiple discovery config libraries are named "{name}"; pass `config_type` to disambiguate.'
+        if matches[0].id is None:
+            raise DataMasqueApiError(
+                "Server returned a discovery config library list entry without an `id`.",
+                response=response,
             )
 
-        return self.get_discovery_config_library(library_ids[0])
+        return matches[0].id
+
+    def get_discovery_config_library_by_name(
+        self, name: str, config_type: DiscoveryConfigType, namespace: str = ""
+    ) -> Optional[DiscoveryConfigLibrary]:
+        """
+        Looks for a discovery config library matching the given name, type, and namespace (case-sensitive, exact match).
+
+        Library names are unique per type within a namespace,
+        so a type is required to identify a single library.
+        Returns it (with full YAML content) if found, otherwise `None`.
+        """
+
+        library_id = self._get_discovery_config_library_id_by_name(name, config_type, namespace)
+        if library_id is None:
+            return None
+
+        return self.get_discovery_config_library(library_id)
 
     def create_discovery_config_library(self, library: DiscoveryConfigLibrary) -> DiscoveryConfigLibrary:
         """
@@ -145,9 +134,9 @@ class DiscoveryConfigLibraryClient(BaseClient):
         Sets the library's `id` property.
         """
 
-        library_ids = self.find_discovery_config_library_ids(library.name, library.namespace, library.config_type)
-        if library_ids:
-            library.id = library_ids[0]
+        library_id = self._get_discovery_config_library_id_by_name(library.name, library.config_type, library.namespace)
+        if library_id is not None:
+            library.id = library_id
             return self.update_discovery_config_library(library)
 
         return self.create_discovery_config_library(library)
@@ -156,7 +145,7 @@ class DiscoveryConfigLibraryClient(BaseClient):
         self, library_id: DiscoveryConfigLibraryId, *, force: bool = False
     ) -> None:
         """
-        Deletes (archives) the discovery config library with the given ID.
+        Deletes the discovery config library with the given ID.
 
         No-op if the library does not exist.
 
@@ -168,21 +157,16 @@ class DiscoveryConfigLibraryClient(BaseClient):
         self._delete_if_exists(f"/api/discovery/config-libraries/{library_id}/", params=params)
 
     def delete_discovery_config_library_by_name_if_exists(
-        self,
-        name: str,
-        namespace: str = "",
-        *,
-        config_type: Optional[DiscoveryConfigType] = None,
-        force: bool = False,
+        self, name: str, config_type: DiscoveryConfigType, namespace: str = "", *, force: bool = False
     ) -> None:
         """
-        Deletes the discovery config library(s) with the given name and namespace.
+        Deletes the discovery config library with the given name, type, and namespace.
 
-        No-op if no library matches.
-
-        When `config_type` is not given and both a database and a file library share the name,
-        both are deleted.
+        Library names are unique per type within a namespace,
+        so a type is required to identify a single library.
+        No-op if no such library exists.
         """
 
-        for library_id in self.find_discovery_config_library_ids(name, namespace, config_type):
+        library_id = self._get_discovery_config_library_id_by_name(name, config_type, namespace)
+        if library_id is not None:
             self.delete_discovery_config_library_by_id_if_exists(library_id, force=force)

@@ -13,7 +13,7 @@ from datamasque.client import (
     DiscoveryConfigLibraryId,
     DiscoveryConfigType,
 )
-from datamasque.client.exceptions import DataMasqueApiError, DataMasqueException
+from datamasque.client.exceptions import DataMasqueApiError
 from datamasque.client.models.status import ValidationStatus
 
 LIBRARY_ID_1 = "aaaaaaaa-1111-2222-3333-444444444444"
@@ -176,7 +176,7 @@ def test_get_discovery_config_library_by_name_found(
             json=sample_library_detail_response,
             status_code=200,
         )
-        library = client.get_discovery_config_library_by_name("my_library", "org")
+        library = client.get_discovery_config_library_by_name("my_library", DiscoveryConfigType.database, "org")
 
     assert library is not None
     assert library.name == "my_library"
@@ -220,7 +220,7 @@ def test_get_discovery_config_library_by_name_matches_namespace_client_side(
             json=sample_library_detail_response,
             status_code=200,
         )
-        library = client.get_discovery_config_library_by_name("my_library", "org")
+        library = client.get_discovery_config_library_by_name("my_library", DiscoveryConfigType.database, "org")
 
     assert library is not None
     assert library.id == DiscoveryConfigLibraryId(LIBRARY_ID_1)
@@ -235,7 +235,7 @@ def test_get_discovery_config_library_by_name_default_namespace_does_not_match_o
             json=[sample_library_list_response[0]],
             status_code=200,
         )
-        library = client.get_discovery_config_library_by_name("my_library")
+        library = client.get_discovery_config_library_by_name("my_library", DiscoveryConfigType.database)
 
     assert library is None
     assert m.call_count == 1
@@ -248,25 +248,12 @@ def test_get_discovery_config_library_by_name_not_found(client: DataMasqueClient
             json=[],
             status_code=200,
         )
-        library = client.get_discovery_config_library_by_name("nonexistent")
+        library = client.get_discovery_config_library_by_name("nonexistent", DiscoveryConfigType.database)
 
     assert library is None
 
 
-def test_get_discovery_config_library_by_name_ambiguous_config_type_raises(
-    client: DataMasqueClient, same_name_both_config_types: list[dict[str, Any]]
-) -> None:
-    with requests_mock.Mocker() as m:
-        m.get(
-            "http://test-server/api/discovery/config-libraries/",
-            json=same_name_both_config_types,
-            status_code=200,
-        )
-        with pytest.raises(DataMasqueException, match="config_type"):
-            client.get_discovery_config_library_by_name("my_library")
-
-
-def test_get_discovery_config_library_by_name_config_type_disambiguates(
+def test_get_discovery_config_library_by_name_selects_matching_config_type(
     client: DataMasqueClient, same_name_both_config_types: list[dict[str, Any]]
 ) -> None:
     detail_response = {
@@ -291,7 +278,7 @@ def test_get_discovery_config_library_by_name_config_type_disambiguates(
             json=detail_response,
             status_code=200,
         )
-        library = client.get_discovery_config_library_by_name("my_library", config_type=DiscoveryConfigType.file)
+        library = client.get_discovery_config_library_by_name("my_library", DiscoveryConfigType.file)
 
     assert library is not None
     assert library.id == DiscoveryConfigLibraryId(LIBRARY_ID_2)
@@ -318,7 +305,7 @@ def test_get_discovery_config_library_by_name_raises_when_server_omits_id(client
             status_code=200,
         )
         with pytest.raises(DataMasqueApiError, match="without an `id`"):
-            client.get_discovery_config_library_by_name("my_library", "org")
+            client.get_discovery_config_library_by_name("my_library", DiscoveryConfigType.database, "org")
 
 
 def test_create_discovery_config_library(client: DataMasqueClient, config_library: DiscoveryConfigLibrary) -> None:
@@ -353,6 +340,8 @@ def test_create_discovery_config_library(client: DataMasqueClient, config_librar
     assert request_body["namespace"] == "test_ns"
     assert request_body["config_type"] == "database"
     assert request_body["config_yaml"] == "labels: []\nmetadata_rules: []\nidd_rules: []\n"
+    read_only_fields = {"id", "is_valid", "validation_error", "created", "modified"}
+    assert not read_only_fields & request_body.keys()
 
 
 def test_create_discovery_config_library_reports_validation_error(
@@ -414,6 +403,8 @@ def test_update_discovery_config_library(client: DataMasqueClient, config_librar
     request_body = m.last_request.json()
     assert request_body["name"] == "test_library"
     assert request_body["config_yaml"] == "labels: []\nmetadata_rules: []\nidd_rules: []\n"
+    read_only_fields = {"id", "is_valid", "validation_error", "created", "modified"}
+    assert not read_only_fields & request_body.keys()
 
 
 def test_update_discovery_config_library_no_id_raises(
@@ -592,36 +583,14 @@ def test_delete_discovery_config_library_by_name(
             f"http://test-server/api/discovery/config-libraries/{LIBRARY_ID_1}/",
             status_code=204,
         )
-        client.delete_discovery_config_library_by_name_if_exists("my_library", "org")
+        client.delete_discovery_config_library_by_name_if_exists("my_library", DiscoveryConfigType.database, "org")
 
     assert m.request_history[0].method == "GET"
     assert "name_exact=my_library" in m.request_history[0].url
     assert m.request_history[1].method == "DELETE"
 
 
-def test_delete_discovery_config_library_by_name_deletes_both_config_types(
-    client: DataMasqueClient, same_name_both_config_types: list[dict[str, Any]]
-) -> None:
-    with requests_mock.Mocker() as m:
-        m.get(
-            "http://test-server/api/discovery/config-libraries/",
-            json=same_name_both_config_types,
-            status_code=200,
-        )
-        m.delete(
-            f"http://test-server/api/discovery/config-libraries/{LIBRARY_ID_1}/",
-            status_code=204,
-        )
-        m.delete(
-            f"http://test-server/api/discovery/config-libraries/{LIBRARY_ID_2}/",
-            status_code=204,
-        )
-        client.delete_discovery_config_library_by_name_if_exists("my_library")
-
-    assert [request.method for request in m.request_history] == ["GET", "DELETE", "DELETE"]
-
-
-def test_delete_discovery_config_library_by_name_config_type_deletes_only_that_type(
+def test_delete_discovery_config_library_by_name_deletes_only_matching_config_type(
     client: DataMasqueClient, same_name_both_config_types: list[dict[str, Any]]
 ) -> None:
     with requests_mock.Mocker() as m:
@@ -634,7 +603,7 @@ def test_delete_discovery_config_library_by_name_config_type_deletes_only_that_t
             f"http://test-server/api/discovery/config-libraries/{LIBRARY_ID_2}/",
             status_code=204,
         )
-        client.delete_discovery_config_library_by_name_if_exists("my_library", config_type=DiscoveryConfigType.file)
+        client.delete_discovery_config_library_by_name_if_exists("my_library", DiscoveryConfigType.file)
 
     assert m.call_count == 2
     assert m.request_history[1].method == "DELETE"
@@ -650,7 +619,7 @@ def test_delete_discovery_config_library_by_name_not_found(
             json=sample_library_list_response,
             status_code=200,
         )
-        client.delete_discovery_config_library_by_name_if_exists("nonexistent")
+        client.delete_discovery_config_library_by_name_if_exists("nonexistent", DiscoveryConfigType.database)
 
     assert m.call_count == 1
     assert m.request_history[0].method == "GET"

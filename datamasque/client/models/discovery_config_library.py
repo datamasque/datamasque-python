@@ -13,8 +13,8 @@ class DiscoveryConfigLibrary(BaseModel):
     """
     Represents a named, namespaced, persisted YAML discovery config library.
 
-    A database and a file library may share a name;
-    uniqueness on the server is scoped to (`namespace`, `name`, `config_type`).
+    Library names are unique per config type within a namespace,
+    so a database and a file library may share a name.
     """
 
     model_config = ConfigDict(extra="allow", populate_by_name=True)
@@ -23,11 +23,11 @@ class DiscoveryConfigLibrary(BaseModel):
     config_type: DiscoveryConfigType
     namespace: str = ""
     yaml: Optional[str] = Field(default=None, alias="config_yaml")
-    id: Optional[DiscoveryConfigLibraryId] = None
-    # Server-managed validation surface, populated by the DataMasque server.
-    # `is_valid` may be `in_progress` immediately after creating a large library,
-    # transitioning to `valid` or `invalid` once the server finishes validating.
-    is_valid: Optional[ValidationStatus] = None
-    validation_error: Optional[str] = None
-    created: Optional[datetime] = None
-    modified: Optional[datetime] = None
+    # Server-populated read-only fields, excluded from request bodies.
+    id: Optional[DiscoveryConfigLibraryId] = Field(default=None, exclude=True)
+    is_valid: Optional[ValidationStatus] = Field(default=None, exclude=True)
+    """Validation status; libraries are validated synchronously on create/update."""
+    validation_error: Optional[str] = Field(default=None, exclude=True)
+    """Human-readable validation error, or `None` when valid."""
+    created: Optional[datetime] = Field(default=None, exclude=True)
+    modified: Optional[datetime] = Field(default=None, exclude=True)
