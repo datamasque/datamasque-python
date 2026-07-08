@@ -80,6 +80,7 @@ from datamasque.client.models.discovery import (
     TableConstraints,
 )
 from datamasque.client.models.discovery_config import DiscoveryConfig, DiscoveryConfigId, DiscoveryConfigType
+from datamasque.client.models.discovery_config_library import DiscoveryConfigLibrary, DiscoveryConfigLibraryId
 from datamasque.client.models.dm_instance import DataMasqueInstanceConfig
 from datamasque.client.models.files import (
     DataMasqueFile,
@@ -148,6 +149,8 @@ __all__ = [
     "DatabricksConnectionConfig",
     "DiscoveryConfig",
     "DiscoveryConfigId",
+    "DiscoveryConfigLibrary",
+    "DiscoveryConfigLibraryId",
     "DiscoveryConfigNotFoundError",
     "DiscoveryConfigType",
     "DiscoveryMatch",
