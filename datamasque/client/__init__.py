@@ -119,6 +119,7 @@ from datamasque.client.models.runs import (
 from datamasque.client.models.status import (
     AsyncRulesetGenerationTaskStatus,
     MaskingRunStatus,
+    ValidationErrorDetails,
     ValidationErrorType,
     ValidationStatus,
 )
@@ -234,6 +235,7 @@ __all__ = [
     "UserId",
     "UserRole",
     "UserSelection",
+    "ValidationErrorDetails",
     "ValidationErrorType",
     "ValidationStatus",
 ]
