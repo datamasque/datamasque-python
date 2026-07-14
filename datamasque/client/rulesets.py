@@ -20,7 +20,7 @@ class RulesetClient(BaseClient):
         """
         Creates or updates a ruleset.
 
-        Populates the given ruleset's `id`, `is_valid`, `validation_error`, `validation_error_type`,
+        Populates the given ruleset's `id`, `is_valid`, `validation_errors`,
         and `git` fields from the server response, and returns the same ruleset instance for convenience.
         """
 
@@ -29,8 +29,7 @@ class RulesetClient(BaseClient):
         created = Ruleset.model_validate(response.json())
         ruleset.id = created.id
         ruleset.is_valid = created.is_valid
-        ruleset.validation_error = created.validation_error
-        ruleset.validation_error_type = created.validation_error_type
+        ruleset.validation_errors = created.validation_errors
         ruleset.git = created.git
 
         if response.status_code == 201:

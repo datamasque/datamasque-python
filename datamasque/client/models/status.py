@@ -1,4 +1,7 @@
 import enum
+from typing import Optional
+
+from pydantic import BaseModel
 
 
 class ValidationStatus(enum.Enum):
@@ -11,12 +14,21 @@ class ValidationStatus(enum.Enum):
 
 
 class ValidationErrorType(enum.Enum):
-    """Categorises why a ruleset failed validation (see `Ruleset.validation_error_type`)."""
+    """Categorises why validation failed (see `ValidationErrorDetails.validation_error_type`)."""
 
     ruleset = "ruleset"
     library_missing = "library_missing"
     library_invalid = "library_invalid"
     expansion = "expansion"  # The ruleset is not valid once its library references are expanded.
+
+
+class ValidationErrorDetails(BaseModel):
+    """A single validation error, with its position in the YAML when available."""
+
+    message: str
+    validation_error_type: Optional[ValidationErrorType] = None
+    line_number: Optional[int] = None
+    column_number: Optional[int] = None
 
 
 class MaskingRunStatus(enum.Enum):

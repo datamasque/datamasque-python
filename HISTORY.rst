@@ -2,11 +2,12 @@
 History
 =======
 
-1.1.7 (unreleased)
+1.1.7 (2026-07-14)
 ------------------
 
 * Added ``retry_writes`` to ``MongoConnectionConfig`` (default ``True``), serialized only when
   disabled. Set it to ``False`` for AWS DocumentDB, which rejects retryable writes.
+* Updated the validation error API on ``Ruleset`` and ``RulesetLibrary``.
 
 1.1.6 (2026-07-13)
 ------------------

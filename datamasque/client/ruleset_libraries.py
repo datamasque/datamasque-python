@@ -64,7 +64,7 @@ class RulesetLibraryClient(BaseClient):
         Creates a new ruleset library on the server.
 
         Sets the library's server-assigned fields
-        (`id`, `is_valid`, `validation_error`, `git`, `created`, `modified`) and returns the library.
+        (`id`, `is_valid`, `validation_errors`, `git`, `created`, `modified`) and returns the library.
         """
 
         data = library.model_dump(exclude_none=True, by_alias=True, mode="json")
@@ -72,7 +72,7 @@ class RulesetLibraryClient(BaseClient):
         created_library = RulesetLibrary.model_validate(response.json())
         library.id = created_library.id
         library.is_valid = created_library.is_valid
-        library.validation_error = created_library.validation_error
+        library.validation_errors = created_library.validation_errors
         library.git = created_library.git
         library.created = created_library.created
         library.modified = created_library.modified
@@ -93,7 +93,7 @@ class RulesetLibraryClient(BaseClient):
         response = self.make_request("PUT", f"/api/ruleset-libraries/{library.id}/", data=data)
         updated_library = RulesetLibrary.model_validate(response.json())
         library.is_valid = updated_library.is_valid
-        library.validation_error = updated_library.validation_error
+        library.validation_errors = updated_library.validation_errors
         library.git = updated_library.git
         library.modified = updated_library.modified
         logger.debug('Update of ruleset library "%s" successful', library.name)

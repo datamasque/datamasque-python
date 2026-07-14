@@ -14,6 +14,7 @@ from datamasque.client.models.ruleset_library import (
     RulesetLibraryId,
     ValidationStatus,
 )
+from datamasque.client.models.status import ValidationErrorDetails
 
 LIBRARY_ID_1 = "aaaaaaaa-1111-2222-3333-444444444444"
 LIBRARY_ID_2 = "bbbbbbbb-1111-2222-3333-444444444444"
@@ -618,17 +619,17 @@ def test_list_rulesets_using_library_pagination(client: DataMasqueClient) -> Non
     assert rulesets[2].name == "r3"
 
 
-def test_create_ruleset_library_populates_validation_error(
+def test_create_ruleset_library_populates_validation_errors(
     client: DataMasqueClient, ruleset_library: RulesetLibrary
 ) -> None:
-    """The server's `validation_error` string is surfaced on the returned library."""
+    """The server's `validation_errors` list is surfaced on the returned library."""
     create_response = {
         "id": LIBRARY_ID_1,
         "name": "test_library",
         "namespace": "test_ns",
         "config_yaml": "version: '1.0'\nfunctions: []",
         "is_valid": "invalid",
-        "validation_error": "Invalid function definition",
+        "validation_errors": [{"message": "Invalid function definition"}],
         "created": "2025-06-01T10:00:00Z",
         "modified": "2025-06-01T10:00:00Z",
     }
@@ -641,13 +642,14 @@ def test_create_ruleset_library_populates_validation_error(
         )
         result = client.create_ruleset_library(ruleset_library)
 
-    assert result.validation_error == "Invalid function definition"
+    assert len(result.validation_errors) == 1
+    assert result.validation_errors[0].message == "Invalid function definition"
 
 
-def test_update_ruleset_library_populates_validation_error(
+def test_update_ruleset_library_populates_validation_errors(
     client: DataMasqueClient, ruleset_library: RulesetLibrary
 ) -> None:
-    """A full update also surfaces the server's `validation_error` string."""
+    """A full update also surfaces the server's `validation_errors` list."""
     ruleset_library.id = RulesetLibraryId(LIBRARY_ID_1)
     update_response = {
         "id": LIBRARY_ID_1,
@@ -655,7 +657,7 @@ def test_update_ruleset_library_populates_validation_error(
         "namespace": "test_ns",
         "config_yaml": "version: '1.0'\nfunctions: []",
         "is_valid": "invalid",
-        "validation_error": "Invalid function definition",
+        "validation_errors": [{"message": "Invalid function definition"}],
         "created": "2025-06-01T10:00:00Z",
         "modified": "2025-06-02T10:00:00Z",
     }
@@ -668,7 +670,8 @@ def test_update_ruleset_library_populates_validation_error(
         )
         result = client.update_ruleset_library(ruleset_library)
 
-    assert result.validation_error == "Invalid function definition"
+    assert len(result.validation_errors) == 1
+    assert result.validation_errors[0].message == "Invalid function definition"
 
 
 def test_create_ruleset_library_does_not_send_read_only_fields(
@@ -677,14 +680,14 @@ def test_create_ruleset_library_does_not_send_read_only_fields(
     """Read-only server fields must never appear in the create request body."""
     ruleset_library.id = RulesetLibraryId(LIBRARY_ID_1)
     ruleset_library.is_valid = ValidationStatus.invalid
-    ruleset_library.validation_error = "stale error"
+    ruleset_library.validation_errors = [ValidationErrorDetails(message="stale error")]
     create_response = {
         "id": LIBRARY_ID_1,
         "name": "test_library",
         "namespace": "test_ns",
         "config_yaml": "version: '1.0'\nfunctions: []",
         "is_valid": "invalid",
-        "validation_error": "Invalid function definition",
+        "validation_errors": [{"message": "Invalid function definition"}],
         "created": "2025-06-01T10:00:00Z",
         "modified": "2025-06-01T10:00:00Z",
     }
@@ -698,7 +701,7 @@ def test_create_ruleset_library_does_not_send_read_only_fields(
         client.create_ruleset_library(ruleset_library)
 
     body = m.last_request.json()
-    for read_only_field in ("id", "is_valid", "validation_error", "created", "modified"):
+    for read_only_field in ("id", "is_valid", "validation_errors", "created", "modified"):
         assert read_only_field not in body
     # Input fields are still present.
     assert body["name"] == "test_library"

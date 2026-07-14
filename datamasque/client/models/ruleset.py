@@ -4,7 +4,7 @@ from typing import Any, NewType, Optional
 from pydantic import Field
 
 from datamasque.client.models.git import GitTrackedEntity
-from datamasque.client.models.status import ValidationErrorType, ValidationStatus
+from datamasque.client.models.status import ValidationErrorDetails, ValidationStatus
 
 RulesetId = NewType("RulesetId", str)
 
@@ -44,7 +44,5 @@ class Ruleset(GitTrackedEntity):
     # Server-populated read-only fields, excluded from request bodies.
     id: Optional[RulesetId] = Field(default=None, exclude=True)
     is_valid: Optional[ValidationStatus] = Field(default=None, exclude=True)
-    validation_error: Optional[str] = Field(default=None, exclude=True)
-    """Human-readable validation error, or `None` when valid."""
-    validation_error_type: Optional[ValidationErrorType] = Field(default=None, exclude=True)
-    """Category of the validation failure, or `None` when valid."""
+    validation_errors: list[ValidationErrorDetails] = Field(default_factory=list, exclude=True)
+    """Validation errors surfaced by the server; empty when valid."""

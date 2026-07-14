@@ -134,8 +134,8 @@ def test_delete_ruleset_that_does_not_exist(client, existing_rulesets_json):
     assert m.request_history[0].method == "GET"
 
 
-def test_create_or_update_ruleset_populates_validation_error(client, ruleset):
-    """The server's `validation_error` string and `validation_error_type` are surfaced on the returned ruleset."""
+def test_create_or_update_ruleset_populates_validation_errors(client, ruleset):
+    """The server's `validation_errors` list is surfaced on the returned ruleset."""
     with requests_mock.Mocker() as m:
         m.post(
             "http://test-server/api/rulesets/?upsert=true",
@@ -143,19 +143,29 @@ def test_create_or_update_ruleset_populates_validation_error(client, ruleset):
                 "id": "2",
                 "name": "test_ruleset",
                 "is_valid": "invalid",
-                "validation_error": "Ruleset error: Missing required field: table",
-                "validation_error_type": "ruleset",
+                "validation_errors": [
+                    {
+                        "message": "Missing required field: table",
+                        "validation_error_type": "ruleset",
+                        "line_number": 5,
+                        "column_number": 3,
+                    }
+                ],
             },
             status_code=201,
         )
         result = client.create_or_update_ruleset(ruleset)
 
-    assert result.validation_error == "Ruleset error: Missing required field: table"
-    assert result.validation_error_type is ValidationErrorType.ruleset
+    assert len(result.validation_errors) == 1
+    error = result.validation_errors[0]
+    assert error.message == "Missing required field: table"
+    assert error.validation_error_type is ValidationErrorType.ruleset
+    assert error.line_number == 5
+    assert error.column_number == 3
 
 
-def test_create_or_update_ruleset_validation_error_none_when_absent(client, ruleset):
-    """`validation_error` and `validation_error_type` are `None` when the server omits them (a valid ruleset)."""
+def test_create_or_update_ruleset_validation_errors_empty_when_valid(client, ruleset):
+    """`validation_errors` is empty when the server omits it (a valid ruleset)."""
     with requests_mock.Mocker() as m:
         m.post(
             "http://test-server/api/rulesets/?upsert=true",
@@ -164,8 +174,7 @@ def test_create_or_update_ruleset_validation_error_none_when_absent(client, rule
         )
         result = client.create_or_update_ruleset(ruleset)
 
-    assert result.validation_error is None
-    assert result.validation_error_type is None
+    assert result.validation_errors == []
 
 
 def test_create_or_update_ruleset_does_not_send_read_only_fields(client, ruleset):
@@ -177,8 +186,7 @@ def test_create_or_update_ruleset_does_not_send_read_only_fields(client, ruleset
                 "id": "2",
                 "name": "test_ruleset",
                 "is_valid": "invalid",
-                "validation_error": "Ruleset error: bad",
-                "validation_error_type": "ruleset",
+                "validation_errors": [{"message": "bad", "validation_error_type": "ruleset"}],
             },
             status_code=201,
         )
@@ -188,7 +196,7 @@ def test_create_or_update_ruleset_does_not_send_read_only_fields(client, ruleset
         client.create_or_update_ruleset(ruleset)
 
     body = m.last_request.json()
-    for read_only_field in ("id", "is_valid", "validation_error", "validation_error_type"):
+    for read_only_field in ("id", "is_valid", "validation_errors"):
         assert read_only_field not in body
     # Input fields are still present.
     assert body["config_yaml"] == "version: '1.0'\ntasks: []"
