@@ -2,6 +2,16 @@
 History
 =======
 
+1.1.8 (unreleased)
+------------------
+
+* Added typed Safe Data Preview support:
+
+  * ``safe_data_preview`` on ``InDataDiscoveryConfig`` (via ``SafeDataPreviewOptions``)
+    to configure or disable the preview.
+  * ``safe_data_preview`` on schema-discovery result columns and file-discovery locators,
+    typed by ``kind``.
+
 1.1.7 (2026-07-14)
 ------------------
 
