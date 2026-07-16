@@ -5,6 +5,7 @@ from pydantic import BaseModel
 from datamasque.client import FileDiscoveryResult, SchemaDiscoveryColumn
 from datamasque.client.models.safe_data_preview import (
     BooleanPreview,
+    CommonStatistics,
     NumericPreview,
     StringPreview,
     TemporalPreview,
@@ -179,6 +180,8 @@ def test_known_kind_with_broken_shape_degrades():
     preview = parse_safe_data_preview(payload)
     assert isinstance(preview, UnknownPreview)
     assert preview.kind == "numeric"
+    assert isinstance(preview.statistics_common, CommonStatistics)
+    assert preview.statistics_common.count_null == 0
 
 
 def test_unparseable_payload_falls_back_without_raising():

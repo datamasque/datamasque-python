@@ -870,6 +870,7 @@ def test_get_schema_discovery_page_returns_page_with_table_metadata(client):
                     "primary_keys": [{"columns": ["id"]}],
                     "unique_keys": [{"columns": ["email"]}],
                     "foreign_keys": [],
+                    "row_count": 12345,
                 },
             },
         },
@@ -885,6 +886,7 @@ def test_get_schema_discovery_page_returns_page_with_table_metadata(client):
     assert isinstance(page, SchemaDiscoveryPage)
     assert [r.column for r in page.results] == ["email"]
     assert page.table_metadata["public"]["users"].primary_keys[0].columns == ["id"]
+    assert page.table_metadata["public"]["users"].row_count == 12345
     assert m.last_request.qs == {"limit": ["10"], "offset": ["20"]}
 
 

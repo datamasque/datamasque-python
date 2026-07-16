@@ -12,6 +12,8 @@ History
   * ``safe_data_preview`` on schema-discovery result columns and file-discovery locators,
     typed by ``kind``.
 
+* Added ``row_count`` to ``TableConstraints`` in schema-discovery ``table_metadata``.
+
 1.1.7 (2026-07-14)
 ------------------
 

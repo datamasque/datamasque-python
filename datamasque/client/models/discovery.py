@@ -339,6 +339,7 @@ class TableConstraints(BaseModel):
     primary_keys: Optional[list[ConstraintColumns]] = None
     unique_keys: Optional[list[ConstraintColumns]] = None
     foreign_keys: Optional[list[ConstraintColumns]] = None
+    row_count: Optional[int] = None
 
 
 class SchemaDiscoveryPage(Page[SchemaDiscoveryResult]):
