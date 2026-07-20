@@ -145,9 +145,7 @@ from datamasque.client.models.safe_data_preview import (
     TemporalPreview,
     TemporalStatistics,
     TemporalSummaries,
-    UnknownPreview,
     UnsupportedPreview,
-    UnsupportedPreviewReason,
     UnsupportedStatistics,
 )
 from datamasque.client.models.status import (
@@ -293,9 +291,7 @@ __all__ = [
     "TemporalStatistics",
     "TemporalSummaries",
     "UnfinishedRun",
-    "UnknownPreview",
     "UnsupportedPreview",
-    "UnsupportedPreviewReason",
     "UnsupportedStatistics",
     "User",
     "UserId",

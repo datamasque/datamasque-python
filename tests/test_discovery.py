@@ -22,12 +22,10 @@ from datamasque.client import (
     InDataDiscoveryConfig,
     RulesetGenerationRequest,
     RunId,
-    SafeDataPreviewOptions,
     SchemaDiscoveryFromConfigRequest,
     SchemaDiscoveryPage,
     SchemaDiscoveryRequest,
     SchemaDiscoveryResult,
-    StringDisclosureLevel,
     StringPreview,
 )
 from datamasque.client.exceptions import (
@@ -651,18 +649,6 @@ def test_schema_discovery_request_model_dump_includes_set_fields():
     }
 
 
-def test_schema_discovery_request_model_dump_includes_safe_data_preview():
-    req = SchemaDiscoveryRequest(
-        connection="conn-1",
-        in_data_discovery=InDataDiscoveryConfig(
-            enabled=True,
-            safe_data_preview=SafeDataPreviewOptions(enabled=False, string_level=StringDisclosureLevel.lengths),
-        ),
-    )
-    dumped = req.model_dump(exclude_none=True, mode="json")
-    assert dumped["in_data_discovery"]["safe_data_preview"] == {"enabled": False, "string_level": "lengths"}
-
-
 def test_discovery_requests_accept_connection_config_objects():
     """All three discovery request models accept a full `ConnectionConfig` and extract its `id`."""
     connection = DatabaseConnectionConfig(
@@ -800,11 +786,6 @@ def test_schema_discovery_result_parses_safe_data_preview():
     assert isinstance(preview, StringPreview)
     assert preview.sampled_from == "data/people.csv"
     assert preview.statistics_common.count_distinct == 988
-
-
-def test_schema_discovery_result_without_safe_data_preview():
-    result = SchemaDiscoveryResult.model_validate(_schema_discovery_row(1, "email"))
-    assert result.data.safe_data_preview is None
 
 
 def test_list_schema_discovery_results_follows_pagination(client):

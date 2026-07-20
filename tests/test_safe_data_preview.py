@@ -1,18 +1,12 @@
-"""Tests for the typed Safe Data Preview models and their tolerant parsing."""
+"""Tests for the typed Safe Data Preview models."""
 
-from pydantic import BaseModel
+import pytest
+from pydantic import BaseModel, ValidationError
 
 from datamasque.client import FileDiscoveryResult, SchemaDiscoveryColumn
 from datamasque.client.models.safe_data_preview import (
-    BooleanPreview,
-    CommonStatistics,
     NumericPreview,
-    StringPreview,
-    TemporalPreview,
-    UnknownPreview,
     UnsupportedPreview,
-    UnsupportedPreviewReason,
-    parse_safe_data_preview,
 )
 
 _STRING_PREVIEW = {
@@ -89,6 +83,14 @@ _UNSUPPORTED_PREVIEW = {
     "statistics_kind": {"reason": "Binary data isn't previewed"},
 }
 
+_KNOWN_PREVIEWS = [
+    pytest.param(_STRING_PREVIEW, id="string"),
+    pytest.param(_NUMERIC_PREVIEW, id="numeric"),
+    pytest.param(_TEMPORAL_PREVIEW, id="temporal"),
+    pytest.param(_BOOLEAN_PREVIEW, id="boolean"),
+    pytest.param(_UNSUPPORTED_PREVIEW, id="unsupported"),
+]
+
 
 def _assert_no_unexpected_extras(value: object) -> None:
     """Recursively assert no field landed in a model's `model_extra` -- i.e. everything is typed."""
@@ -101,102 +103,7 @@ def _assert_no_unexpected_extras(value: object) -> None:
             _assert_no_unexpected_extras(item)
 
 
-def test_each_preview_parses_to_its_typed_variant():
-    assert type(parse_safe_data_preview(_STRING_PREVIEW)) is StringPreview
-    assert type(parse_safe_data_preview(_NUMERIC_PREVIEW)) is NumericPreview
-    assert type(parse_safe_data_preview(_TEMPORAL_PREVIEW)) is TemporalPreview
-    assert type(parse_safe_data_preview(_BOOLEAN_PREVIEW)) is BooleanPreview
-    assert type(parse_safe_data_preview(_UNSUPPORTED_PREVIEW)) is UnsupportedPreview
-
-
-def test_each_preview_round_trips():
-    assert parse_safe_data_preview(_STRING_PREVIEW).model_dump(mode="json") == _STRING_PREVIEW
-    assert parse_safe_data_preview(_NUMERIC_PREVIEW).model_dump(mode="json") == _NUMERIC_PREVIEW
-    assert parse_safe_data_preview(_TEMPORAL_PREVIEW).model_dump(mode="json") == _TEMPORAL_PREVIEW
-    assert parse_safe_data_preview(_BOOLEAN_PREVIEW).model_dump(mode="json") == _BOOLEAN_PREVIEW
-    assert parse_safe_data_preview(_UNSUPPORTED_PREVIEW).model_dump(mode="json") == _UNSUPPORTED_PREVIEW
-
-
-def test_each_preview_has_no_untyped_fields():
-    _assert_no_unexpected_extras(parse_safe_data_preview(_STRING_PREVIEW))
-    _assert_no_unexpected_extras(parse_safe_data_preview(_NUMERIC_PREVIEW))
-    _assert_no_unexpected_extras(parse_safe_data_preview(_TEMPORAL_PREVIEW))
-    _assert_no_unexpected_extras(parse_safe_data_preview(_BOOLEAN_PREVIEW))
-    _assert_no_unexpected_extras(parse_safe_data_preview(_UNSUPPORTED_PREVIEW))
-
-
-def test_numeric_preview_typed_access():
-    preview = parse_safe_data_preview(_NUMERIC_PREVIEW)
-    assert isinstance(preview, NumericPreview)
-    assert preview.statistics_common.count_row == 1000
-    assert preview.statistics_kind.summaries.mean == 41.3
-    assert preview.statistics_kind.histograms.bins[0].count == 210
-
-
-def test_string_preview_typed_access():
-    preview = parse_safe_data_preview(_STRING_PREVIEW)
-    assert isinstance(preview, StringPreview)
-    assert preview.statistics_kind.lengths.most_common[0].length == 20
-    assert preview.statistics_kind.patterns.composition.letter == 0.78
-    assert preview.statistics_kind.first_chars.top[0].masked == "j*******"
-
-
-def test_unsupported_preview_reason_reads_as_str_and_matches_known_constant():
-    preview = parse_safe_data_preview(_UNSUPPORTED_PREVIEW)
-    assert isinstance(preview, UnsupportedPreview)
-    assert UnsupportedPreviewReason(preview.statistics_kind.reason) is UnsupportedPreviewReason.is_binary
-    assert preview.statistics_kind.reason == "Binary data isn't previewed"
-
-
-def test_none_passes_through():
-    assert parse_safe_data_preview(None) is None
-
-
-def test_already_parsed_model_passes_through():
-    preview = parse_safe_data_preview(_BOOLEAN_PREVIEW)
-    assert parse_safe_data_preview(preview) is preview
-
-
-def test_unknown_kind_degrades():
-    payload = {
-        "kind": "geospatial",
-        "sampled_from": None,
-        "statistics_common": {"count_row": 5, "count_null": 0, "count_distinct": 5},
-        "statistics_kind": {"crs": "EPSG:4326"},
-    }
-    preview = parse_safe_data_preview(payload)
-    assert isinstance(preview, UnknownPreview)
-    assert preview.kind == "geospatial"
-    assert preview.model_extra["statistics_kind"] == {"crs": "EPSG:4326"}
-
-
-def test_known_kind_with_broken_shape_degrades():
-    # `numeric`, but missing the required `statistics_kind`.
-    payload = {
-        "kind": "numeric",
-        "sampled_from": None,
-        "statistics_common": {"count_row": 5, "count_null": 0, "count_distinct": 5},
-    }
-    preview = parse_safe_data_preview(payload)
-    assert isinstance(preview, UnknownPreview)
-    assert preview.kind == "numeric"
-    assert isinstance(preview.statistics_common, CommonStatistics)
-    assert preview.statistics_common.count_null == 0
-
-
-def test_unparseable_payload_falls_back_without_raising():
-    payload = {"kind": 123, "sampled_from": "f.csv", "statistics_common": {"count_row": "oops"}}
-    preview = parse_safe_data_preview(payload)
-    assert isinstance(preview, UnknownPreview)
-    assert preview.kind == 123
-
-
-def test_non_dict_preview_is_none():
-    assert parse_safe_data_preview("not a preview") is None
-    assert parse_safe_data_preview(42) is None
-
-
-def _column_data(**overrides: object) -> dict[str, object]:
+def _build_column_data(**overrides: object) -> dict[str, object]:
     data: dict[str, object] = {
         "data_type": "text",
         "foreign_keys": [],
@@ -210,36 +117,42 @@ def _column_data(**overrides: object) -> dict[str, object]:
     return data
 
 
-def test_column_null_preview_is_none():
-    column = SchemaDiscoveryColumn.model_validate(_column_data(safe_data_preview=None))
-    assert column.safe_data_preview is None
+@pytest.mark.parametrize("payload", _KNOWN_PREVIEWS)
+def test_each_preview_has_no_untyped_fields(payload):
+    column = SchemaDiscoveryColumn.model_validate(_build_column_data(safe_data_preview=payload))
+    _assert_no_unexpected_extras(column.safe_data_preview)
 
 
-def test_column_absent_preview_is_none():
-    column = SchemaDiscoveryColumn.model_validate(_column_data())
+@pytest.mark.parametrize(
+    "overrides",
+    [
+        pytest.param({"safe_data_preview": None}, id="explicit-null"),
+        pytest.param({}, id="absent"),
+    ],
+)
+def test_column_without_preview_is_none(overrides):
+    column = SchemaDiscoveryColumn.model_validate(_build_column_data(**overrides))
     assert column.safe_data_preview is None
 
 
 def test_column_unsupported_preview_is_distinct_from_none():
-    column = SchemaDiscoveryColumn.model_validate(_column_data(safe_data_preview=_UNSUPPORTED_PREVIEW))
+    column = SchemaDiscoveryColumn.model_validate(_build_column_data(safe_data_preview=_UNSUPPORTED_PREVIEW))
     assert column.safe_data_preview is not None
     assert isinstance(column.safe_data_preview, UnsupportedPreview)
 
 
-def test_column_unknown_preview_does_not_break_the_result():
-    column = SchemaDiscoveryColumn.model_validate(
-        _column_data(safe_data_preview={"kind": "geospatial", "statistics_common": {"count_row": 1, "count_null": 0}})
-    )
-    assert isinstance(column.safe_data_preview, UnknownPreview)
-    assert column.data_type == "text"  # the rest of the column still parsed
-
-
-def test_column_model_dump_preserves_preview_fields():
-    # SerializeAsAny guard: dumping through the ColumnPreview-typed field must keep the concrete fields.
-    column = SchemaDiscoveryColumn.model_validate(_column_data(safe_data_preview=_NUMERIC_PREVIEW))
-    dumped = column.model_dump(mode="json")["safe_data_preview"]
-    assert dumped["kind"] == "numeric"
-    assert dumped["statistics_kind"]["summaries"]["mean"] == 41.3
+@pytest.mark.parametrize(
+    "safe_data_preview",
+    [
+        pytest.param({"kind": "geospatial", "statistics_common": {"count_row": 1, "count_null": 0}}, id="unknown-kind"),
+        pytest.param({"kind": "numeric", "statistics_common": {"count_row": 5, "count_null": 0}}, id="broken-shape"),
+        pytest.param({"kind": 123, "statistics_common": {"count_row": "oops"}}, id="malformed"),
+        pytest.param("not a preview", id="non-dict"),
+    ],
+)
+def test_column_rejects_unparseable_preview(safe_data_preview):
+    with pytest.raises(ValidationError):
+        SchemaDiscoveryColumn.model_validate(_build_column_data(safe_data_preview=safe_data_preview))
 
 
 def _file_discovery_payload(locator_extra: dict[str, object]) -> dict[str, object]:

@@ -7,10 +7,8 @@ History
 
 * Added typed Safe Data Preview support:
 
-  * ``safe_data_preview`` on ``InDataDiscoveryConfig`` (via ``SafeDataPreviewOptions``)
-    to configure or disable the preview.
-  * ``safe_data_preview`` on schema-discovery result columns and file-discovery locators,
-    typed by ``kind``.
+  * ``safe_data_preview`` on ``InDataDiscoveryConfig`` (via ``SafeDataPreviewOptions``) to configure or disable it.
+  * ``safe_data_preview`` on schema-discovery result columns and file-discovery locators, typed by ``kind``.
 
 * Added ``row_count`` to ``TableConstraints`` in schema-discovery ``table_metadata``.
 

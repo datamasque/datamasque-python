@@ -1,14 +1,12 @@
 """Typed request and response shapes for Safe Data Preview, part of In-Data Discovery."""
 
 from enum import Enum
-from typing import Literal, Optional, Union
+from typing import Annotated, Literal, Optional, Union
 
 from pydantic import (
     BaseModel,
     ConfigDict,
-    JsonValue,
-    SerializeAsAny,
-    ValidationError,
+    Field,
 )
 
 
@@ -47,20 +45,6 @@ class ColumnKind(str, Enum):
     string = "string"
     temporal = "temporal"
     unsupported = "unsupported"
-
-
-class UnsupportedPreviewReason(str, Enum):
-    """Known reasons an `UnsupportedPreview` gives for declining a column."""
-
-    no_rows = "No rows sampled"
-    all_null = "All sampled values are null"
-    all_identical = "All sampled values are identical"
-    below_min_group_size = "A value count is below the minimum group size"
-    uninterpretable = "Values couldn't be interpreted as a single consistent type"
-    is_binary = "Binary data isn't previewed"
-    datatype_not_previewed = "This data type has no Safe Data Preview"
-    too_many_columns = "Table has too many columns for Safe Data Preview"
-    unavailable = "This column could not be previewed"
 
 
 class CommonStatistics(BaseModel):
@@ -140,7 +124,7 @@ class FirstCharsStatistics(BaseModel):
 
 
 class StringStatistics(BaseModel):
-    """String preview statistics; `patterns`/`first_chars` appear only at the matching disclosure level."""
+    """String preview statistics; `patterns`/`first_chars` appear at or above certain disclosure levels."""
 
     model_config = ConfigDict(extra="allow")
 
@@ -240,7 +224,7 @@ class BooleanStatistics(BaseModel):
 
 
 class UnsupportedStatistics(BaseModel):
-    """Why a column could not be previewed. See `UnsupportedPreviewReason` for known values."""
+    """Why a column could not be previewed."""
 
     model_config = ConfigDict(extra="allow")
 
@@ -254,13 +238,13 @@ class ColumnPreview(BaseModel):
 
     # For grouped file discovery, the file whose sample produced this preview; None for database columns.
     sampled_from: Optional[str] = None
+    statistics_common: CommonStatistics
 
 
 class StringPreview(ColumnPreview):
     """A preview of a string column."""
 
     kind: Literal[ColumnKind.string] = ColumnKind.string
-    statistics_common: CommonStatistics
     statistics_kind: StringStatistics
 
 
@@ -268,7 +252,6 @@ class NumericPreview(ColumnPreview):
     """A preview of a numeric column."""
 
     kind: Literal[ColumnKind.numeric] = ColumnKind.numeric
-    statistics_common: CommonStatistics
     statistics_kind: NumericStatistics
 
 
@@ -276,7 +259,6 @@ class TemporalPreview(ColumnPreview):
     """A preview of a date/time column."""
 
     kind: Literal[ColumnKind.temporal] = ColumnKind.temporal
-    statistics_common: CommonStatistics
     statistics_kind: TemporalStatistics
 
 
@@ -284,7 +266,6 @@ class BooleanPreview(ColumnPreview):
     """A preview of a boolean column."""
 
     kind: Literal[ColumnKind.boolean] = ColumnKind.boolean
-    statistics_common: CommonStatistics
     statistics_kind: BooleanStatistics
 
 
@@ -292,47 +273,10 @@ class UnsupportedPreview(ColumnPreview):
     """A column the preview ran against but declined; `statistics_kind.reason` says why."""
 
     kind: Literal[ColumnKind.unsupported] = ColumnKind.unsupported
-    statistics_common: CommonStatistics
     statistics_kind: UnsupportedStatistics
 
 
-class UnknownPreview(ColumnPreview):
-    """A Safe Data Preview whose `kind` or shape this client can't parse; raw fields stay on `model_extra`."""
-
-    kind: Optional[str] = None
-    statistics_common: Optional[CommonStatistics] = None
-
-
-PREVIEW_BY_KIND: dict[str, type[ColumnPreview]] = {
-    ColumnKind.string.value: StringPreview,
-    ColumnKind.numeric.value: NumericPreview,
-    ColumnKind.temporal.value: TemporalPreview,
-    ColumnKind.boolean.value: BooleanPreview,
-    ColumnKind.unsupported.value: UnsupportedPreview,
-}
-
-
-def parse_safe_data_preview(value: Union[dict[str, JsonValue], ColumnPreview, None]) -> Optional[ColumnPreview]:
-    """Parse a raw preview into its typed variant, or `UnknownPreview` if the kind or shape is unrecognised."""
-
-    if value is None:
-        return None
-    if isinstance(value, ColumnPreview):
-        return value
-    if not isinstance(value, dict):
-        return None
-    kind = value.get("kind")
-    preview_type = PREVIEW_BY_KIND.get(kind) if isinstance(kind, str) else None
-    if preview_type is not None:
-        try:
-            return preview_type.model_validate(value)
-        except ValidationError:
-            pass
-    try:
-        return UnknownPreview.model_validate(value)
-    except ValidationError:
-        # Fallback to raw
-        return UnknownPreview.model_construct(**value)  # type: ignore[arg-type]
-
-
-SafeDataPreview = SerializeAsAny[ColumnPreview]
+SafeDataPreview = Annotated[
+    Union[StringPreview, NumericPreview, TemporalPreview, BooleanPreview, UnsupportedPreview],
+    Field(discriminator="kind"),
+]

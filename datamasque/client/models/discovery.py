@@ -3,7 +3,7 @@
 from enum import Enum
 from typing import Any, Optional, Union
 
-from pydantic import BaseModel, ConfigDict, Field, JsonValue, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from datamasque.client.models.connection import ConnectionConfig, ConnectionId, unwrap_connection_id
 from datamasque.client.models.data_selection import HashColumnsTableConfig, Locator, UserSelection
@@ -11,10 +11,8 @@ from datamasque.client.models.discovery_config import DiscoveryConfig, Discovery
 from datamasque.client.models.pagination import Page
 from datamasque.client.models.runs import RunConnectionRef
 from datamasque.client.models.safe_data_preview import (
-    ColumnPreview,
     SafeDataPreview,
     SafeDataPreviewOptions,
-    parse_safe_data_preview,
 )
 
 
@@ -303,13 +301,6 @@ class SchemaDiscoveryColumn(BaseModel):
     constraint: str  # Primary or Unique, or empty string if column does not participate in a PK/UK
     safe_data_preview: Optional[SafeDataPreview] = None
 
-    @field_validator("safe_data_preview", mode="before")
-    @classmethod
-    def _parse_safe_data_preview(
-        cls, value: Union[dict[str, JsonValue], ColumnPreview, None]
-    ) -> Optional[ColumnPreview]:
-        return parse_safe_data_preview(value)
-
 
 class SchemaDiscoveryResult(BaseModel):
     """A single row in the v2 schema discovery results."""
@@ -373,13 +364,6 @@ class FileDiscoveryLocatorResult(BaseModel):
     matches: list[FileDiscoveryMatch]
     data_types: list[str]
     safe_data_preview: Optional[SafeDataPreview] = None
-
-    @field_validator("safe_data_preview", mode="before")
-    @classmethod
-    def _parse_safe_data_preview(
-        cls, value: Union[dict[str, JsonValue], ColumnPreview, None]
-    ) -> Optional[ColumnPreview]:
-        return parse_safe_data_preview(value)
 
 
 class FileDiscoveryFile(BaseModel):
