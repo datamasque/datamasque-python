@@ -3,7 +3,6 @@ from typing import NewType, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from datamasque.client.models.discovery_config import DiscoveryConfigType
 from datamasque.client.models.status import ValidationStatus
 
 DiscoveryConfigLibraryId = NewType("DiscoveryConfigLibraryId", str)
@@ -13,14 +12,13 @@ class DiscoveryConfigLibrary(BaseModel):
     """
     Represents a named, namespaced, persisted YAML discovery config library.
 
-    Library names are unique per config type within a namespace,
-    so a database and a file library may share a name.
+    A library is untyped: the same library may be imported by both database and
+    file discovery configs, and its name is unique within a namespace.
     """
 
     model_config = ConfigDict(extra="allow", populate_by_name=True)
 
     name: str
-    config_type: DiscoveryConfigType
     namespace: str = ""
     yaml: Optional[str] = Field(default=None, alias="config_yaml")
     # Server-populated read-only fields, excluded from request bodies.
