@@ -11,6 +11,8 @@ History
   * ``safe_data_preview`` on schema-discovery result columns and file-discovery locators, typed by ``kind``.
 
 * Added ``row_count`` to ``TableConstraints`` in schema-discovery ``table_metadata``.
+* Added table-reference management APIs (``list_table_references``, ``create_table_reference``, and friends),
+  along with the ``TableReference`` and ``TableReferenceOptions`` models.
 
 1.1.7 (2026-07-14)
 ------------------
