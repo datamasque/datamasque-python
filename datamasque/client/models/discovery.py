@@ -10,6 +10,10 @@ from datamasque.client.models.data_selection import HashColumnsTableConfig, Loca
 from datamasque.client.models.discovery_config import DiscoveryConfig, DiscoveryConfigId, unwrap_discovery_config_id
 from datamasque.client.models.pagination import Page
 from datamasque.client.models.runs import RunConnectionRef
+from datamasque.client.models.safe_data_preview import (
+    SafeDataPreview,
+    SafeDataPreviewOptions,
+)
 
 
 class InDataDiscoveryRule(BaseModel):
@@ -32,6 +36,7 @@ class InDataDiscoveryConfig(BaseModel):
     non_sensitive_rules: Optional[list[InDataDiscoveryRule]] = None
     ignore_rules: Optional[list[InDataDiscoveryRule]] = None
     force: Optional[bool] = None
+    safe_data_preview: Optional[SafeDataPreviewOptions] = None
 
 
 class SchemaDiscoveryRequest(BaseModel):
@@ -294,6 +299,7 @@ class SchemaDiscoveryColumn(BaseModel):
     unique_index_names: list[str]
     referencing_foreign_keys: list[ReferencingForeignKey]
     constraint: str  # Primary or Unique, or empty string if column does not participate in a PK/UK
+    safe_data_preview: Optional[SafeDataPreview] = None
 
 
 class SchemaDiscoveryResult(BaseModel):
@@ -324,6 +330,7 @@ class TableConstraints(BaseModel):
     primary_keys: Optional[list[ConstraintColumns]] = None
     unique_keys: Optional[list[ConstraintColumns]] = None
     foreign_keys: Optional[list[ConstraintColumns]] = None
+    row_count: Optional[int] = None
 
 
 class SchemaDiscoveryPage(Page[SchemaDiscoveryResult]):
@@ -356,6 +363,7 @@ class FileDiscoveryLocatorResult(BaseModel):
     locator: Locator
     matches: list[FileDiscoveryMatch]
     data_types: list[str]
+    safe_data_preview: Optional[SafeDataPreview] = None
 
 
 class FileDiscoveryFile(BaseModel):

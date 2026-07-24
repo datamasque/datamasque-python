@@ -26,6 +26,7 @@ from datamasque.client import (
     SchemaDiscoveryPage,
     SchemaDiscoveryRequest,
     SchemaDiscoveryResult,
+    StringPreview,
 )
 from datamasque.client.exceptions import (
     AsyncRulesetGenerationInProgressError,
@@ -770,6 +771,23 @@ def _schema_discovery_row(row_id: int, column_name: str, table_name: str = "user
     }
 
 
+def test_schema_discovery_result_parses_safe_data_preview():
+    row = _schema_discovery_row(1, "email")
+    row["data"]["safe_data_preview"] = {
+        "kind": "string",
+        "sampled_from": "data/people.csv",
+        "statistics_common": {"count_row": 1000, "count_null": 0, "count_distinct": 988},
+        "statistics_kind": {
+            "lengths": {"min": 5, "max": 30, "mean": 18.0, "median": 18.0, "most_common": []},
+        },
+    }
+    result = SchemaDiscoveryResult.model_validate(row)
+    preview = result.data.safe_data_preview
+    assert isinstance(preview, StringPreview)
+    assert preview.sampled_from == "data/people.csv"
+    assert preview.statistics_common.count_distinct == 988
+
+
 def test_list_schema_discovery_results_follows_pagination(client):
     run_id = RunId(42)
     page1 = {
@@ -833,6 +851,7 @@ def test_get_schema_discovery_page_returns_page_with_table_metadata(client):
                     "primary_keys": [{"columns": ["id"]}],
                     "unique_keys": [{"columns": ["email"]}],
                     "foreign_keys": [],
+                    "row_count": 12345,
                 },
             },
         },
@@ -848,6 +867,7 @@ def test_get_schema_discovery_page_returns_page_with_table_metadata(client):
     assert isinstance(page, SchemaDiscoveryPage)
     assert [r.column for r in page.results] == ["email"]
     assert page.table_metadata["public"]["users"].primary_keys[0].columns == ["id"]
+    assert page.table_metadata["public"]["users"].row_count == 12345
     assert m.last_request.qs == {"limit": ["10"], "offset": ["20"]}
 
 
