@@ -2,7 +2,7 @@
 
 import enum
 from datetime import datetime
-from typing import Any, NewType, Optional, Union
+from typing import NewType, Optional, Union
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
@@ -64,7 +64,7 @@ class TableReference(BaseModel):
 
     * file connection — a path to the file within the connection's fileset.
       The format comes from `options.format`, never from the path's suffix.
-    * database connection — a dotted, schema-qualified ``schema.table`` reference.
+    * database connection — a dotted, schema-qualified `schema.table` reference.
 
     Names are unique across live table references (a deleted reference frees its name for reuse),
     and the referenced connection must not be archived.
@@ -86,7 +86,7 @@ class TableReference(BaseModel):
 
     @field_validator("connection", mode="before")
     @classmethod
-    def _unwrap_connection(cls, value: Any) -> Any:
+    def _unwrap_connection(cls, value: object) -> object:
         return unwrap_connection_id(value)
 
     @property

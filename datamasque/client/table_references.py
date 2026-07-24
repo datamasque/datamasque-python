@@ -66,7 +66,9 @@ class TableReferenceClient(BaseClient):
         then returns the table reference.
         """
 
-        data = table_reference.model_dump(exclude_none=True, by_alias=True, mode="json")
+        data = table_reference.model_dump(by_alias=True, mode="json")
+        if data.get("options") is None:
+            data.pop("options", None)
         response = self.make_request("POST", "/api/table-references/", data=data)
         created = TableReference.model_validate(response.json())
         table_reference.id = created.id
@@ -91,7 +93,9 @@ class TableReferenceClient(BaseClient):
         if table_reference.id is None:
             raise ValueError("Cannot update a table reference that has not been created yet (id is None)")
 
-        data = table_reference.model_dump(exclude_none=True, by_alias=True, mode="json")
+        data = table_reference.model_dump(by_alias=True, mode="json")
+        if data.get("options") is None:
+            data.pop("options", None)
         response = self.make_request("PUT", f"/api/table-references/{table_reference.id}/", data=data)
         updated = TableReference.model_validate(response.json())
         table_reference.options = updated.options

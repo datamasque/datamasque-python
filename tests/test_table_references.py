@@ -1,7 +1,6 @@
 """Tests for table reference support in the DataMasque client."""
 
 from datetime import datetime
-from typing import Any
 
 import pytest
 import requests_mock
@@ -33,7 +32,7 @@ DEFAULT_OPTIONS_JSON = {
 
 
 @pytest.fixture
-def sample_table_reference_list_response() -> list[dict[str, Any]]:
+def sample_table_reference_list_response() -> list[dict[str, object]]:
     """List response: a bare (unpaginated) array of full entries."""
     return [
         {
@@ -103,7 +102,7 @@ def test_connection_config_without_an_id_is_rejected() -> None:
 
 
 def test_list_table_references(
-    client: DataMasqueClient, sample_table_reference_list_response: list[dict[str, Any]]
+    client: DataMasqueClient, sample_table_reference_list_response: list[dict[str, object]]
 ) -> None:
     with requests_mock.Mocker() as m:
         m.get(
@@ -144,7 +143,7 @@ def test_list_table_references_empty(client: DataMasqueClient) -> None:
 
 
 def test_get_table_reference(
-    client: DataMasqueClient, sample_table_reference_list_response: list[dict[str, Any]]
+    client: DataMasqueClient, sample_table_reference_list_response: list[dict[str, object]]
 ) -> None:
     with requests_mock.Mocker() as m:
         m.get(
@@ -160,7 +159,7 @@ def test_get_table_reference(
 
 
 def test_get_table_reference_by_name_found(
-    client: DataMasqueClient, sample_table_reference_list_response: list[dict[str, Any]]
+    client: DataMasqueClient, sample_table_reference_list_response: list[dict[str, object]]
 ) -> None:
     """The list response carries every field, so a by-name lookup needs no follow-up detail request."""
     with requests_mock.Mocker() as m:
@@ -177,7 +176,7 @@ def test_get_table_reference_by_name_found(
 
 
 def test_get_table_reference_by_name_not_found(
-    client: DataMasqueClient, sample_table_reference_list_response: list[dict[str, Any]]
+    client: DataMasqueClient, sample_table_reference_list_response: list[dict[str, object]]
 ) -> None:
     with requests_mock.Mocker() as m:
         m.get(
@@ -261,6 +260,37 @@ def test_create_table_reference_sends_options(client: DataMasqueClient) -> None:
     assert options["format"] == "parquet"
     assert options["delimiter"] == ";"
     assert options["null_string"] == "NULL"
+
+
+def test_create_table_reference_sends_null_string_default(client: DataMasqueClient) -> None:
+    """`null_string`'s default of `None` must be sent explicitly, not dropped from the payload."""
+    reference = TableReference(
+        name="customer_identities",
+        connection=ConnectionId(CONNECTION_ID_1),
+        source="identities/customers.csv",
+        options=TableReferenceOptions(),
+    )
+    create_response = {
+        "id": TABLE_REFERENCE_ID_1,
+        "name": "customer_identities",
+        "connection": CONNECTION_ID_1,
+        "source": "identities/customers.csv",
+        "options": DEFAULT_OPTIONS_JSON,
+        "created": "2025-06-01T10:00:00Z",
+        "modified": "2025-06-01T10:00:00Z",
+    }
+
+    with requests_mock.Mocker() as m:
+        m.post(
+            "http://test-server/api/table-references/",
+            json=create_response,
+            status_code=201,
+        )
+        client.create_table_reference(reference)
+
+    options = m.last_request.json()["options"]
+    assert "null_string" in options
+    assert options["null_string"] is None
 
 
 def test_update_table_reference(client: DataMasqueClient, table_reference: TableReference) -> None:
@@ -361,7 +391,7 @@ def test_create_or_update_table_reference_create(client: DataMasqueClient, table
 def test_create_or_update_table_reference_update(
     client: DataMasqueClient,
     table_reference: TableReference,
-    sample_table_reference_list_response: list[dict[str, Any]],
+    sample_table_reference_list_response: list[dict[str, object]],
 ) -> None:
     update_response = {
         "id": TABLE_REFERENCE_ID_1,
@@ -437,7 +467,7 @@ def test_delete_table_reference_by_id_not_found(client: DataMasqueClient) -> Non
 
 
 def test_delete_table_reference_by_name(
-    client: DataMasqueClient, sample_table_reference_list_response: list[dict[str, Any]]
+    client: DataMasqueClient, sample_table_reference_list_response: list[dict[str, object]]
 ) -> None:
     with requests_mock.Mocker() as m:
         m.get(
@@ -458,7 +488,7 @@ def test_delete_table_reference_by_name(
 
 
 def test_delete_table_reference_by_name_not_found(
-    client: DataMasqueClient, sample_table_reference_list_response: list[dict[str, Any]]
+    client: DataMasqueClient, sample_table_reference_list_response: list[dict[str, object]]
 ) -> None:
     with requests_mock.Mocker() as m:
         m.get(
