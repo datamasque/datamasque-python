@@ -2,7 +2,7 @@ import logging
 from typing import Optional
 
 from datamasque.client.base import BaseClient
-from datamasque.client.exceptions import DataMasqueException
+from datamasque.client.exceptions import DataMasqueApiError
 from datamasque.client.models.table_reference import TableReference, TableReferenceId
 
 logger = logging.getLogger(__name__)
@@ -48,14 +48,19 @@ class TableReferenceClient(BaseClient):
     def _get_table_reference_id_by_name(self, name: str) -> Optional[TableReferenceId]:
         """Return the ID of the table reference with the given name, or `None` if there is none."""
 
-        existing = self.get_table_reference_by_name(name)
-        if existing is None:
+        response = self.make_request("GET", "/api/table-references/")
+        matches = [item for item in response.json() if item.get("name") == name]
+        if not matches:
             return None
 
-        if existing.id is None:
-            raise DataMasqueException(f'Server returned a table reference named "{name}" without an `id`.')
+        existing_id = matches[0].get("id")
+        if existing_id is None:
+            raise DataMasqueApiError(
+                f'Server returned a table reference named "{name}" without an `id`.',
+                response=response,
+            )
 
-        return existing.id
+        return TableReferenceId(existing_id)
 
     def create_table_reference(self, table_reference: TableReference) -> TableReference:
         """
