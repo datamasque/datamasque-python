@@ -2,7 +2,7 @@
 History
 =======
 
-1.1.8 (unreleased)
+1.1.8 (2026-07-27)
 ------------------
 
 * Added typed Safe Data Preview support:
