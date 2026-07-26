@@ -155,6 +155,12 @@ from datamasque.client.models.status import (
     ValidationErrorType,
     ValidationStatus,
 )
+from datamasque.client.models.table_reference import (
+    TableReference,
+    TableReferenceFormat,
+    TableReferenceId,
+    TableReferenceOptions,
+)
 from datamasque.client.models.user import User, UserId, UserRole
 
 __version__ = version("datamasque-python")
@@ -285,6 +291,10 @@ __all__ = [
     "StringStatistics",
     "SwitchableLicenseMetadata",
     "TableConstraints",
+    "TableReference",
+    "TableReferenceFormat",
+    "TableReferenceId",
+    "TableReferenceOptions",
     "TemporalBin",
     "TemporalHistograms",
     "TemporalPreview",
