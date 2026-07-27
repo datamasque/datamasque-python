@@ -23,6 +23,7 @@ from datamasque.client.exceptions import (
     InvalidDiscoveryConfigError,
     InvalidLibraryError,
     InvalidRulesetError,
+    RGConfigNotFoundError,
     RunNotCancellableError,
 )
 from datamasque.client.ifm import DataMasqueIfmClient
@@ -67,11 +68,13 @@ from datamasque.client.models.discovery import (
     FileFilter,
     FileFilterMatchAgainst,
     FileRulesetGenerationRequest,
+    FileRulesetGenerationWithRGConfigRequest,
     ForeignKeyRef,
     InDataDiscoveryConfig,
     InDataDiscoveryRule,
     ReferencingForeignKey,
     RulesetGenerationRequest,
+    RulesetGenerationWithRGConfigRequest,
     SchemaDiscoveryColumn,
     SchemaDiscoveryFromConfigRequest,
     SchemaDiscoveryPage,
@@ -105,6 +108,7 @@ from datamasque.client.models.ifm import (
     RulesetPlanUpdateRequest,
 )
 from datamasque.client.models.license import LicenseInfo, SwitchableLicenseMetadata
+from datamasque.client.models.rg_config import RGConfig, RGConfigId
 from datamasque.client.models.ruleset import Ruleset, RulesetId, RulesetType
 from datamasque.client.models.ruleset_library import RulesetLibrary, RulesetLibraryId
 from datamasque.client.models.runs import (
@@ -214,6 +218,7 @@ __all__ = [
     "FileId",
     "FileOrContent",
     "FileRulesetGenerationRequest",
+    "FileRulesetGenerationWithRGConfigRequest",
     "FirstCharsStatistics",
     "ForeignKeyRef",
     "GitSnapshot",
@@ -252,9 +257,13 @@ __all__ = [
     "PatternComposition",
     "PatternEntry",
     "PatternsStatistics",
+    "RGConfig",
+    "RGConfigId",
+    "RGConfigNotFoundError",
     "ReferencingForeignKey",
     "Ruleset",
     "RulesetGenerationRequest",
+    "RulesetGenerationWithRGConfigRequest",
     "RulesetId",
     "RulesetLibrary",
     "RulesetLibraryId",

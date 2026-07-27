@@ -119,8 +119,9 @@ class RulesetLibraryClient(BaseClient):
 
         No-op if the library does not exist.
 
-        If the library is imported by any rulesets,
+        If the library is imported by any rulesets or RG configs,
         the server will return 409 Conflict unless `force=True` is passed.
+        Forcing the deletion marks those dependents' validation state as invalid.
         """
 
         params = {"force": "true"} if force else None
@@ -151,6 +152,8 @@ class RulesetLibraryClient(BaseClient):
     def list_rulesets_using_library(self, library_id: RulesetLibraryId) -> list[Ruleset]:
         """
         Lists rulesets that import the given library.
+
+        Only rulesets are listed; RG configs that import the library are not included.
 
         Note: The YAML content is not included in the response for performance.
         Each returned Ruleset will have an empty string for `yaml`.

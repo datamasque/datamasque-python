@@ -19,8 +19,12 @@ from datamasque.client import (
     FileFilter,
     FileFilterMatchAgainst,
     FileRulesetGenerationRequest,
+    FileRulesetGenerationWithRGConfigRequest,
     InDataDiscoveryConfig,
+    RGConfig,
+    RGConfigId,
     RulesetGenerationRequest,
+    RulesetGenerationWithRGConfigRequest,
     RunId,
     SchemaDiscoveryFromConfigRequest,
     SchemaDiscoveryPage,
@@ -35,6 +39,7 @@ from datamasque.client.exceptions import (
     DiscoveryConfigNotFoundError,
     FailedToStartError,
     InvalidDiscoveryConfigError,
+    RGConfigNotFoundError,
 )
 from datamasque.client.models.connection import ConnectionId, DatabaseConnectionConfig, DatabaseType
 from datamasque.client.models.data_selection import SelectedColumns, SelectedFileData, UserSelection
@@ -42,6 +47,7 @@ from datamasque.client.models.status import AsyncRulesetGenerationTaskStatus
 from tests.helpers import parse_multipart_form
 
 DISCOVERY_CONFIG_ID = "aaaaaaaa-1111-2222-3333-444444444444"
+RG_CONFIG_ID = "bbbbbbbb-1111-2222-3333-444444444444"
 
 
 def test_generate_ruleset(client):
@@ -1375,3 +1381,346 @@ def test_get_discovery_run_config_snapshot_yaml_empty_archive_raises(client):
         )
         with pytest.raises(DataMasqueException, match="contained no files"):
             client.get_discovery_run_config_snapshot_yaml(RunId(7))
+
+
+def test_generate_ruleset_with_rg_config(client):
+    """`generate_ruleset_with_rg_config` posts the rg_config id to the v3 endpoint."""
+    req = RulesetGenerationWithRGConfigRequest(
+        connection="conn-1",
+        selected_columns={"public": {"users": ["email"]}},
+        rg_config=RGConfigId(RG_CONFIG_ID),
+    )
+    with requests_mock.Mocker() as m:
+        m.post(
+            "http://test-server/api/generate-ruleset/v3/",
+            content=b'version: "1.0"',
+            status_code=201,
+        )
+        assert client.generate_ruleset_with_rg_config(req) == 'version: "1.0"'
+
+    assert m.last_request.json() == {
+        "connection": "conn-1",
+        "selected_columns": {"public": {"users": ["email"]}},
+        "rg_config": RG_CONFIG_ID,
+    }
+
+
+def test_generate_ruleset_with_rg_config_none_sends_null(client):
+    """With `rg_config=None` the client posts an explicit null so the server applies its default RG config."""
+    req = RulesetGenerationWithRGConfigRequest(
+        connection="conn-1",
+        selected_columns={"public": {"users": ["email"]}},
+        rg_config=None,
+    )
+    with requests_mock.Mocker() as m:
+        m.post(
+            "http://test-server/api/generate-ruleset/v3/",
+            content=b'version: "1.0"',
+            status_code=201,
+        )
+        assert client.generate_ruleset_with_rg_config(req) == 'version: "1.0"'
+
+    assert m.last_request.json()["rg_config"] is None
+
+
+def test_ruleset_generation_with_rg_config_request_unwraps_rg_config_model():
+    """Passing a full `RGConfig` object substitutes its `id` for the wire payload."""
+    config = RGConfig(name="my_rgc", id=RGConfigId(RG_CONFIG_ID))
+    req = RulesetGenerationWithRGConfigRequest(
+        connection="conn-1",
+        selected_columns={"public": {"users": ["email"]}},
+        rg_config=config,
+    )
+    assert req.model_dump(exclude_none=True, mode="json")["rg_config"] == RG_CONFIG_ID
+
+
+def test_ruleset_generation_with_rg_config_request_rejects_unsaved_rg_config():
+    """An `RGConfig` without an `id` cannot be used yet — raises immediately."""
+    config = RGConfig(name="my_rgc")
+    with pytest.raises(ValueError, match="id is None"):
+        RulesetGenerationWithRGConfigRequest(
+            connection="conn-1",
+            selected_columns={"public": {"users": ["email"]}},
+            rg_config=config,
+        )
+
+
+def test_ruleset_generation_with_rg_config_request_requires_rg_config():
+    """`rg_config` must be set explicitly; omitting it is a validation error (it may be None, but not absent)."""
+    with pytest.raises(ValidationError, match="rg_config"):
+        RulesetGenerationWithRGConfigRequest(connection="conn-1", selected_columns={"public": {"users": ["email"]}})
+
+
+def test_ruleset_generation_request_rejects_rg_config():
+    """The v2 request rejects `rg_config` with a pointer at the versioned method."""
+    with pytest.raises(ValidationError, match="generate_ruleset_with_rg_config"):
+        RulesetGenerationRequest(
+            connection="conn-1",
+            selected_columns={"public": {"users": ["email"]}},
+            rg_config=RGConfigId(RG_CONFIG_ID),
+        )
+
+
+def test_generate_file_ruleset_with_rg_config(client):
+    """`generate_file_ruleset_with_rg_config` posts the rg_config id to the v2 endpoint."""
+    req = FileRulesetGenerationWithRGConfigRequest(
+        connection="conn-1",
+        selected_data=[UserSelection(locators=[["a"]], files=["f1.csv"])],
+        rg_config=RGConfigId(RG_CONFIG_ID),
+    )
+    with requests_mock.Mocker() as m:
+        m.post(
+            "http://test-server/api/generate-file-ruleset/v2/",
+            content=b'version: "1.0"',
+            status_code=201,
+        )
+        assert client.generate_file_ruleset_with_rg_config(req) == 'version: "1.0"'
+
+    assert m.last_request.json() == {
+        "connection": "conn-1",
+        "selected_data": [{"locators": [["a"]], "files": ["f1.csv"]}],
+        "rg_config": RG_CONFIG_ID,
+    }
+
+
+def test_generate_file_ruleset_with_rg_config_none_sends_null(client):
+    """With `rg_config=None` the file trigger posts an explicit null so the server applies its default RG config."""
+    req = FileRulesetGenerationWithRGConfigRequest(
+        connection="conn-1",
+        selected_data=[UserSelection(locators=[["a"]], files=["f1.csv"])],
+        rg_config=None,
+    )
+    with requests_mock.Mocker() as m:
+        m.post(
+            "http://test-server/api/generate-file-ruleset/v2/",
+            content=b'version: "1.0"',
+            status_code=201,
+        )
+        assert client.generate_file_ruleset_with_rg_config(req) == 'version: "1.0"'
+
+    assert m.last_request.json()["rg_config"] is None
+
+
+def test_file_ruleset_generation_with_rg_config_request_requires_rg_config():
+    """`rg_config` must be set explicitly; omitting it is a validation error (it may be None, but not absent)."""
+    with pytest.raises(ValidationError, match="rg_config"):
+        FileRulesetGenerationWithRGConfigRequest(
+            connection="conn-1",
+            selected_data=[UserSelection(locators=[["a"]], files=["f1.csv"])],
+        )
+
+
+def test_file_ruleset_generation_request_rejects_rg_config():
+    """The unversioned file request rejects `rg_config` with a pointer at the versioned method."""
+    with pytest.raises(ValidationError, match="generate_file_ruleset_with_rg_config"):
+        FileRulesetGenerationRequest(
+            connection="conn-1",
+            selected_data=[UserSelection(locators=[["a"]], files=["f1.csv"])],
+            rg_config=RGConfigId(RG_CONFIG_ID),
+        )
+
+
+def test_start_async_ruleset_generation_with_rg_config_columns(client):
+    """The async v2 trigger carries the column selection plus the rg_config id."""
+    connection_id = ConnectionId("1")
+    selected_columns = SelectedColumns(columns={"public": {"users": ["col1", "col2"]}})
+
+    with requests_mock.Mocker() as m:
+        m.post(f"http://test-server/api/async-generate-ruleset/v2/{connection_id}/", status_code=201)
+        client.start_async_ruleset_generation_with_rg_config(connection_id, selected_columns, RGConfigId(RG_CONFIG_ID))
+
+    request_data = m.last_request.json()
+    assert request_data["selected_columns"] == {"public": {"users": ["col1", "col2"]}}
+    assert request_data["rg_config"] == RG_CONFIG_ID
+
+
+def test_start_async_ruleset_generation_with_rg_config_file(client):
+    """The async v2 trigger carries the file selection plus the rg_config id."""
+    connection_id = ConnectionId("1")
+    selected_file_data = SelectedFileData(user_selections=[{"locators": [["locator1"]], "files": ["file1"]}])
+
+    with requests_mock.Mocker() as m:
+        m.post(f"http://test-server/api/async-generate-ruleset/v2/{connection_id}/", status_code=201)
+        client.start_async_ruleset_generation_with_rg_config(
+            connection_id, selected_file_data, RGConfigId(RG_CONFIG_ID)
+        )
+
+    request_data = m.last_request.json()
+    assert request_data["selected_data"] == [{"locators": [["locator1"]], "files": ["file1"]}]
+    assert request_data["rg_config"] == RG_CONFIG_ID
+
+
+def test_start_async_ruleset_generation_with_rg_config_none_sends_null(client):
+    """With `rg_config=None` the async v2 trigger posts an explicit null to select the default RG config."""
+    connection_id = ConnectionId("1")
+    selected_columns = SelectedColumns(columns={"public": {"users": ["col1"]}})
+
+    with requests_mock.Mocker() as m:
+        m.post(f"http://test-server/api/async-generate-ruleset/v2/{connection_id}/", status_code=201)
+        client.start_async_ruleset_generation_with_rg_config(connection_id, selected_columns, None)
+
+    assert m.last_request.json()["rg_config"] is None
+
+
+def test_start_async_ruleset_generation_with_rg_config_unwraps_rg_config_model(client):
+    """A full `RGConfig` object is unwrapped to its id in the request body."""
+    connection_id = ConnectionId("1")
+    selected_columns = SelectedColumns(columns={"public": {"users": ["col1"]}})
+    config = RGConfig(name="my_rgc", id=RGConfigId(RG_CONFIG_ID))
+
+    with requests_mock.Mocker() as m:
+        m.post(f"http://test-server/api/async-generate-ruleset/v2/{connection_id}/", status_code=201)
+        client.start_async_ruleset_generation_with_rg_config(connection_id, selected_columns, config)
+
+    assert m.last_request.json()["rg_config"] == RG_CONFIG_ID
+
+
+def test_start_async_ruleset_generation_with_rg_config_no_selected_data(client):
+    """The versioned trigger applies the same selection validation as the unversioned one."""
+    connection_id = ConnectionId("1")
+
+    with pytest.raises(ValueError, match="`selected_data` is a required argument"):
+        client.start_async_ruleset_generation_with_rg_config(connection_id, None, RGConfigId(RG_CONFIG_ID))
+
+
+def test_start_async_ruleset_generation_from_csv_with_rg_config(client):
+    """The CSV v2 trigger uploads the report and carries the rg_config id as a form field."""
+    connection_id = ConnectionId("1")
+    csv_content = "schema,table,column,selected\npublic,users,email,true"
+
+    with requests_mock.Mocker() as m:
+        m.post(
+            f"http://test-server/api/async-generate-ruleset/v2/{connection_id}/from-csv/",
+            status_code=201,
+        )
+        client.start_async_ruleset_generation_from_csv_with_rg_config(
+            connection_id, csv_content, RGConfigId(RG_CONFIG_ID)
+        )
+
+    form_data = parse_multipart_form(m.last_request)
+    assert form_data["rg_config"] == RG_CONFIG_ID
+    assert form_data["csv_or_zip_file"]["filename"] == "ruleset.csv"
+    assert form_data["csv_or_zip_file"]["content_type"] == "text/csv"
+    assert form_data["csv_or_zip_file"]["content"] == b"schema,table,column,selected\npublic,users,email,true"
+
+
+def test_start_async_ruleset_generation_from_csv_with_rg_config_none_sends_empty_field(client):
+    """Multipart forms cannot carry a JSON null; an empty `rg_config` field selects the default RG config."""
+    connection_id = ConnectionId("1")
+    csv_content = "schema,table,column,selected\npublic,users,email,true"
+
+    with requests_mock.Mocker() as m:
+        m.post(
+            f"http://test-server/api/async-generate-ruleset/v2/{connection_id}/from-csv/",
+            status_code=201,
+        )
+        client.start_async_ruleset_generation_from_csv_with_rg_config(connection_id, csv_content, None)
+
+    form_data = parse_multipart_form(m.last_request)
+    assert form_data["rg_config"] == ""
+
+
+def test_start_async_ruleset_generation_from_csv_with_rg_config_with_target_size(client):
+    """`target_size_bytes` is still supported on the versioned CSV trigger."""
+    connection_id = ConnectionId("1")
+    csv_content = "schema,table,column,selected\npublic,users,email,true"
+
+    with requests_mock.Mocker() as m:
+        m.post(
+            f"http://test-server/api/async-generate-ruleset/v2/{connection_id}/from-csv/",
+            status_code=201,
+        )
+        client.start_async_ruleset_generation_from_csv_with_rg_config(
+            connection_id, csv_content, RGConfigId(RG_CONFIG_ID), target_size_bytes=1024000
+        )
+
+    form_data = parse_multipart_form(m.last_request)
+    assert form_data["rg_config"] == RG_CONFIG_ID
+    assert form_data["target_size_bytes"] == "1024000"
+
+
+# The DRF `PrimaryKeyRelatedField` error the server returns for an unknown or archived RG config.
+MISSING_RG_CONFIG_400 = {"rg_config": [f'Invalid pk "{RG_CONFIG_ID}" - object does not exist.']}
+
+RG_CONFIG_GENERATION_CALLS = [
+    pytest.param(
+        "/api/generate-ruleset/v3/",
+        lambda client: client.generate_ruleset_with_rg_config(
+            RulesetGenerationWithRGConfigRequest(
+                connection="conn-1",
+                selected_columns={"public": {"users": ["email"]}},
+                rg_config=RGConfigId(RG_CONFIG_ID),
+            )
+        ),
+        id="generate_ruleset",
+    ),
+    pytest.param(
+        "/api/generate-file-ruleset/v2/",
+        lambda client: client.generate_file_ruleset_with_rg_config(
+            FileRulesetGenerationWithRGConfigRequest(
+                connection="conn-1",
+                selected_data=[UserSelection(locators=[["a"]], files=["f1.csv"])],
+                rg_config=RGConfigId(RG_CONFIG_ID),
+            )
+        ),
+        id="generate_file_ruleset",
+    ),
+    pytest.param(
+        "/api/async-generate-ruleset/v2/1/",
+        lambda client: client.start_async_ruleset_generation_with_rg_config(
+            ConnectionId("1"),
+            SelectedColumns(columns={"public": {"users": ["email"]}}),
+            RGConfigId(RG_CONFIG_ID),
+        ),
+        id="start_async",
+    ),
+    pytest.param(
+        "/api/async-generate-ruleset/v2/1/from-csv/",
+        lambda client: client.start_async_ruleset_generation_from_csv_with_rg_config(
+            ConnectionId("1"),
+            "schema,table,column,selected\npublic,users,email,true",
+            RGConfigId(RG_CONFIG_ID),
+        ),
+        id="start_async_from_csv",
+    ),
+]
+
+
+@pytest.mark.parametrize("path, call", RG_CONFIG_GENERATION_CALLS)
+def test_generation_with_missing_rg_config_raises(client, path, call):
+    """Every generate-with-RG-config entry point classifies the server's unknown-config 400."""
+    with requests_mock.Mocker() as m:
+        m.post(f"http://test-server{path}", json=MISSING_RG_CONFIG_400, status_code=400)
+        with pytest.raises(RGConfigNotFoundError, match="could not be found") as exc_info:
+            call(client)
+
+    assert exc_info.value.response.status_code == 400
+
+
+@pytest.mark.parametrize("path, call", RG_CONFIG_GENERATION_CALLS)
+def test_generation_with_other_error_raises_generic_api_error(client, path, call):
+    """A 400 that doesn't name the RG config keeps raising the generic API error."""
+    with requests_mock.Mocker() as m:
+        m.post(f"http://test-server{path}", json={"connection": ["This field is required."]}, status_code=400)
+        with pytest.raises(DataMasqueApiError) as exc_info:
+            call(client)
+
+    assert not isinstance(exc_info.value, RGConfigNotFoundError)
+
+
+def test_generation_with_unparseable_rg_config_raises_generic_api_error(client):
+    """Broken stored YAML surfaces under a top-level `message`, not the `rg_config` key, so it stays generic."""
+    body = {"message": 'Ruleset generation config "my_config" could not be parsed: bad indentation on line 3'}
+
+    with requests_mock.Mocker() as m:
+        m.post("http://test-server/api/generate-ruleset/v3/", json=body, status_code=400)
+        with pytest.raises(DataMasqueApiError) as exc_info:
+            client.generate_ruleset_with_rg_config(
+                RulesetGenerationWithRGConfigRequest(
+                    connection="conn-1",
+                    selected_columns={"public": {"users": ["email"]}},
+                    rg_config=RGConfigId(RG_CONFIG_ID),
+                )
+            )
+
+    assert not isinstance(exc_info.value, RGConfigNotFoundError)
