@@ -2,6 +2,16 @@
 History
 =======
 
+1.2.0 (2026-07-27)
+------------------
+
+* Made discovery config libraries untyped, matching the DataMasque 3.26.14 server. A single
+  library is now identified by ``(namespace, name)`` and may be imported by both database and
+  file discovery configs. **Breaking:** removed the ``config_type`` field from
+  ``DiscoveryConfigLibrary`` and the ``config_type`` argument from
+  ``get_discovery_config_library_by_name``, ``create_or_update_discovery_config_library``, and
+  ``delete_discovery_config_library_by_name_if_exists``. Requires a 3.26.14 or later server.
+
 1.1.8 (2026-07-27)
 ------------------
 

@@ -5,13 +5,11 @@ from typing import Any
 
 import pytest
 import requests_mock
-from pydantic import ValidationError
 
 from datamasque.client import (
     DataMasqueClient,
     DiscoveryConfigLibrary,
     DiscoveryConfigLibraryId,
-    DiscoveryConfigType,
 )
 from datamasque.client.exceptions import DataMasqueApiError
 from datamasque.client.models.status import ValidationStatus
@@ -28,7 +26,6 @@ def sample_library_list_response() -> list[dict[str, Any]]:
             "id": LIBRARY_ID_1,
             "name": "my_library",
             "namespace": "org",
-            "config_type": "database",
             "is_valid": "valid",
             "validation_error": None,
             "usage_count": 0,
@@ -39,7 +36,6 @@ def sample_library_list_response() -> list[dict[str, Any]]:
             "id": LIBRARY_ID_2,
             "name": "another_library",
             "namespace": "",
-            "config_type": "file",
             "is_valid": "invalid",
             "validation_error": "bad yaml",
             "usage_count": 2,
@@ -56,7 +52,6 @@ def sample_library_detail_response() -> dict[str, Any]:
         "id": LIBRARY_ID_1,
         "name": "my_library",
         "namespace": "org",
-        "config_type": "database",
         "config_yaml": "labels: []\nmetadata_rules: []\nidd_rules: []\n",
         "is_valid": "valid",
         "validation_error": None,
@@ -67,43 +62,18 @@ def sample_library_detail_response() -> dict[str, Any]:
 
 
 @pytest.fixture
-def same_name_both_config_types() -> list[dict[str, Any]]:
-    """Two libraries sharing (name, namespace) but with different config types, as the server allows."""
-    return [
-        {
-            "id": LIBRARY_ID_1,
-            "name": "my_library",
-            "namespace": "",
-            "config_type": "database",
-            "is_valid": "valid",
-            "created": "2025-01-01T12:00:00Z",
-            "modified": "2025-01-02T12:00:00Z",
-        },
-        {
-            "id": LIBRARY_ID_2,
-            "name": "my_library",
-            "namespace": "",
-            "config_type": "file",
-            "is_valid": "valid",
-            "created": "2025-01-01T12:00:00Z",
-            "modified": "2025-01-02T12:00:00Z",
-        },
-    ]
-
-
-@pytest.fixture
 def config_library() -> DiscoveryConfigLibrary:
     return DiscoveryConfigLibrary(
         name="test_library",
         namespace="test_ns",
-        config_type=DiscoveryConfigType.database,
         yaml="labels: []\nmetadata_rules: []\nidd_rules: []\n",
     )
 
 
-def test_config_type_is_required_on_the_model() -> None:
-    with pytest.raises(ValidationError, match="config_type"):
-        DiscoveryConfigLibrary(name="test_library", yaml="labels: []\n")
+def test_library_is_untyped() -> None:
+    """A library carries no `config_type`; the same library serves both config types."""
+    library = DiscoveryConfigLibrary(name="test_library", yaml="labels: []\n")
+    assert "config_type" not in library.model_dump(by_alias=True)
 
 
 def test_list_discovery_config_libraries(
@@ -121,12 +91,10 @@ def test_list_discovery_config_libraries(
     assert libraries[0].id == DiscoveryConfigLibraryId(LIBRARY_ID_1)
     assert libraries[0].name == "my_library"
     assert libraries[0].namespace == "org"
-    assert libraries[0].config_type is DiscoveryConfigType.database
     assert libraries[0].yaml is None
     assert libraries[0].is_valid is ValidationStatus.valid
     assert libraries[1].id == DiscoveryConfigLibraryId(LIBRARY_ID_2)
     assert libraries[1].name == "another_library"
-    assert libraries[1].config_type is DiscoveryConfigType.file
     assert libraries[1].is_valid is ValidationStatus.invalid
     assert libraries[1].validation_error == "bad yaml"
 
@@ -155,7 +123,6 @@ def test_get_discovery_config_library(client: DataMasqueClient, sample_library_d
     assert library.id == DiscoveryConfigLibraryId(LIBRARY_ID_1)
     assert library.name == "my_library"
     assert library.namespace == "org"
-    assert library.config_type is DiscoveryConfigType.database
     assert library.yaml == "labels: []\nmetadata_rules: []\nidd_rules: []\n"
     assert library.is_valid is ValidationStatus.valid
 
@@ -176,7 +143,7 @@ def test_get_discovery_config_library_by_name_found(
             json=sample_library_detail_response,
             status_code=200,
         )
-        library = client.get_discovery_config_library_by_name("my_library", DiscoveryConfigType.database, "org")
+        library = client.get_discovery_config_library_by_name("my_library", "org")
 
     assert library is not None
     assert library.name == "my_library"
@@ -193,7 +160,6 @@ def test_get_discovery_config_library_by_name_matches_namespace_client_side(
             "id": LIBRARY_ID_1,
             "name": "my_library",
             "namespace": "org",
-            "config_type": "database",
             "is_valid": "valid",
             "created": "2025-01-01T12:00:00Z",
             "modified": "2025-01-02T12:00:00Z",
@@ -202,7 +168,6 @@ def test_get_discovery_config_library_by_name_matches_namespace_client_side(
             "id": LIBRARY_ID_2,
             "name": "my_library",
             "namespace": "",
-            "config_type": "database",
             "is_valid": "valid",
             "created": "2025-01-01T12:00:00Z",
             "modified": "2025-01-02T12:00:00Z",
@@ -220,7 +185,7 @@ def test_get_discovery_config_library_by_name_matches_namespace_client_side(
             json=sample_library_detail_response,
             status_code=200,
         )
-        library = client.get_discovery_config_library_by_name("my_library", DiscoveryConfigType.database, "org")
+        library = client.get_discovery_config_library_by_name("my_library", "org")
 
     assert library is not None
     assert library.id == DiscoveryConfigLibraryId(LIBRARY_ID_1)
@@ -235,7 +200,7 @@ def test_get_discovery_config_library_by_name_default_namespace_does_not_match_o
             json=[sample_library_list_response[0]],
             status_code=200,
         )
-        library = client.get_discovery_config_library_by_name("my_library", DiscoveryConfigType.database)
+        library = client.get_discovery_config_library_by_name("my_library")
 
     assert library is None
     assert m.call_count == 1
@@ -248,41 +213,9 @@ def test_get_discovery_config_library_by_name_not_found(client: DataMasqueClient
             json=[],
             status_code=200,
         )
-        library = client.get_discovery_config_library_by_name("nonexistent", DiscoveryConfigType.database)
+        library = client.get_discovery_config_library_by_name("nonexistent")
 
     assert library is None
-
-
-def test_get_discovery_config_library_by_name_selects_matching_config_type(
-    client: DataMasqueClient, same_name_both_config_types: list[dict[str, Any]]
-) -> None:
-    detail_response = {
-        "id": LIBRARY_ID_2,
-        "name": "my_library",
-        "namespace": "",
-        "config_type": "file",
-        "config_yaml": "labels: []\n",
-        "is_valid": "valid",
-        "created": "2025-01-01T12:00:00Z",
-        "modified": "2025-01-02T12:00:00Z",
-    }
-
-    with requests_mock.Mocker() as m:
-        m.get(
-            "http://test-server/api/discovery/config-libraries/",
-            json=same_name_both_config_types,
-            status_code=200,
-        )
-        m.get(
-            f"http://test-server/api/discovery/config-libraries/{LIBRARY_ID_2}/",
-            json=detail_response,
-            status_code=200,
-        )
-        library = client.get_discovery_config_library_by_name("my_library", DiscoveryConfigType.file)
-
-    assert library is not None
-    assert library.id == DiscoveryConfigLibraryId(LIBRARY_ID_2)
-    assert library.config_type is DiscoveryConfigType.file
 
 
 def test_get_discovery_config_library_by_name_raises_when_server_omits_id(client: DataMasqueClient) -> None:
@@ -291,7 +224,6 @@ def test_get_discovery_config_library_by_name_raises_when_server_omits_id(client
         {
             "name": "my_library",
             "namespace": "org",
-            "config_type": "database",
             "is_valid": "valid",
             "created": "2025-01-01T12:00:00Z",
             "modified": "2025-01-02T12:00:00Z",
@@ -305,7 +237,7 @@ def test_get_discovery_config_library_by_name_raises_when_server_omits_id(client
             status_code=200,
         )
         with pytest.raises(DataMasqueApiError, match="without an `id`"):
-            client.get_discovery_config_library_by_name("my_library", DiscoveryConfigType.database, "org")
+            client.get_discovery_config_library_by_name("my_library", "org")
 
 
 def test_create_discovery_config_library(client: DataMasqueClient, config_library: DiscoveryConfigLibrary) -> None:
@@ -313,7 +245,6 @@ def test_create_discovery_config_library(client: DataMasqueClient, config_librar
         "id": LIBRARY_ID_1,
         "name": "test_library",
         "namespace": "test_ns",
-        "config_type": "database",
         "config_yaml": "labels: []\nmetadata_rules: []\nidd_rules: []\n",
         "is_valid": "valid",
         "validation_error": None,
@@ -338,7 +269,7 @@ def test_create_discovery_config_library(client: DataMasqueClient, config_librar
     request_body = m.last_request.json()
     assert request_body["name"] == "test_library"
     assert request_body["namespace"] == "test_ns"
-    assert request_body["config_type"] == "database"
+    assert "config_type" not in request_body
     assert request_body["config_yaml"] == "labels: []\nmetadata_rules: []\nidd_rules: []\n"
     read_only_fields = {"id", "is_valid", "validation_error", "created", "modified"}
     assert not read_only_fields & request_body.keys()
@@ -351,7 +282,6 @@ def test_create_discovery_config_library_reports_validation_error(
         "id": LIBRARY_ID_1,
         "name": "test_library",
         "namespace": "test_ns",
-        "config_type": "database",
         "config_yaml": "labels: []\nmetadata_rules: []\nidd_rules: []\n",
         "is_valid": "invalid",
         "validation_error": "metadata_rules is not a list",
@@ -379,7 +309,6 @@ def test_update_discovery_config_library(client: DataMasqueClient, config_librar
         "id": LIBRARY_ID_1,
         "name": "test_library",
         "namespace": "test_ns",
-        "config_type": "database",
         "config_yaml": "labels: []\nmetadata_rules: []\nidd_rules: []\n",
         "is_valid": "valid",
         "validation_error": None,
@@ -431,7 +360,6 @@ def test_create_or_update_discovery_config_library_create(
         "id": LIBRARY_ID_1,
         "name": "test_library",
         "namespace": "test_ns",
-        "config_type": "database",
         "config_yaml": "labels: []\nmetadata_rules: []\nidd_rules: []\n",
         "is_valid": "valid",
         "validation_error": None,
@@ -466,7 +394,6 @@ def test_create_or_update_discovery_config_library_update(
             "id": LIBRARY_ID_1,
             "name": "test_library",
             "namespace": "test_ns",
-            "config_type": "database",
             "is_valid": "valid",
             "created": "2025-06-01T10:00:00Z",
             "modified": "2025-06-01T10:00:00Z",
@@ -476,7 +403,6 @@ def test_create_or_update_discovery_config_library_update(
         "id": LIBRARY_ID_1,
         "name": "test_library",
         "namespace": "test_ns",
-        "config_type": "database",
         "config_yaml": "labels: []\nmetadata_rules: []\nidd_rules: []\n",
         "is_valid": "valid",
         "validation_error": None,
@@ -501,42 +427,6 @@ def test_create_or_update_discovery_config_library_update(
     assert m.call_count == 2
     assert m.request_history[0].method == "GET"
     assert m.request_history[1].method == "PUT"
-
-
-def test_create_or_update_discovery_config_library_matches_config_type(
-    client: DataMasqueClient, same_name_both_config_types: list[dict[str, Any]]
-) -> None:
-    file_library = DiscoveryConfigLibrary(
-        name="my_library",
-        config_type=DiscoveryConfigType.file,
-        yaml="labels: []\n",
-    )
-    update_response = {
-        "id": LIBRARY_ID_2,
-        "name": "my_library",
-        "namespace": "",
-        "config_type": "file",
-        "config_yaml": "labels: []\n",
-        "is_valid": "valid",
-        "validation_error": None,
-        "created": "2025-01-01T12:00:00Z",
-        "modified": "2025-01-03T12:00:00Z",
-    }
-
-    with requests_mock.Mocker() as m:
-        m.get(
-            "http://test-server/api/discovery/config-libraries/",
-            json=same_name_both_config_types,
-            status_code=200,
-        )
-        m.put(
-            f"http://test-server/api/discovery/config-libraries/{LIBRARY_ID_2}/",
-            json=update_response,
-            status_code=200,
-        )
-        result = client.create_or_update_discovery_config_library(file_library)
-
-    assert result.id == DiscoveryConfigLibraryId(LIBRARY_ID_2)
 
 
 def test_delete_discovery_config_library_by_id(client: DataMasqueClient) -> None:
@@ -583,31 +473,11 @@ def test_delete_discovery_config_library_by_name(
             f"http://test-server/api/discovery/config-libraries/{LIBRARY_ID_1}/",
             status_code=204,
         )
-        client.delete_discovery_config_library_by_name_if_exists("my_library", DiscoveryConfigType.database, "org")
+        client.delete_discovery_config_library_by_name_if_exists("my_library", "org")
 
     assert m.request_history[0].method == "GET"
     assert "name_exact=my_library" in m.request_history[0].url
     assert m.request_history[1].method == "DELETE"
-
-
-def test_delete_discovery_config_library_by_name_deletes_only_matching_config_type(
-    client: DataMasqueClient, same_name_both_config_types: list[dict[str, Any]]
-) -> None:
-    with requests_mock.Mocker() as m:
-        m.get(
-            "http://test-server/api/discovery/config-libraries/",
-            json=same_name_both_config_types,
-            status_code=200,
-        )
-        m.delete(
-            f"http://test-server/api/discovery/config-libraries/{LIBRARY_ID_2}/",
-            status_code=204,
-        )
-        client.delete_discovery_config_library_by_name_if_exists("my_library", DiscoveryConfigType.file)
-
-    assert m.call_count == 2
-    assert m.request_history[1].method == "DELETE"
-    assert LIBRARY_ID_2 in m.request_history[1].url
 
 
 def test_delete_discovery_config_library_by_name_not_found(
@@ -619,7 +489,7 @@ def test_delete_discovery_config_library_by_name_not_found(
             json=sample_library_list_response,
             status_code=200,
         )
-        client.delete_discovery_config_library_by_name_if_exists("nonexistent", DiscoveryConfigType.database)
+        client.delete_discovery_config_library_by_name_if_exists("nonexistent")
 
     assert m.call_count == 1
     assert m.request_history[0].method == "GET"
