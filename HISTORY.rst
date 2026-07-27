@@ -2,6 +2,16 @@
 History
 =======
 
+1.2.2 (unreleased)
+------------------
+
+* Added ``validation_error_details`` to ``DiscoveryConfig``.
+* Added ``usage_count`` to ``DiscoveryConfigLibrary``.
+* Added ``validate_discovery_config`` and ``validate_discovery_config_library``.
+* ``update_discovery_config``, ``validate_discovery_config``, and ``validate_discovery_config_library``
+* Now raise ``DataMasqueArgumentError`` when the passed entity has no ``yaml`` content,
+  instead of sending a request the server rejects.
+
 1.2.1 (2026-07-30)
 ------------------
 

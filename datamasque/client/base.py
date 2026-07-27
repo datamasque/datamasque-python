@@ -17,6 +17,7 @@ from urllib3.exceptions import InsecureRequestWarning
 
 from datamasque.client.exceptions import (
     DataMasqueApiError,
+    DataMasqueException,
     DataMasqueNotReadyError,
     DataMasqueTransportError,
 )
@@ -308,6 +309,12 @@ class BaseClient:
             return
 
         self._raise_for_status(response)
+
+    def _delete_best_effort(self, delete: Callable[[], None], description: str) -> None:
+        try:
+            delete()
+        except DataMasqueException as e:
+            logger.warning("Failed to clean up %s; remove it manually. Error: %s", description, e)
 
     def _iter_paginated(
         self,

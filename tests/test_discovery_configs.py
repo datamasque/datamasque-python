@@ -1,13 +1,16 @@
 """Tests for discovery-config support in the DataMasque client."""
 
+import logging
 from datetime import datetime
 from typing import Any
 
 import pytest
+import requests
 import requests_mock
+from pydantic import JsonValue, ValidationError
 
 from datamasque.client import DataMasqueClient
-from datamasque.client.exceptions import DataMasqueApiError, DataMasqueException
+from datamasque.client.exceptions import DataMasqueApiError, DataMasqueArgumentError, DataMasqueException
 from datamasque.client.models.discovery_config import (
     DiscoveryConfig,
     DiscoveryConfigId,
@@ -306,7 +309,17 @@ def test_update_discovery_config(client: DataMasqueClient, discovery_config: Dis
 
 
 def test_update_discovery_config_no_id_raises(client: DataMasqueClient, discovery_config: DiscoveryConfig) -> None:
-    with pytest.raises(ValueError, match="id is None"):
+    with pytest.raises(DataMasqueArgumentError, match="id is None"):
+        client.update_discovery_config(discovery_config)
+
+
+def test_update_discovery_config_without_yaml_raises(
+    client: DataMasqueClient, discovery_config: DiscoveryConfig
+) -> None:
+    discovery_config.id = DiscoveryConfigId(CONFIG_ID_1)
+    discovery_config.yaml = None
+
+    with pytest.raises(DataMasqueArgumentError, match="without YAML content"):
         client.update_discovery_config(discovery_config)
 
 
@@ -518,3 +531,193 @@ def test_unwrap_discovery_config_id_raises_without_id() -> None:
     config = DiscoveryConfig(name="x", config_type="database")
     with pytest.raises(ValueError, match="id is None"):
         unwrap_discovery_config_id(config)
+
+
+def _build_config_response(is_valid: str, **extra: JsonValue) -> dict[str, JsonValue]:
+    return {
+        "id": CONFIG_ID_1,
+        "name": "test_config",
+        "config_type": "database",
+        "is_valid": is_valid,
+        "validation_error": None,
+        **extra,
+    }
+
+
+def test_discovery_config_promotes_errors_payload() -> None:
+    config = DiscoveryConfig.model_validate(
+        _build_config_response(
+            "invalid",
+            validation_error="Unknown mask 'foo'",
+            errors={"config_yaml": [{"message": "Unknown mask 'foo'", "line_number": 3, "column_number": 5}]},
+        )
+    )
+
+    assert config.is_valid is ValidationStatus.invalid
+    assert len(config.validation_error_details) == 1
+    detail = config.validation_error_details[0]
+    assert detail.message == "Unknown mask 'foo'"
+    assert detail.line_number == 3
+    assert detail.column_number == 5
+    assert "errors" not in (config.model_extra or {})
+
+
+def test_discovery_config_accepts_flat_details_list() -> None:
+    config = DiscoveryConfig.model_validate(
+        _build_config_response(
+            "invalid",
+            validation_error_details=[{"message": "Unknown mask 'foo'", "line_number": 3}],
+        )
+    )
+
+    assert [detail.message for detail in config.validation_error_details] == ["Unknown mask 'foo'"]
+
+
+def test_discovery_config_accepts_empty_errors_map() -> None:
+    config = DiscoveryConfig.model_validate(_build_config_response("valid", errors={}))
+
+    assert config.validation_error_details == []
+
+
+def test_discovery_config_rejects_non_list_error_group() -> None:
+    with pytest.raises(ValidationError, match="config_yaml"):
+        DiscoveryConfig.model_validate(_build_config_response("invalid", errors={"config_yaml": "Unknown mask 'foo'"}))
+
+
+def test_discovery_config_rejects_null_error_group() -> None:
+    with pytest.raises(ValidationError, match="config_yaml"):
+        DiscoveryConfig.model_validate(_build_config_response("invalid", errors={"config_yaml": None}))
+
+
+def test_discovery_config_rejects_malformed_error_entry() -> None:
+    with pytest.raises(ValidationError):
+        DiscoveryConfig.model_validate(
+            _build_config_response("invalid", errors={"config_yaml": ["Unknown mask 'foo'"]})
+        )
+
+
+def test_validate_discovery_config_round_trips_temp_copy(
+    client: DataMasqueClient, discovery_config: DiscoveryConfig
+) -> None:
+    with requests_mock.Mocker() as m:
+        m.post("http://test-server/api/discovery/configs/", json=_build_config_response("valid"), status_code=201)
+        delete = m.delete(f"http://test-server/api/discovery/configs/{CONFIG_ID_1}/", status_code=204)
+        result = client.validate_discovery_config(discovery_config)
+
+    assert result is discovery_config
+    assert result.is_valid is ValidationStatus.valid
+    assert result.validation_error is None
+    assert result.id is None
+    assert delete.called_once
+
+    request_body = m.request_history[0].json()
+    assert request_body["name"].startswith("dm_python_validate_")
+    assert request_body["config_yaml"] == discovery_config.yaml
+
+
+def test_validate_discovery_config_surfaces_structured_errors(
+    client: DataMasqueClient, discovery_config: DiscoveryConfig
+) -> None:
+    invalid_response = _build_config_response(
+        "invalid",
+        validation_error="Unknown mask 'foo'",
+        errors={"config_yaml": [{"message": "Unknown mask 'foo'", "line_number": 3, "column_number": 5}]},
+    )
+
+    with requests_mock.Mocker() as m:
+        m.post("http://test-server/api/discovery/configs/", json=invalid_response, status_code=201)
+        m.delete(f"http://test-server/api/discovery/configs/{CONFIG_ID_1}/", status_code=204)
+        result = client.validate_discovery_config(discovery_config)
+
+    assert result.is_valid is ValidationStatus.invalid
+    assert result.validation_error == "Unknown mask 'foo'"
+    assert [detail.line_number for detail in result.validation_error_details] == [3]
+
+
+def test_validate_discovery_config_returns_outcome_when_cleanup_fails(
+    client: DataMasqueClient, discovery_config: DiscoveryConfig
+) -> None:
+    with requests_mock.Mocker() as m:
+        m.post("http://test-server/api/discovery/configs/", json=_build_config_response("valid"), status_code=201)
+        m.delete(f"http://test-server/api/discovery/configs/{CONFIG_ID_1}/", status_code=500, json={})
+        result = client.validate_discovery_config(discovery_config)
+
+    assert result.is_valid is ValidationStatus.valid
+
+
+def test_validate_discovery_config_without_yaml_raises(
+    client: DataMasqueClient, sample_config_list_response: dict[str, Any]
+) -> None:
+
+    with requests_mock.Mocker() as m:
+        m.get("http://test-server/api/discovery/configs/", json=sample_config_list_response, status_code=200)
+        config = client.list_discovery_configs()[0]
+        assert config.yaml is None
+
+        with pytest.raises(DataMasqueArgumentError, match="without YAML content"):
+            client.validate_discovery_config(config)
+
+        assert not any(request.method == "POST" for request in m.request_history)
+
+
+def test_create_discovery_config_with_empty_yaml_raises(client: DataMasqueClient) -> None:
+    config = DiscoveryConfig(name="test_config", yaml="", config_type="database")
+
+    with requests_mock.Mocker() as m:
+        with pytest.raises(DataMasqueArgumentError, match="without YAML content"):
+            client.create_discovery_config(config)
+
+        assert not any(request.method == "POST" for request in m.request_history)
+
+
+def test_validate_discovery_config_with_empty_yaml_raises(client: DataMasqueClient) -> None:
+    config = DiscoveryConfig(name="test_config", yaml="", config_type="database")
+
+    with requests_mock.Mocker() as m:
+        with pytest.raises(DataMasqueArgumentError, match="without YAML content"):
+            client.validate_discovery_config(config)
+
+        assert not any(request.method == "POST" for request in m.request_history)
+
+
+def test_update_discovery_config_with_empty_yaml_raises(client: DataMasqueClient) -> None:
+    config = DiscoveryConfig(id=CONFIG_ID_1, name="test_config", yaml="", config_type="database")
+
+    with requests_mock.Mocker() as m:
+        with pytest.raises(DataMasqueArgumentError, match="without YAML content"):
+            client.update_discovery_config(config)
+
+        assert not any(request.method == "PUT" for request in m.request_history)
+
+
+def test_validate_discovery_config_deletes_temp_config_when_response_is_rejected(
+    client: DataMasqueClient, discovery_config: DiscoveryConfig
+) -> None:
+    with requests_mock.Mocker() as m:
+        m.post(
+            "http://test-server/api/discovery/configs/",
+            json=_build_config_response("not_a_real_status"),
+            status_code=201,
+        )
+        delete = m.delete(f"http://test-server/api/discovery/configs/{CONFIG_ID_1}/", status_code=204)
+
+        with pytest.raises(ValidationError):
+            client.validate_discovery_config(discovery_config)
+
+    assert delete.called_once
+
+
+def test_validate_discovery_config_returns_outcome_when_cleanup_cannot_reach_server(
+    client: DataMasqueClient, discovery_config: DiscoveryConfig, caplog: pytest.LogCaptureFixture
+) -> None:
+    with requests_mock.Mocker() as m:
+        m.post("http://test-server/api/discovery/configs/", json=_build_config_response("valid"), status_code=201)
+        m.delete(
+            f"http://test-server/api/discovery/configs/{CONFIG_ID_1}/",
+            exc=requests.exceptions.ConnectionError("connection refused"),
+        )
+        with caplog.at_level(logging.WARNING, logger="datamasque.client.base"):
+            result = client.validate_discovery_config(discovery_config)
+
+    assert result.is_valid is ValidationStatus.valid
+    assert any("Failed to clean up temporary validation config" in r.getMessage() for r in caplog.records)

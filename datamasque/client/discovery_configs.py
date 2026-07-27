@@ -1,8 +1,9 @@
 import logging
+import uuid
 from typing import Iterator, Optional
 
 from datamasque.client.base import BaseClient
-from datamasque.client.exceptions import DataMasqueApiError, DataMasqueException
+from datamasque.client.exceptions import DataMasqueApiError, DataMasqueArgumentError, DataMasqueException
 from datamasque.client.models.discovery_config import DiscoveryConfig, DiscoveryConfigId, DiscoveryConfigType
 from datamasque.client.models.pagination import Page
 
@@ -75,8 +76,12 @@ class DiscoveryConfigClient(BaseClient):
         Creates a new discovery config on the server.
 
         Sets the config's server-assigned fields
-        (`id`, `is_valid`, `validation_error`, `created`, `modified`) and returns the config.
+        (`id`, `is_valid`, `validation_error`, `validation_error_details`, `created`, `modified`)
+        and returns the config.
         """
+
+        if not config.yaml:
+            raise DataMasqueArgumentError("Cannot create a discovery config without YAML content (yaml is empty)")
 
         data = config.model_dump(exclude_none=True, by_alias=True, mode="json")
         response = self.make_request("POST", "/api/discovery/configs/", data=data)
@@ -84,6 +89,7 @@ class DiscoveryConfigClient(BaseClient):
         config.id = created.id
         config.is_valid = created.is_valid
         config.validation_error = created.validation_error
+        config.validation_error_details = created.validation_error_details
         config.created = created.created
         config.modified = created.modified
         logger.info('Creation of discovery config "%s" successful', config.name)
@@ -94,17 +100,24 @@ class DiscoveryConfigClient(BaseClient):
         Performs a full update of the discovery config.
 
         The config must have its `id` set
-        (i.e., it must have been previously created or retrieved from the server).
+        and its `yaml` content present.
         """
 
         if config.id is None:
-            raise ValueError("Cannot update a discovery config that has not been created yet (id is None)")
+            raise DataMasqueArgumentError("Cannot update a discovery config that has not been created yet (id is None)")
+
+        if not config.yaml:
+            raise DataMasqueArgumentError(
+                "Cannot update a discovery config without YAML content (yaml is empty or unset); "
+                "list results omit YAML, so fetch the full config with `get_discovery_config` first"
+            )
 
         data = config.model_dump(exclude_none=True, by_alias=True, mode="json")
         response = self.make_request("PUT", f"/api/discovery/configs/{config.id}/", data=data)
         updated = DiscoveryConfig.model_validate(response.json())
         config.is_valid = updated.is_valid
         config.validation_error = updated.validation_error
+        config.validation_error_details = updated.validation_error_details
         config.modified = updated.modified
         logger.debug('Update of discovery config "%s" successful', config.name)
         return config
@@ -122,6 +135,42 @@ class DiscoveryConfigClient(BaseClient):
             return self.update_discovery_config(config)
 
         return self.create_discovery_config(config)
+
+    def validate_discovery_config(self, config: DiscoveryConfig) -> DiscoveryConfig:
+        """Validates a discovery config against the server."""
+
+        if not config.yaml:
+            raise DataMasqueArgumentError(
+                "Cannot validate a discovery config without YAML content (yaml is empty or unset); "
+                "list results omit YAML, so fetch the full config with `get_discovery_config` first"
+            )
+
+        temporary = DiscoveryConfig(
+            name=f"dm_python_validate_{uuid.uuid4().hex}",
+            yaml=config.yaml,
+            config_type=config.config_type,
+        )
+        data = temporary.model_dump(exclude_none=True, by_alias=True, mode="json")
+        response = self.make_request("POST", "/api/discovery/configs/", data=data)
+
+        payload = response.json()
+        raw_id = payload.get("id") if isinstance(payload, dict) else None
+        created_id = DiscoveryConfigId(raw_id) if isinstance(raw_id, str) else None
+
+        try:
+            created = DiscoveryConfig.model_validate(payload)
+            config.is_valid = created.is_valid
+            config.validation_error = created.validation_error
+            config.validation_error_details = created.validation_error_details
+        finally:
+            if created_id is not None:
+                self._delete_best_effort(
+                    lambda: self.delete_discovery_config_by_id_if_exists(created_id),
+                    f'temporary validation config "{temporary.name}"',
+                )
+
+        logger.debug('Validation of discovery config "%s" complete', config.name)
+        return config
 
     def delete_discovery_config_by_id_if_exists(self, config_id: DiscoveryConfigId) -> None:
         """
