@@ -9,6 +9,7 @@ from datamasque.client.models.connection import ConnectionConfig, ConnectionId, 
 from datamasque.client.models.data_selection import HashColumnsTableConfig, Locator, UserSelection
 from datamasque.client.models.discovery_config import DiscoveryConfig, DiscoveryConfigId, unwrap_discovery_config_id
 from datamasque.client.models.pagination import Page
+from datamasque.client.models.rg_config import RGConfig, RGConfigId, unwrap_rg_config_id
 from datamasque.client.models.runs import RunConnectionRef
 from datamasque.client.models.safe_data_preview import (
     SafeDataPreview,
@@ -106,12 +107,13 @@ class SchemaDiscoveryFromConfigRequest(BaseModel):
 
 class RulesetGenerationRequest(BaseModel):
     """
-    Request body for `POST /api/generate-ruleset/v2/`.
+    Request body for `POST /api/generate-ruleset/v2/` (generation with the default RG config).
 
     `connection` accepts either a `ConnectionId` or a full `ConnectionConfig` returned by an earlier client call.
     `selected_columns` is the same nested `schema -> table -> [column, ...]` mapping
     used by `SelectedColumns.columns`,
     and `hash_columns` follows the `HashColumnsTableConfig` shape.
+    This request does not accept an `rg_config`.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -124,6 +126,45 @@ class RulesetGenerationRequest(BaseModel):
     @classmethod
     def _unwrap_connection(cls, value: Any) -> Any:
         return unwrap_connection_id(value)
+
+    @model_validator(mode="before")
+    @classmethod
+    def _reject_rg_config(cls, data: Any) -> Any:
+        if isinstance(data, dict) and "rg_config" in data:
+            raise ValueError(
+                "`rg_config` is not accepted by `RulesetGenerationRequest`; "
+                "use `generate_ruleset_with_rg_config` with a `RulesetGenerationWithRGConfigRequest` "
+                "to generate with a selected RG config."
+            )
+        return data
+
+
+class RulesetGenerationWithRGConfigRequest(BaseModel):
+    """
+    Request body for `POST /api/generate-ruleset/v3/` (generation with a selected RG config).
+
+    `connection` accepts either a `ConnectionId` or a full `ConnectionConfig` returned by an earlier client call.
+    `selected_columns` and `hash_columns` follow the same shapes as `RulesetGenerationRequest`.
+    `rg_config` is required: pass an `RGConfigId`, a full `RGConfig`,
+    or `None` to generate with the server's default RG config.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    connection: Union[ConnectionId, ConnectionConfig]
+    selected_columns: dict[str, dict[str, list[str]]]
+    rg_config: Optional[Union[RGConfigId, RGConfig]]
+    hash_columns: Optional[dict[str, dict[str, HashColumnsTableConfig]]] = None
+
+    @field_validator("connection", mode="before")
+    @classmethod
+    def _unwrap_connection(cls, value: Any) -> Any:
+        return unwrap_connection_id(value)
+
+    @field_validator("rg_config", mode="before")
+    @classmethod
+    def _unwrap_rg_config(cls, value: Any) -> Any:
+        return unwrap_rg_config_id(value)
 
 
 class FileFilterMatchAgainst(Enum):
@@ -236,9 +277,10 @@ class FileDataDiscoveryFromConfigRequest(BaseModel):
 
 class FileRulesetGenerationRequest(BaseModel):
     """
-    Request body for `POST /api/generate-file-ruleset/`.
+    Request body for `POST /api/generate-file-ruleset/` (generation with the default RG config).
 
     `connection` accepts either a `ConnectionId` or a full `ConnectionConfig` returned by an earlier client call.
+    This request does not accept an `rg_config`.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -250,6 +292,43 @@ class FileRulesetGenerationRequest(BaseModel):
     @classmethod
     def _unwrap_connection(cls, value: Any) -> Any:
         return unwrap_connection_id(value)
+
+    @model_validator(mode="before")
+    @classmethod
+    def _reject_rg_config(cls, data: Any) -> Any:
+        if isinstance(data, dict) and "rg_config" in data:
+            raise ValueError(
+                "`rg_config` is not accepted by `FileRulesetGenerationRequest`; "
+                "use `generate_file_ruleset_with_rg_config` with a `FileRulesetGenerationWithRGConfigRequest` "
+                "to generate with a selected RG config."
+            )
+        return data
+
+
+class FileRulesetGenerationWithRGConfigRequest(BaseModel):
+    """
+    Request body for `POST /api/generate-file-ruleset/v2/` (generation with a selected RG config).
+
+    `connection` accepts either a `ConnectionId` or a full `ConnectionConfig` returned by an earlier client call.
+    `rg_config` is required: pass an `RGConfigId`, a full `RGConfig`,
+    or `None` to generate with the server's default RG config.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    connection: Union[ConnectionId, ConnectionConfig]
+    selected_data: list[UserSelection]
+    rg_config: Optional[Union[RGConfigId, RGConfig]]
+
+    @field_validator("connection", mode="before")
+    @classmethod
+    def _unwrap_connection(cls, value: Any) -> Any:
+        return unwrap_connection_id(value)
+
+    @field_validator("rg_config", mode="before")
+    @classmethod
+    def _unwrap_rg_config(cls, value: Any) -> Any:
+        return unwrap_rg_config_id(value)
 
 
 class DiscoveryMatch(BaseModel):

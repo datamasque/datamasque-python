@@ -2,6 +2,11 @@
 History
 =======
 
+1.2.1 (2026-07-30)
+------------------
+
+* Added ruleset generation configuration
+
 1.2.0 (2026-07-27)
 ------------------
 

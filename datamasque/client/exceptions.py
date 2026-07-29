@@ -58,6 +58,14 @@ class DiscoveryConfigNotFoundError(FailedToStartError):
     """
 
 
+class RGConfigNotFoundError(DataMasqueApiError):
+    """
+    Raised when ruleset generation references an RG config that cannot be found.
+
+    The config does not exist, or has been deleted.
+    """
+
+
 class DataMasqueTransportError(DataMasqueException):
     """
     Raised when a request to the DataMasque server fails before any response is received.

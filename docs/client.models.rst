@@ -60,6 +60,14 @@ datamasque.client.models.license module
    :undoc-members:
    :show-inheritance:
 
+datamasque.client.models.rg_config module
+-----------------------------------------
+
+.. automodule:: datamasque.client.models.rg_config
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 datamasque.client.models.ruleset module
 ---------------------------------------
 

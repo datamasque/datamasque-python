@@ -13,6 +13,7 @@ from datamasque.client.exceptions import (
     DiscoveryConfigNotFoundError,
     FailedToStartError,
     InvalidDiscoveryConfigError,
+    RGConfigNotFoundError,
 )
 from datamasque.client.models.connection import ConnectionId
 from datamasque.client.models.data_selection import (
@@ -25,12 +26,15 @@ from datamasque.client.models.discovery import (
     FileDataDiscoveryRequest,
     FileDiscoveryResult,
     FileRulesetGenerationRequest,
+    FileRulesetGenerationWithRGConfigRequest,
     RulesetGenerationRequest,
+    RulesetGenerationWithRGConfigRequest,
     SchemaDiscoveryFromConfigRequest,
     SchemaDiscoveryPage,
     SchemaDiscoveryRequest,
     SchemaDiscoveryResult,
 )
+from datamasque.client.models.rg_config import RGConfig, RGConfigId, unwrap_rg_config_id
 from datamasque.client.models.ruleset import Ruleset
 from datamasque.client.models.runs import RunId
 from datamasque.client.models.status import AsyncRulesetGenerationTaskStatus
@@ -41,21 +45,12 @@ logger = logging.getLogger(__name__)
 class DiscoveryClient(BaseClient):
     """Schema-discovery and ruleset-generation API methods. Mixed into `DataMasqueClient`."""
 
-    def start_async_ruleset_generation(self, connection_id: ConnectionId, selected_data: SelectedData) -> None:
-        """
-        Starts async ruleset generation using the most recent discovery results on the given connection.
-
-        If the connection is a database connection, `selected_data` should be of type `SelectedColumns`.
-        If the connection is a file connection, `selected_data` should be of type `SelectedFileData`.
-
-        Generation runs asynchronously on the server.
-        Poll `get_async_ruleset_generation_task_status` until it returns
-        `AsyncRulesetGenerationTaskStatus.finished`,
-        then call `get_generated_rulesets` to retrieve the resulting `Ruleset`.
-        """
+    @staticmethod
+    def _selected_data_payload(selected_data: SelectedData) -> dict:
+        """Build the async-generation request-body fields for a column or file selection, validating its shape."""
 
         if not selected_data:
-            raise ValueError("`selected_data` is a required argument to `start_async_ruleset_generation`.")
+            raise ValueError("`selected_data` is a required argument to async ruleset generation.")
 
         data: dict = {}
         if isinstance(selected_data, SelectedColumns):
@@ -75,11 +70,55 @@ class DiscoveryClient(BaseClient):
             data["selected_data"] = [s.model_dump() for s in selected_data.user_selections]
         else:
             raise TypeError(
-                f"The argument `selected_data` to `start_async_ruleset_generation` was of an invalid type, "
+                f"The `selected_data` argument to async ruleset generation was of an invalid type, "
                 f"expected `SelectedColumns` or `SelectedFileData`, got {type(selected_data)}."
             )
 
+        return data
+
+    def start_async_ruleset_generation(self, connection_id: ConnectionId, selected_data: SelectedData) -> None:
+        """
+        Starts async ruleset generation using the most recent discovery results on the given connection.
+
+        Masks are assigned from the server's default RG config;
+        use `start_async_ruleset_generation_with_rg_config` to generate with a saved RG config.
+
+        If the connection is a database connection, `selected_data` should be of type `SelectedColumns`.
+        If the connection is a file connection, `selected_data` should be of type `SelectedFileData`.
+
+        Generation runs asynchronously on the server.
+        Poll `get_async_ruleset_generation_task_status` until it returns `AsyncRulesetGenerationTaskStatus.finished`,
+        then call `get_generated_rulesets` to retrieve the resulting `Ruleset`.
+        """
+
+        data = self._selected_data_payload(selected_data)
         self.make_request(method="POST", path=f"/api/async-generate-ruleset/{connection_id}/", data=data)
+
+    def start_async_ruleset_generation_with_rg_config(
+        self,
+        connection_id: ConnectionId,
+        selected_data: SelectedData,
+        rg_config: Optional[Union[RGConfigId, RGConfig]],
+    ) -> None:
+        """
+        Starts async ruleset generation with a selected RG config mapping discovered labels to masks.
+
+        Like `start_async_ruleset_generation`,
+        but posts to the v2 endpoint with a required `rg_config`:
+        a saved RG config (`RGConfigId` or `RGConfig`),
+        or `None` for the server's default RG config.
+
+        Raises `RGConfigNotFoundError` if the selected RG config does not exist on the server.
+
+        Generation runs asynchronously on the server.
+        Poll `get_async_ruleset_generation_task_status` until it returns `AsyncRulesetGenerationTaskStatus.finished`,
+        then call `get_generated_rulesets` to retrieve the resulting `Ruleset`.
+        """
+
+        data = self._selected_data_payload(selected_data)
+        # The server requires `rg_config` to be present; an explicit null selects the default RG config.
+        data["rg_config"] = unwrap_rg_config_id(rg_config)
+        self._post_with_rg_config(f"/api/async-generate-ruleset/v2/{connection_id}/", data)
 
     def start_async_ruleset_generation_from_csv(
         self,
@@ -103,10 +142,56 @@ class DiscoveryClient(BaseClient):
         otherwise it is uploaded as CSV.
 
         Generation runs asynchronously on the server.
-        Poll `get_async_ruleset_generation_task_status` until it returns
-        `AsyncRulesetGenerationTaskStatus.finished`,
+        Poll `get_async_ruleset_generation_task_status` until it returns `AsyncRulesetGenerationTaskStatus.finished`,
         then call `get_generated_rulesets` to retrieve the resulting `Ruleset` objects.
         """
+
+        self.make_request(
+            method="POST",
+            path=f"/api/async-generate-ruleset/{connection_id}/from-csv/",
+            data={"target_size_bytes": target_size_bytes} if target_size_bytes is not None else None,
+            files=self._csv_upload_files(csv_content),
+        )
+
+    def start_async_ruleset_generation_from_csv_with_rg_config(
+        self,
+        connection_id: ConnectionId,
+        csv_content: Union[str, bytes, TextIOBase, BufferedIOBase],
+        rg_config: Optional[Union[RGConfigId, RGConfig]],
+        target_size_bytes: Optional[int] = None,
+    ) -> None:
+        """
+        Generate ruleset(s) from a schema discovery CSV report with a selected RG config.
+
+        Like `start_async_ruleset_generation_from_csv`,
+        but posts to the v2 endpoint with a required `rg_config`:
+        a saved RG config (`RGConfigId` or `RGConfig`),
+        or `None` for the server's default RG config.
+
+        Raises `RGConfigNotFoundError` if the selected RG config does not exist on the server.
+
+        Generation runs asynchronously on the server.
+        Poll `get_async_ruleset_generation_task_status` until it returns `AsyncRulesetGenerationTaskStatus.finished`,
+        then call `get_generated_rulesets` to retrieve the resulting `Ruleset` objects.
+        """
+
+        rg_config_id = unwrap_rg_config_id(rg_config)
+        # The upload is a multipart form, whose fields cannot carry a JSON null;
+        # the server reads an empty string as null for this nullable field,
+        # selecting the default RG config.
+        data: dict = {"rg_config": rg_config_id if rg_config_id is not None else ""}
+        if target_size_bytes is not None:
+            data["target_size_bytes"] = target_size_bytes
+
+        self._post_with_rg_config(
+            f"/api/async-generate-ruleset/v2/{connection_id}/from-csv/",
+            data,
+            files=self._csv_upload_files(csv_content),
+        )
+
+    @staticmethod
+    def _csv_upload_files(csv_content: Union[str, bytes, TextIOBase, BufferedIOBase]) -> list[UploadFile]:
+        """Normalise CSV-or-zip report content into the `csv_or_zip_file` multipart upload."""
 
         content: BufferedIOBase
         if isinstance(csv_content, str):
@@ -125,7 +210,7 @@ class DiscoveryClient(BaseClient):
         filename = "ruleset.zip" if is_zip else "ruleset.csv"
         content_type = "application/zip" if is_zip else "text/csv"
 
-        files = [
+        return [
             UploadFile(
                 field_name="csv_or_zip_file",
                 filename=filename,
@@ -133,13 +218,6 @@ class DiscoveryClient(BaseClient):
                 content_type=content_type,
             ),
         ]
-
-        self.make_request(
-            method="POST",
-            path=f"/api/async-generate-ruleset/{connection_id}/from-csv/",
-            data={"target_size_bytes": target_size_bytes} if target_size_bytes is not None else None,
-            files=files,
-        )
 
     def get_async_ruleset_generation_task_status(self, connection_id: ConnectionId) -> AsyncRulesetGenerationTaskStatus:
         """Queries the status of an async ruleset generation task."""
@@ -381,7 +459,7 @@ class DiscoveryClient(BaseClient):
         if not (errors := run_data.get(cls.DISCOVERY_CONFIG_ERROR_FIELD)):
             return
 
-        detail = cls._format_discovery_config_error(errors)
+        detail = cls._format_config_error(errors)
         if cls.MISSING_DISCOVERY_CONFIG_SIGNATURE in detail:
             raise DiscoveryConfigNotFoundError(
                 f"{run_kind} run failed to start: the referenced discovery config could not be found: {detail}",
@@ -394,13 +472,60 @@ class DiscoveryClient(BaseClient):
         )
 
     @staticmethod
-    def _format_discovery_config_error(errors: object) -> str:
-        """Render the first server error, handling both string and `{message, ...}` dict items."""
+    def _format_config_error(errors: object) -> str:
+        """Render the first server error for a config field, handling both string and `{message, ...}` dict items."""
         first = errors[0] if isinstance(errors, list) and errors else errors
         if isinstance(first, dict) and "message" in first:
             return str(first["message"])
 
         return str(first)
+
+    # Server key for an error that names the selected RG config.
+    RG_CONFIG_ERROR_FIELD = "rg_config"
+
+    # The phrase the server uses when the config id cannot be resolved
+    # (the config does not exist, or has been archived).
+    MISSING_RG_CONFIG_SIGNATURE = "object does not exist"
+
+    def _post_with_rg_config(
+        self,
+        path: str,
+        data: dict,
+        files: Optional[list[UploadFile]] = None,
+    ) -> Response:
+        """Post a generation request carrying an `rg_config`, classifying a rejected config on failure."""
+
+        response = self.make_request("POST", path, data=data, files=files, require_status_check=False)
+        self._maybe_raise_rg_config_not_found(response)
+        self._raise_for_status(response, request_data=data)
+        return response
+
+    @classmethod
+    def _maybe_raise_rg_config_not_found(cls, response: Response) -> None:
+        """Raise `RGConfigNotFoundError` if the server's error body says the selected RG config does not exist."""
+
+        if response.ok:
+            return
+
+        try:
+            body = response.json()
+        except ValueError:
+            return
+
+        if not isinstance(body, dict):
+            return
+
+        if not (errors := body.get(cls.RG_CONFIG_ERROR_FIELD)):
+            return
+
+        detail = cls._format_config_error(errors)
+        if cls.MISSING_RG_CONFIG_SIGNATURE not in detail:
+            return
+
+        raise RGConfigNotFoundError(
+            f"The referenced RG config could not be found: {detail}",
+            response=response,
+        )
 
     def iter_schema_discovery_results(self, run_id: RunId) -> Iterator[SchemaDiscoveryResult]:
         """Lazily iterate all schema discovery results for a run via the paginated v2 endpoint."""
@@ -433,6 +558,9 @@ class DiscoveryClient(BaseClient):
         """
         Generates database-masking ruleset YAML from the most recent discovery run on the given connection.
 
+        Masks are assigned from the server's default RG config;
+        use `generate_ruleset_with_rg_config` to generate with a saved RG config.
+
         `generation_request` is a `RulesetGenerationRequest`.
         """
 
@@ -440,15 +568,58 @@ class DiscoveryClient(BaseClient):
         response = self.make_request("POST", "/api/generate-ruleset/v2/", data=data)
         return response.content.decode("utf-8")
 
+    def generate_ruleset_with_rg_config(self, generation_request: RulesetGenerationWithRGConfigRequest) -> str:
+        """
+        Generates database-masking ruleset YAML with a selected RG config mapping discovered labels to masks.
+
+        `generation_request` is a `RulesetGenerationWithRGConfigRequest`;
+        its required `rg_config` selects the saved RG config to use
+        (`None` for the server's default RG config).
+
+        Raises `RGConfigNotFoundError` if the selected RG config does not exist on the server.
+        """
+
+        return self._generate_ruleset_with_rg_config(generation_request, "/api/generate-ruleset/v3/")
+
     def generate_file_ruleset(self, generation_request: FileRulesetGenerationRequest) -> str:
         """
         Generates file-masking ruleset YAML from the most recent file-data-discovery run on the given connection.
+
+        Masks are assigned from the server's default RG config;
+        use `generate_file_ruleset_with_rg_config` to generate with a saved RG config.
 
         `generation_request` is a `FileRulesetGenerationRequest`.
         """
 
         data = generation_request.model_dump(exclude_none=True, mode="json")
         response = self.make_request("POST", "/api/generate-file-ruleset/", data=data)
+        return response.content.decode("utf-8")
+
+    def generate_file_ruleset_with_rg_config(self, generation_request: FileRulesetGenerationWithRGConfigRequest) -> str:
+        """
+        Generates file-masking ruleset YAML with a selected RG config mapping discovered labels to masks.
+
+        `generation_request` is a `FileRulesetGenerationWithRGConfigRequest`;
+        its required `rg_config` selects the saved RG config to use
+        (`None` for the server's default RG config).
+
+        Raises `RGConfigNotFoundError` if the selected RG config does not exist on the server.
+        """
+
+        return self._generate_ruleset_with_rg_config(generation_request, "/api/generate-file-ruleset/v2/")
+
+    def _generate_ruleset_with_rg_config(
+        self,
+        generation_request: Union[RulesetGenerationWithRGConfigRequest, FileRulesetGenerationWithRGConfigRequest],
+        path: str,
+    ) -> str:
+        """Post a with-RG-config generation request and return the generated ruleset YAML."""
+
+        data = generation_request.model_dump(exclude_none=True, mode="json")
+        # The server requires `rg_config` to be present; a null selects its default RG config,
+        # so send it explicitly rather than letting `exclude_none` drop a None.
+        data.setdefault("rg_config", None)
+        response = self._post_with_rg_config(path, data)
         return response.content.decode("utf-8")
 
     def get_file_data_discovery_report(self, run_id: RunId) -> list[FileDiscoveryResult]:
