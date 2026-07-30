@@ -1,20 +1,17 @@
 """Tests for discovery config library support in the DataMasque client."""
 
-import logging
 from datetime import datetime
-from typing import Any, Optional
+from typing import Any
 
 import pytest
-import requests
 import requests_mock
-from pydantic import ValidationError
 
 from datamasque.client import (
     DataMasqueClient,
     DiscoveryConfigLibrary,
     DiscoveryConfigLibraryId,
 )
-from datamasque.client.exceptions import DataMasqueApiError, DataMasqueArgumentError
+from datamasque.client.exceptions import DataMasqueApiError
 from datamasque.client.models.status import ValidationStatus
 
 LIBRARY_ID_1 = "aaaaaaaa-1111-2222-3333-444444444444"
@@ -349,7 +346,7 @@ def test_update_discovery_config_library(client: DataMasqueClient, config_librar
 def test_update_discovery_config_library_no_id_raises(
     client: DataMasqueClient, config_library: DiscoveryConfigLibrary
 ) -> None:
-    with pytest.raises(DataMasqueArgumentError, match="id is None"):
+    with pytest.raises(ValueError, match="id is None"):
         client.update_discovery_config_library(config_library)
 
 
@@ -359,7 +356,7 @@ def test_update_discovery_config_library_without_yaml_raises(
     config_library.id = DiscoveryConfigLibraryId(LIBRARY_ID_1)
     config_library.yaml = None
 
-    with pytest.raises(DataMasqueArgumentError, match="without YAML content"):
+    with pytest.raises(ValueError, match="without YAML content"):
         client.update_discovery_config_library(config_library)
 
 
@@ -505,120 +502,11 @@ def test_delete_discovery_config_library_by_name_not_found(
     assert m.request_history[0].method == "GET"
 
 
-@pytest.mark.parametrize(
-    ("is_valid", "validation_error"),
-    [("valid", None), ("invalid", 'duplicate label "email"')],
-)
-def test_validate_discovery_config_library_round_trips_outcome(
-    client: DataMasqueClient,
-    config_library: DiscoveryConfigLibrary,
-    is_valid: str,
-    validation_error: Optional[str],
-) -> None:
-    create_response = {
-        "id": LIBRARY_ID_1,
-        "name": "dm_python_validate_abc",
-        "namespace": "test_ns",
-        "is_valid": is_valid,
-        "validation_error": validation_error,
-        "usage_count": 0,
-    }
-
-    with requests_mock.Mocker() as m:
-        m.post("http://test-server/api/discovery/config-libraries/", json=create_response, status_code=201)
-        delete = m.delete(f"http://test-server/api/discovery/config-libraries/{LIBRARY_ID_1}/", status_code=204)
-        result = client.validate_discovery_config_library(config_library)
-
-    assert result is config_library
-    assert result.is_valid is ValidationStatus(is_valid)
-    assert result.validation_error == validation_error
-    assert result.name == "test_library"
-    assert result.namespace == "test_ns"
-    assert delete.called_once
-
-    request_body = m.request_history[0].json()
-    assert request_body["name"].startswith("dm_python_validate_")
-    assert request_body["namespace"] == "test_ns"
-    assert "config_yaml" in request_body
-
-
-def test_validate_discovery_config_library_without_yaml_raises(
-    client: DataMasqueClient, sample_library_list_response: list[dict[str, Any]]
-) -> None:
-
-    with requests_mock.Mocker() as m:
-        m.get("http://test-server/api/discovery/config-libraries/", json=sample_library_list_response, status_code=200)
-        library = client.list_discovery_config_libraries()[0]
-        assert library.yaml is None
-
-        with pytest.raises(DataMasqueArgumentError, match="without YAML content"):
-            client.validate_discovery_config_library(library)
-
-        assert not any(request.method == "POST" for request in m.request_history)
-
-
 def test_create_discovery_config_library_with_empty_yaml_raises(client: DataMasqueClient) -> None:
     library = DiscoveryConfigLibrary(name="test_library", yaml="")
 
     with requests_mock.Mocker() as m:
-        with pytest.raises(DataMasqueArgumentError, match="without YAML content"):
+        with pytest.raises(ValueError, match="without YAML content"):
             client.create_discovery_config_library(library)
 
         assert not any(request.method == "POST" for request in m.request_history)
-
-
-def test_validate_discovery_config_library_with_empty_yaml_raises(client: DataMasqueClient) -> None:
-    library = DiscoveryConfigLibrary(name="test_library", yaml="")
-
-    with requests_mock.Mocker() as m:
-        with pytest.raises(DataMasqueArgumentError, match="without YAML content"):
-            client.validate_discovery_config_library(library)
-
-        assert not any(request.method == "POST" for request in m.request_history)
-
-
-def test_validate_discovery_config_library_deletes_temp_library_when_response_is_rejected(
-    client: DataMasqueClient, config_library: DiscoveryConfigLibrary
-) -> None:
-    rejected_response = {
-        "id": LIBRARY_ID_1,
-        "name": "dm_python_validate_abc",
-        "namespace": "",
-        "is_valid": "not_a_real_status",
-        "validation_error": None,
-        "usage_count": 0,
-    }
-
-    with requests_mock.Mocker() as m:
-        m.post("http://test-server/api/discovery/config-libraries/", json=rejected_response, status_code=201)
-        delete = m.delete(f"http://test-server/api/discovery/config-libraries/{LIBRARY_ID_1}/", status_code=204)
-
-        with pytest.raises(ValidationError):
-            client.validate_discovery_config_library(config_library)
-
-    assert delete.called_once
-
-
-def test_validate_discovery_config_library_returns_outcome_when_cleanup_cannot_reach_server(
-    client: DataMasqueClient, config_library: DiscoveryConfigLibrary, caplog: pytest.LogCaptureFixture
-) -> None:
-    create_response = {
-        "id": LIBRARY_ID_1,
-        "name": "dm_python_validate_abc",
-        "namespace": "",
-        "is_valid": "valid",
-        "validation_error": None,
-        "usage_count": 0,
-    }
-
-    with requests_mock.Mocker() as m:
-        m.post("http://test-server/api/discovery/config-libraries/", json=create_response, status_code=201)
-        m.delete(
-            f"http://test-server/api/discovery/config-libraries/{LIBRARY_ID_1}/",
-            exc=requests.exceptions.ConnectionError("connection refused"),
-        )
-        with caplog.at_level(logging.WARNING, logger="datamasque.client.base"):
-            result = client.validate_discovery_config_library(config_library)
-
-    assert result.is_valid is ValidationStatus.valid
-    assert any("Failed to clean up temporary validation library" in r.getMessage() for r in caplog.records)

@@ -9,16 +9,6 @@ class DataMasqueUserError(DataMasqueException):
     """Raised when error occurs during user creation or configuration."""
 
 
-class DataMasqueArgumentError(DataMasqueException):
-    """
-    Raised when a client method is given an object it cannot act on.
-
-    Covers arguments the client rejects without contacting the server, such as
-    updating a record that has no `id` yet, or sending a config whose `yaml` is
-    empty.
-    """
-
-
 class DataMasqueApiError(DataMasqueException):
     """
     Raised when the DataMasque server responds to a request with a non-2xx status code.

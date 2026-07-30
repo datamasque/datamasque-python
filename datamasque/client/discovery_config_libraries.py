@@ -1,9 +1,8 @@
 import logging
-import uuid
 from typing import Optional
 
 from datamasque.client.base import BaseClient
-from datamasque.client.exceptions import DataMasqueApiError, DataMasqueArgumentError
+from datamasque.client.exceptions import DataMasqueApiError
 from datamasque.client.models.discovery_config_library import DiscoveryConfigLibrary, DiscoveryConfigLibraryId
 
 logger = logging.getLogger(__name__)
@@ -81,9 +80,7 @@ class DiscoveryConfigLibraryClient(BaseClient):
         """
 
         if not library.yaml:
-            raise DataMasqueArgumentError(
-                "Cannot create a discovery config library without YAML content (yaml is empty)"
-            )
+            raise ValueError("Cannot create a discovery config library without YAML content (yaml is empty)")
 
         data = library.model_dump(exclude_none=True, by_alias=True, mode="json")
         response = self.make_request("POST", "/api/discovery/config-libraries/", data=data)
@@ -106,12 +103,10 @@ class DiscoveryConfigLibraryClient(BaseClient):
         """
 
         if library.id is None:
-            raise DataMasqueArgumentError(
-                "Cannot update a discovery config library that has not been created yet (id is None)"
-            )
+            raise ValueError("Cannot update a discovery config library that has not been created yet (id is None)")
 
         if not library.yaml:
-            raise DataMasqueArgumentError(
+            raise ValueError(
                 "Cannot update a discovery config library without YAML content (yaml is empty or unset); "
                 "list results omit YAML, so fetch the full library with `get_discovery_config_library` first"
             )
@@ -139,41 +134,6 @@ class DiscoveryConfigLibraryClient(BaseClient):
             return self.update_discovery_config_library(library)
 
         return self.create_discovery_config_library(library)
-
-    def validate_discovery_config_library(self, library: DiscoveryConfigLibrary) -> DiscoveryConfigLibrary:
-        """Validates a discovery config library against the server without persisting it."""
-
-        if not library.yaml:
-            raise DataMasqueArgumentError(
-                "Cannot validate a discovery config library without YAML content (yaml is empty or unset); "
-                "list results omit YAML, so fetch the full library with `get_discovery_config_library` first"
-            )
-
-        temporary = DiscoveryConfigLibrary(
-            name=f"dm_python_validate_{uuid.uuid4().hex}",
-            namespace=library.namespace,
-            yaml=library.yaml,
-        )
-        data = temporary.model_dump(exclude_none=True, by_alias=True, mode="json")
-        response = self.make_request("POST", "/api/discovery/config-libraries/", data=data)
-
-        payload = response.json()
-        raw_id = payload.get("id") if isinstance(payload, dict) else None
-        created_id = DiscoveryConfigLibraryId(raw_id) if isinstance(raw_id, str) else None
-
-        try:
-            created = DiscoveryConfigLibrary.model_validate(payload)
-            library.is_valid = created.is_valid
-            library.validation_error = created.validation_error
-        finally:
-            if created_id is not None:
-                self._delete_best_effort(
-                    lambda: self.delete_discovery_config_library_by_id_if_exists(created_id),
-                    f'temporary validation library "{temporary.name}"',
-                )
-
-        logger.debug('Validation of discovery config library "%s" complete', library.name)
-        return library
 
     def delete_discovery_config_library_by_id_if_exists(
         self, library_id: DiscoveryConfigLibraryId, *, force: bool = False

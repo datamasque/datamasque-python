@@ -1,9 +1,8 @@
 import logging
-import uuid
 from typing import Iterator, Optional
 
 from datamasque.client.base import BaseClient
-from datamasque.client.exceptions import DataMasqueApiError, DataMasqueArgumentError, DataMasqueException
+from datamasque.client.exceptions import DataMasqueApiError, DataMasqueException
 from datamasque.client.models.discovery_config import DiscoveryConfig, DiscoveryConfigId, DiscoveryConfigType
 from datamasque.client.models.pagination import Page
 
@@ -81,7 +80,7 @@ class DiscoveryConfigClient(BaseClient):
         """
 
         if not config.yaml:
-            raise DataMasqueArgumentError("Cannot create a discovery config without YAML content (yaml is empty)")
+            raise ValueError("Cannot create a discovery config without YAML content (yaml is empty)")
 
         data = config.model_dump(exclude_none=True, by_alias=True, mode="json")
         response = self.make_request("POST", "/api/discovery/configs/", data=data)
@@ -104,10 +103,10 @@ class DiscoveryConfigClient(BaseClient):
         """
 
         if config.id is None:
-            raise DataMasqueArgumentError("Cannot update a discovery config that has not been created yet (id is None)")
+            raise ValueError("Cannot update a discovery config that has not been created yet (id is None)")
 
         if not config.yaml:
-            raise DataMasqueArgumentError(
+            raise ValueError(
                 "Cannot update a discovery config without YAML content (yaml is empty or unset); "
                 "list results omit YAML, so fetch the full config with `get_discovery_config` first"
             )
@@ -135,42 +134,6 @@ class DiscoveryConfigClient(BaseClient):
             return self.update_discovery_config(config)
 
         return self.create_discovery_config(config)
-
-    def validate_discovery_config(self, config: DiscoveryConfig) -> DiscoveryConfig:
-        """Validates a discovery config against the server."""
-
-        if not config.yaml:
-            raise DataMasqueArgumentError(
-                "Cannot validate a discovery config without YAML content (yaml is empty or unset); "
-                "list results omit YAML, so fetch the full config with `get_discovery_config` first"
-            )
-
-        temporary = DiscoveryConfig(
-            name=f"dm_python_validate_{uuid.uuid4().hex}",
-            yaml=config.yaml,
-            config_type=config.config_type,
-        )
-        data = temporary.model_dump(exclude_none=True, by_alias=True, mode="json")
-        response = self.make_request("POST", "/api/discovery/configs/", data=data)
-
-        payload = response.json()
-        raw_id = payload.get("id") if isinstance(payload, dict) else None
-        created_id = DiscoveryConfigId(raw_id) if isinstance(raw_id, str) else None
-
-        try:
-            created = DiscoveryConfig.model_validate(payload)
-            config.is_valid = created.is_valid
-            config.validation_error = created.validation_error
-            config.validation_error_details = created.validation_error_details
-        finally:
-            if created_id is not None:
-                self._delete_best_effort(
-                    lambda: self.delete_discovery_config_by_id_if_exists(created_id),
-                    f'temporary validation config "{temporary.name}"',
-                )
-
-        logger.debug('Validation of discovery config "%s" complete', config.name)
-        return config
 
     def delete_discovery_config_by_id_if_exists(self, config_id: DiscoveryConfigId) -> None:
         """
