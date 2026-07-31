@@ -2,9 +2,9 @@ import enum
 from datetime import datetime
 from typing import Any, NewType, Optional
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import AliasChoices, AliasPath, BaseModel, ConfigDict, Field
 
-from datamasque.client.models.status import ValidationStatus
+from datamasque.client.models.status import ValidationErrorDetails, ValidationStatus
 
 DiscoveryConfigId = NewType("DiscoveryConfigId", str)
 
@@ -49,5 +49,14 @@ class DiscoveryConfig(BaseModel):
     """Validation status; may be `in_progress` briefly after creating a large config."""
     validation_error: Optional[str] = Field(default=None, exclude=True)
     """Human-readable validation error, or `None` when valid."""
+    # Deliberately not `validation_errors`:
+    # this is a different shape to `Ruleset.validation_errors`,
+    # and would sit one character from `validation_error` above.
+    validation_error_details: list[ValidationErrorDetails] = Field(
+        default_factory=list,
+        exclude=True,
+        validation_alias=AliasChoices(AliasPath("errors", "config_yaml"), "validation_error_details"),
+    )
+    """Structured, positional validation errors."""
     created: Optional[datetime] = Field(default=None, exclude=True)
     modified: Optional[datetime] = Field(default=None, exclude=True)

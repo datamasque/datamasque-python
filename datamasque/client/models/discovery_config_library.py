@@ -27,5 +27,7 @@ class DiscoveryConfigLibrary(BaseModel):
     """Validation status; libraries are validated synchronously on create/update."""
     validation_error: Optional[str] = Field(default=None, exclude=True)
     """Human-readable validation error, or `None` when valid."""
+    usage_count: Optional[int] = Field(default=None, exclude=True)
+    """Number of active discovery configs that import this library."""
     created: Optional[datetime] = Field(default=None, exclude=True)
     modified: Optional[datetime] = Field(default=None, exclude=True)

@@ -93,10 +93,12 @@ def test_list_discovery_config_libraries(
     assert libraries[0].namespace == "org"
     assert libraries[0].yaml is None
     assert libraries[0].is_valid is ValidationStatus.valid
+    assert libraries[0].usage_count == 0
     assert libraries[1].id == DiscoveryConfigLibraryId(LIBRARY_ID_2)
     assert libraries[1].name == "another_library"
     assert libraries[1].is_valid is ValidationStatus.invalid
     assert libraries[1].validation_error == "bad yaml"
+    assert libraries[1].usage_count == 2
 
 
 def test_list_discovery_config_libraries_empty(client: DataMasqueClient) -> None:
@@ -125,6 +127,7 @@ def test_get_discovery_config_library(client: DataMasqueClient, sample_library_d
     assert library.namespace == "org"
     assert library.yaml == "labels: []\nmetadata_rules: []\nidd_rules: []\n"
     assert library.is_valid is ValidationStatus.valid
+    assert library.usage_count == 0
 
 
 def test_get_discovery_config_library_by_name_found(
@@ -248,6 +251,7 @@ def test_create_discovery_config_library(client: DataMasqueClient, config_librar
         "config_yaml": "labels: []\nmetadata_rules: []\nidd_rules: []\n",
         "is_valid": "valid",
         "validation_error": None,
+        "usage_count": 0,
         "created": "2025-06-01T10:00:00Z",
         "modified": "2025-06-01T10:00:00Z",
     }
@@ -263,16 +267,16 @@ def test_create_discovery_config_library(client: DataMasqueClient, config_librar
     assert result is config_library
     assert result.id == DiscoveryConfigLibraryId(LIBRARY_ID_1)
     assert result.is_valid is ValidationStatus.valid
+    assert result.usage_count == 0
     assert result.created == datetime.fromisoformat("2025-06-01T10:00:00+00:00")
     assert result.modified == datetime.fromisoformat("2025-06-01T10:00:00+00:00")
 
     request_body = m.last_request.json()
-    assert request_body["name"] == "test_library"
-    assert request_body["namespace"] == "test_ns"
-    assert "config_type" not in request_body
-    assert request_body["config_yaml"] == "labels: []\nmetadata_rules: []\nidd_rules: []\n"
-    read_only_fields = {"id", "is_valid", "validation_error", "created", "modified"}
-    assert not read_only_fields & request_body.keys()
+    assert request_body == {
+        "name": "test_library",
+        "namespace": "test_ns",
+        "config_yaml": "labels: []\nmetadata_rules: []\nidd_rules: []\n",
+    }
 
 
 def test_create_discovery_config_library_reports_validation_error(
@@ -312,6 +316,7 @@ def test_update_discovery_config_library(client: DataMasqueClient, config_librar
         "config_yaml": "labels: []\nmetadata_rules: []\nidd_rules: []\n",
         "is_valid": "valid",
         "validation_error": None,
+        "usage_count": 3,
         "created": "2025-06-01T10:00:00Z",
         "modified": "2025-06-02T10:00:00Z",
     }
@@ -327,13 +332,15 @@ def test_update_discovery_config_library(client: DataMasqueClient, config_librar
     assert result is config_library
     assert result.is_valid is ValidationStatus.valid
     assert result.validation_error is None
+    assert result.usage_count == 3
     assert result.modified == datetime.fromisoformat("2025-06-02T10:00:00+00:00")
 
     request_body = m.last_request.json()
-    assert request_body["name"] == "test_library"
-    assert request_body["config_yaml"] == "labels: []\nmetadata_rules: []\nidd_rules: []\n"
-    read_only_fields = {"id", "is_valid", "validation_error", "created", "modified"}
-    assert not read_only_fields & request_body.keys()
+    assert request_body == {
+        "name": "test_library",
+        "namespace": "test_ns",
+        "config_yaml": "labels: []\nmetadata_rules: []\nidd_rules: []\n",
+    }
 
 
 def test_update_discovery_config_library_no_id_raises(
@@ -349,7 +356,7 @@ def test_update_discovery_config_library_without_yaml_raises(
     config_library.id = DiscoveryConfigLibraryId(LIBRARY_ID_1)
     config_library.yaml = None
 
-    with pytest.raises(ValueError, match="yaml is None"):
+    with pytest.raises(ValueError, match="without YAML content"):
         client.update_discovery_config_library(config_library)
 
 
@@ -493,3 +500,13 @@ def test_delete_discovery_config_library_by_name_not_found(
 
     assert m.call_count == 1
     assert m.request_history[0].method == "GET"
+
+
+def test_create_discovery_config_library_with_empty_yaml_raises(client: DataMasqueClient) -> None:
+    library = DiscoveryConfigLibrary(name="test_library", yaml="")
+
+    with requests_mock.Mocker() as m:
+        with pytest.raises(ValueError, match="without YAML content"):
+            client.create_discovery_config_library(library)
+
+        assert not any(request.method == "POST" for request in m.request_history)

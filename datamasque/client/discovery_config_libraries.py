@@ -76,8 +76,11 @@ class DiscoveryConfigLibraryClient(BaseClient):
         Creates a new discovery config library on the server.
 
         Sets the library's server-assigned fields
-        (`id`, `is_valid`, `validation_error`, `created`, `modified`) and returns the library.
+        (`id`, `is_valid`, `validation_error`, `usage_count`, `created`, `modified`) and returns the library.
         """
+
+        if not library.yaml:
+            raise ValueError("Cannot create a discovery config library without YAML content (yaml is empty)")
 
         data = library.model_dump(exclude_none=True, by_alias=True, mode="json")
         response = self.make_request("POST", "/api/discovery/config-libraries/", data=data)
@@ -85,6 +88,7 @@ class DiscoveryConfigLibraryClient(BaseClient):
         library.id = created.id
         library.is_valid = created.is_valid
         library.validation_error = created.validation_error
+        library.usage_count = created.usage_count
         library.created = created.created
         library.modified = created.modified
         logger.info('Creation of discovery config library "%s" successful', library.name)
@@ -101,9 +105,9 @@ class DiscoveryConfigLibraryClient(BaseClient):
         if library.id is None:
             raise ValueError("Cannot update a discovery config library that has not been created yet (id is None)")
 
-        if library.yaml is None:
+        if not library.yaml:
             raise ValueError(
-                "Cannot update a discovery config library without YAML content (yaml is None); "
+                "Cannot update a discovery config library without YAML content (yaml is empty or unset); "
                 "list results omit YAML, so fetch the full library with `get_discovery_config_library` first"
             )
 
@@ -112,6 +116,7 @@ class DiscoveryConfigLibraryClient(BaseClient):
         updated = DiscoveryConfigLibrary.model_validate(response.json())
         library.is_valid = updated.is_valid
         library.validation_error = updated.validation_error
+        library.usage_count = updated.usage_count
         library.modified = updated.modified
         logger.debug('Update of discovery config library "%s" successful', library.name)
         return library

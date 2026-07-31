@@ -5,6 +5,7 @@ from typing import Any
 
 import pytest
 import requests_mock
+from pydantic import JsonValue, ValidationError
 
 from datamasque.client import DataMasqueClient
 from datamasque.client.exceptions import DataMasqueApiError, DataMasqueException
@@ -310,6 +311,16 @@ def test_update_discovery_config_no_id_raises(client: DataMasqueClient, discover
         client.update_discovery_config(discovery_config)
 
 
+def test_update_discovery_config_without_yaml_raises(
+    client: DataMasqueClient, discovery_config: DiscoveryConfig
+) -> None:
+    discovery_config.id = DiscoveryConfigId(CONFIG_ID_1)
+    discovery_config.yaml = None
+
+    with pytest.raises(ValueError, match="without YAML content"):
+        client.update_discovery_config(discovery_config)
+
+
 def test_create_or_update_discovery_config_create(client: DataMasqueClient, discovery_config: DiscoveryConfig) -> None:
     empty_list = {"count": 0, "next": None, "previous": None, "results": []}
     create_response = {
@@ -518,3 +529,86 @@ def test_unwrap_discovery_config_id_raises_without_id() -> None:
     config = DiscoveryConfig(name="x", config_type="database")
     with pytest.raises(ValueError, match="id is None"):
         unwrap_discovery_config_id(config)
+
+
+def _build_config_response(is_valid: str, **extra: JsonValue) -> dict[str, JsonValue]:
+    return {
+        "id": CONFIG_ID_1,
+        "name": "test_config",
+        "config_type": "database",
+        "is_valid": is_valid,
+        "validation_error": None,
+        **extra,
+    }
+
+
+def test_discovery_config_promotes_errors_payload() -> None:
+    config = DiscoveryConfig.model_validate(
+        _build_config_response(
+            "invalid",
+            validation_error="Unknown mask 'foo'",
+            errors={"config_yaml": [{"message": "Unknown mask 'foo'", "line_number": 3, "column_number": 5}]},
+        )
+    )
+
+    assert config.is_valid is ValidationStatus.invalid
+    assert len(config.validation_error_details) == 1
+    detail = config.validation_error_details[0]
+    assert detail.message == "Unknown mask 'foo'"
+    assert detail.line_number == 3
+    assert detail.column_number == 5
+    assert "errors" not in (config.model_extra or {})
+
+
+def test_discovery_config_accepts_flat_details_list() -> None:
+    config = DiscoveryConfig.model_validate(
+        _build_config_response(
+            "invalid",
+            validation_error_details=[{"message": "Unknown mask 'foo'", "line_number": 3}],
+        )
+    )
+
+    assert [detail.message for detail in config.validation_error_details] == ["Unknown mask 'foo'"]
+
+
+def test_discovery_config_accepts_empty_errors_map() -> None:
+    config = DiscoveryConfig.model_validate(_build_config_response("valid", errors={}))
+
+    assert config.validation_error_details == []
+
+
+def test_discovery_config_rejects_non_list_error_group() -> None:
+    with pytest.raises(ValidationError, match="config_yaml"):
+        DiscoveryConfig.model_validate(_build_config_response("invalid", errors={"config_yaml": "Unknown mask 'foo'"}))
+
+
+def test_discovery_config_rejects_null_error_group() -> None:
+    with pytest.raises(ValidationError, match="config_yaml"):
+        DiscoveryConfig.model_validate(_build_config_response("invalid", errors={"config_yaml": None}))
+
+
+def test_discovery_config_rejects_malformed_error_entry() -> None:
+    with pytest.raises(ValidationError):
+        DiscoveryConfig.model_validate(
+            _build_config_response("invalid", errors={"config_yaml": ["Unknown mask 'foo'"]})
+        )
+
+
+def test_create_discovery_config_with_empty_yaml_raises(client: DataMasqueClient) -> None:
+    config = DiscoveryConfig(name="test_config", yaml="", config_type="database")
+
+    with requests_mock.Mocker() as m:
+        with pytest.raises(ValueError, match="without YAML content"):
+            client.create_discovery_config(config)
+
+        assert not any(request.method == "POST" for request in m.request_history)
+
+
+def test_update_discovery_config_with_empty_yaml_raises(client: DataMasqueClient) -> None:
+    config = DiscoveryConfig(id=CONFIG_ID_1, name="test_config", yaml="", config_type="database")
+
+    with requests_mock.Mocker() as m:
+        with pytest.raises(ValueError, match="without YAML content"):
+            client.update_discovery_config(config)
+
+        assert not any(request.method == "PUT" for request in m.request_history)

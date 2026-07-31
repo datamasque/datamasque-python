@@ -75,8 +75,12 @@ class DiscoveryConfigClient(BaseClient):
         Creates a new discovery config on the server.
 
         Sets the config's server-assigned fields
-        (`id`, `is_valid`, `validation_error`, `created`, `modified`) and returns the config.
+        (`id`, `is_valid`, `validation_error`, `validation_error_details`, `created`, `modified`)
+        and returns the config.
         """
+
+        if not config.yaml:
+            raise ValueError("Cannot create a discovery config without YAML content (yaml is empty)")
 
         data = config.model_dump(exclude_none=True, by_alias=True, mode="json")
         response = self.make_request("POST", "/api/discovery/configs/", data=data)
@@ -84,6 +88,7 @@ class DiscoveryConfigClient(BaseClient):
         config.id = created.id
         config.is_valid = created.is_valid
         config.validation_error = created.validation_error
+        config.validation_error_details = created.validation_error_details
         config.created = created.created
         config.modified = created.modified
         logger.info('Creation of discovery config "%s" successful', config.name)
@@ -94,17 +99,24 @@ class DiscoveryConfigClient(BaseClient):
         Performs a full update of the discovery config.
 
         The config must have its `id` set
-        (i.e., it must have been previously created or retrieved from the server).
+        and its `yaml` content present.
         """
 
         if config.id is None:
             raise ValueError("Cannot update a discovery config that has not been created yet (id is None)")
+
+        if not config.yaml:
+            raise ValueError(
+                "Cannot update a discovery config without YAML content (yaml is empty or unset); "
+                "list results omit YAML, so fetch the full config with `get_discovery_config` first"
+            )
 
         data = config.model_dump(exclude_none=True, by_alias=True, mode="json")
         response = self.make_request("PUT", f"/api/discovery/configs/{config.id}/", data=data)
         updated = DiscoveryConfig.model_validate(response.json())
         config.is_valid = updated.is_valid
         config.validation_error = updated.validation_error
+        config.validation_error_details = updated.validation_error_details
         config.modified = updated.modified
         logger.debug('Update of discovery config "%s" successful', config.name)
         return config
