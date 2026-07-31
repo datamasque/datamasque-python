@@ -2,7 +2,7 @@
 History
 =======
 
-1.2.2 (unreleased)
+1.2.2 (2026-07-31)
 ------------------
 
 * Added ``validation_error_details`` to ``DiscoveryConfig``.
@@ -10,6 +10,8 @@ History
 * ``create_discovery_config``, ``update_discovery_config``, ``create_discovery_config_library``, and
   ``update_discovery_config_library`` now raise ``ValueError`` when the passed entity has no ``yaml``
   content, instead of sending a request the server rejects.
+
+Requires server version 3.26.14
 
 1.2.1 (2026-07-30)
 ------------------
