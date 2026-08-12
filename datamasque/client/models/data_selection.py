@@ -1,5 +1,6 @@
 """Models related to data selection in endpoints such as /api/async-generate-ruleset."""
 
+import json
 from typing import Optional, Union
 
 from pydantic import BaseModel, ConfigDict
@@ -17,6 +18,33 @@ A locator identifying a masked value within a file.
 - Tabular files (CSV, parquet, fixed-width) use a bare string column name, e.g. `"email"`.
 - Structured files (JSON) use a :data:`JsonPath`, e.g. `["employees", "*", "email"]`.
 """
+
+
+def serialize_locator(locator: Locator) -> str:
+    """
+    Returns the string form of `locator` that the API uses as a key, such as in `FileDiscoveryFile.value_counts`.
+
+    A string locator is its own key.
+    A :data:`JsonPath` becomes compact JSON, e.g. `'["employees","*","email"]'`.
+    """
+
+    if isinstance(locator, str):
+        return locator
+    return json.dumps(locator, separators=(",", ":"), ensure_ascii=False)
+
+
+def deserialize_locator(key: str) -> Locator:
+    """
+    Returns the `Locator` that `key`, a serialized locator from the API, identifies.
+
+    A key that holds no JSON array names a column, and comes back as a string.
+    """
+
+    try:
+        parsed = json.loads(key)
+    except json.JSONDecodeError:
+        return key
+    return parsed if isinstance(parsed, list) else key
 
 
 class UserSelection(BaseModel):
