@@ -6,7 +6,13 @@ from typing import Any, Optional, Union
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from datamasque.client.models.connection import ConnectionConfig, ConnectionId, unwrap_connection_id
-from datamasque.client.models.data_selection import HashColumnsTableConfig, Locator, UserSelection
+from datamasque.client.models.data_selection import (
+    HashColumnsTableConfig,
+    Locator,
+    UserSelection,
+    deserialize_locator,
+    serialize_locator,
+)
 from datamasque.client.models.discovery_config import DiscoveryConfig, DiscoveryConfigId, unwrap_discovery_config_id
 from datamasque.client.models.pagination import Page
 from datamasque.client.models.rg_config import RGConfig, RGConfigId, unwrap_rg_config_id
@@ -434,6 +440,14 @@ class FileDiscoveryMatch(BaseModel):
     hit_ratio: Optional[int] = None  # None for metadata matches, percentage 0-100 for IDD matches.
 
 
+class ValueCountStatus(Enum):
+    """Whether a file's values were counted, and when they were not, why."""
+
+    counted = "counted"
+    in_data_discovery_disabled = "in_data_discovery_disabled"
+    file_type_has_no_values = "file_type_has_no_values"
+
+
 class FileDiscoveryLocatorResult(BaseModel):
     """A locator (column/path) within a discovered file."""
 
@@ -443,6 +457,7 @@ class FileDiscoveryLocatorResult(BaseModel):
     matches: list[FileDiscoveryMatch]
     data_types: list[str]
     safe_data_preview: Optional[SafeDataPreview] = None
+    value_count: Optional[int] = None
 
 
 class FileDiscoveryFile(BaseModel):
@@ -454,6 +469,23 @@ class FileDiscoveryFile(BaseModel):
     file_type: str
     delimiter: Optional[str] = None
     encoding: Optional[str] = None
+    value_counts: dict[str, int] = Field(default_factory=dict)
+    value_count_status: Optional[ValueCountStatus] = None
+
+    @field_validator("value_count_status", mode="before")
+    @classmethod
+    def _blank_status_is_none(cls, value: Any) -> Any:
+        return value or None
+
+    def get_value_count_of_locator(self, locator: Locator) -> Optional[int]:
+        """Returns how many values this file holds at `locator`, or `None` if this file holds no count for it."""
+
+        return self.value_counts.get(serialize_locator(locator))
+
+    def parse_value_counts(self) -> list[tuple[Locator, int]]:
+        """Returns this file's value counts, with each locator in the form that the discovery results use."""
+
+        return [(deserialize_locator(key), count) for key, count in self.value_counts.items()]
 
 
 class FileDiscoveryResult(BaseModel):

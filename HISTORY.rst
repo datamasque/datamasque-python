@@ -2,6 +2,16 @@
 History
 =======
 
+1.2.3 (2026-08-12)
+------------------
+
+* Added file-discovery value counts:
+
+  * ``value_count`` on ``FileDiscoveryLocatorResult``, the total over the files in the group.
+  * ``value_counts`` and ``value_count_status`` on ``FileDiscoveryFile``, typed by ``ValueCountStatus``.
+
+Requires server version 3.26.15
+
 1.2.2 (2026-07-31)
 ------------------
 

@@ -31,6 +31,7 @@ from datamasque.client import (
     SchemaDiscoveryRequest,
     SchemaDiscoveryResult,
     StringPreview,
+    ValueCountStatus,
 )
 from datamasque.client.exceptions import (
     AsyncRulesetGenerationInProgressError,
@@ -1010,6 +1011,181 @@ def test_file_discovery_result_parses_server_response():
     non_sensitive_match = result.results[0].matches[1]
     assert non_sensitive_match.label is None
     assert non_sensitive_match.categories is None
+
+
+def test_file_discovery_value_counts_parse():
+    """A JSON file's value counts parse, keyed by serialized locator, with the group total on the locator."""
+    result = FileDiscoveryResult.model_validate(
+        {
+            "id": 8,
+            "connection": {"id": "conn-1", "name": "my files"},
+            "file_type": "json",
+            "files": [
+                {
+                    "path": "data/staff.json",
+                    "file_type": "json",
+                    "value_counts": {'["employees","*","email"]': 12},
+                    "value_count_status": "counted",
+                }
+            ],
+            "results": [
+                {
+                    "locator": ["employees", "*", "email"],
+                    "data_types": ["string"],
+                    "matches": [{"flagged_by": "IDD", "description": "Email", "label": "email"}],
+                    "value_count": 30,
+                }
+            ],
+        }
+    )
+
+    file = result.files[0]
+    assert file.value_count_status is ValueCountStatus.counted
+    assert file.value_counts == {'["employees","*","email"]': 12}
+    assert result.results[0].value_count == 30
+
+
+def test_file_discovery_uncounted_values_parse():
+    """A file type that holds no values reports the reason, no counts, and a null count on the locator."""
+    result = FileDiscoveryResult.model_validate(
+        {
+            "id": 9,
+            "connection": {"id": "conn-1", "name": "my files"},
+            "file_type": "csv",
+            "files": [
+                {
+                    "path": "data/people.csv",
+                    "file_type": "csv",
+                    "value_counts": {},
+                    "value_count_status": "file_type_has_no_values",
+                }
+            ],
+            "results": [
+                {
+                    "locator": "email",
+                    "data_types": ["string"],
+                    "matches": [{"flagged_by": "MDD", "description": "Email", "label": "email"}],
+                    "value_count": None,
+                }
+            ],
+        }
+    )
+
+    file = result.files[0]
+    assert file.value_count_status is ValueCountStatus.file_type_has_no_values
+    assert file.value_counts == {}
+    assert result.results[0].value_count is None
+
+
+def test_file_discovery_result_without_value_counts_parses():
+    """A result from a server that predates value counts parses, with a blank status read as `None`."""
+    result = FileDiscoveryResult.model_validate(
+        {
+            "id": 10,
+            "connection": {"id": "conn-1", "name": "my files"},
+            "file_type": "csv",
+            "files": [{"path": "data/people.csv", "file_type": "csv", "value_count_status": ""}],
+            "results": [
+                {
+                    "locator": "email",
+                    "data_types": ["string"],
+                    "matches": [{"flagged_by": "MDD", "description": "Email", "label": "email"}],
+                }
+            ],
+        }
+    )
+
+    file = result.files[0]
+    assert file.value_count_status is None
+    assert file.value_counts == {}
+    assert result.results[0].value_count is None
+
+
+def test_file_discovery_value_counts_read_by_locator():
+    """A file's counts are read with a `Locator`, and listed with each locator in the form the results use."""
+    result = FileDiscoveryResult.model_validate(
+        {
+            "id": 11,
+            "connection": {"id": "conn-1", "name": "my files"},
+            "file_type": "json",
+            "files": [
+                {
+                    "path": "data/staff.json",
+                    "file_type": "json",
+                    "value_counts": {'["employees","*","email"]': 12, '["employees","*","phone"]': 4},
+                    "value_count_status": "counted",
+                }
+            ],
+            "results": [
+                {
+                    "locator": ["employees", "*", "email"],
+                    "data_types": ["string"],
+                    "matches": [{"flagged_by": "IDD", "description": "Email", "label": "email"}],
+                    "value_count": 30,
+                }
+            ],
+        }
+    )
+
+    file = result.files[0]
+    assert file.get_value_count_of_locator(result.results[0].locator) == 12
+    assert file.get_value_count_of_locator(["employees", "*", "phone"]) == 4
+    assert file.get_value_count_of_locator(["employees", "*", "address"]) is None
+    assert file.parse_value_counts() == [(["employees", "*", "email"], 12), (["employees", "*", "phone"], 4)]
+
+
+def test_file_discovery_value_count_of_non_ascii_locator():
+    """A locator with a non-ASCII element matches its key, which the API sends with no escape."""
+    result = FileDiscoveryResult.model_validate(
+        {
+            "id": 13,
+            "connection": {"id": "conn-1", "name": "my files"},
+            "file_type": "json",
+            "files": [
+                {
+                    "path": "data/personnel.json",
+                    "file_type": "json",
+                    "value_counts": {'["personnel","*","prénom"]': 7},
+                    "value_count_status": "counted",
+                }
+            ],
+            "results": [
+                {
+                    "locator": ["personnel", "*", "prénom"],
+                    "data_types": ["string"],
+                    "matches": [{"flagged_by": "IDD", "description": "First name", "label": "first_name"}],
+                    "value_count": 7,
+                }
+            ],
+        }
+    )
+
+    file = result.files[0]
+    assert file.get_value_count_of_locator(result.results[0].locator) == 7
+    assert file.parse_value_counts() == [(["personnel", "*", "prénom"], 7)]
+
+
+def test_file_discovery_without_value_counts_reads_no_count():
+    """A file that carries no counts reports `None` for every locator, and lists nothing."""
+    result = FileDiscoveryResult.model_validate(
+        {
+            "id": 12,
+            "connection": {"id": "conn-1", "name": "my files"},
+            "file_type": "csv",
+            "files": [{"path": "data/people.csv", "file_type": "csv", "value_count_status": ""}],
+            "results": [
+                {
+                    "locator": "email",
+                    "data_types": ["string"],
+                    "matches": [{"flagged_by": "MDD", "description": "Email", "label": "email"}],
+                }
+            ],
+        }
+    )
+
+    file = result.files[0]
+    assert file.get_value_count_of_locator("email") is None
+    assert file.parse_value_counts() == []
 
 
 def test_file_data_discovery_ignore_rules_serialize():

@@ -81,6 +81,7 @@ from datamasque.client.models.discovery import (
     SchemaDiscoveryRequest,
     SchemaDiscoveryResult,
     TableConstraints,
+    ValueCountStatus,
 )
 from datamasque.client.models.discovery_config import DiscoveryConfig, DiscoveryConfigId, DiscoveryConfigType
 from datamasque.client.models.discovery_config_library import DiscoveryConfigLibrary, DiscoveryConfigLibraryId
@@ -319,4 +320,5 @@ __all__ = [
     "ValidationErrorDetails",
     "ValidationErrorType",
     "ValidationStatus",
+    "ValueCountStatus",
 ]
