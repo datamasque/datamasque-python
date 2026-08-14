@@ -2,6 +2,13 @@
 History
 =======
 
+1.2.4 (2026-08-12)
+------------------
+
+* Added ``rg_config`` to ``ValidationErrorType``, covering ruleset generation config validation errors.
+
+Requires server version 3.26.15
+
 1.2.3 (2026-08-12)
 ------------------
 

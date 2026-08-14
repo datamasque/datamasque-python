@@ -20,6 +20,7 @@ class ValidationErrorType(enum.Enum):
     library_missing = "library_missing"
     library_invalid = "library_invalid"
     expansion = "expansion"  # The ruleset is not valid once its library references are expanded.
+    rg_config = "rg_config"
 
 
 class ValidationErrorDetails(BaseModel):
