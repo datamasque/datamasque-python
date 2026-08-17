@@ -2,6 +2,15 @@
 History
 =======
 
+1.2.5 (2026-08-17)
+------------------
+
+* Added ``iam_role_arn`` to ``DatabaseConnectionConfig``: the IAM role DataMasque assumes to tag
+  the connection's AWS resource, for resources in another AWS account. Sent only for the engines
+  that can be an Amazon RDS instance, Aurora cluster or Redshift cluster.
+
+Requires server version 3.26.16
+
 1.2.4 (2026-08-12)
 ------------------
 
