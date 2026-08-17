@@ -1400,3 +1400,73 @@ def test_create_or_update_mongo_connection(client):
     assert sent["db_type"] == "mongodb"
     assert sent["dbpassword"] == "hunter2"
     assert sent["replica_set"] == "rs0"
+
+
+def _database_connection(database_type: DatabaseType, **extra) -> DatabaseConnectionConfig:
+    return DatabaseConnectionConfig(
+        name="conn",
+        host="mydb.abc123.ap-southeast-2.rds.amazonaws.com",
+        port=5432,
+        database="db",
+        user="user",
+        password="secret",
+        database_type=database_type,
+        **extra,
+    )
+
+
+@pytest.mark.parametrize(
+    "database_type",
+    [
+        DatabaseType.postgres,
+        DatabaseType.mysql,
+        DatabaseType.mariadb,
+        DatabaseType.oracle,
+        DatabaseType.mssql,
+        DatabaseType.db2_luw,
+        DatabaseType.redshift,
+    ],
+)
+def test_database_connection_sends_tagging_iam_role_for_aws_hosted_engines(database_type):
+    """The engines that can sit behind an RDS, Aurora or Redshift endpoint can carry a tagging role."""
+    extra = (
+        {"s3_bucket_name": "bucket", "s3_redshift_iam_role": "arn:aws:iam::123456789012:role/redshift-s3"}
+        if database_type is DatabaseType.redshift
+        else {}
+    )
+    conn = _database_connection(database_type, iam_role_arn="arn:aws:iam::119836602066:role/tagger", **extra)
+
+    api_dict = conn.model_dump(exclude_none=True, by_alias=True, mode="json")
+
+    assert api_dict["iam_role_arn"] == "arn:aws:iam::119836602066:role/tagger"
+
+
+@pytest.mark.parametrize("database_type", [DatabaseType.db2i, DatabaseType.informix, DatabaseType.saphana])
+def test_database_connection_omits_tagging_iam_role_for_engines_that_cannot_be_aws_resources(database_type):
+    """Mirrors how `s3_redshift_iam_role` is pruned: the server has no such field on these engines."""
+    conn = _database_connection(database_type, iam_role_arn="arn:aws:iam::119836602066:role/tagger")
+
+    api_dict = conn.model_dump(exclude_none=True, by_alias=True, mode="json")
+
+    assert "iam_role_arn" not in api_dict
+
+
+def test_database_connection_omits_tagging_iam_role_when_unset():
+    conn = _database_connection(DatabaseType.postgres)
+
+    assert "iam_role_arn" not in conn.model_dump(exclude_none=True, by_alias=True, mode="json")
+
+
+def test_redshift_connection_keeps_its_cluster_s3_role_separate_from_its_tagging_role():
+    """Two ARNs with different meanings: the cluster's own S3 access, and the role DataMasque assumes to tag."""
+    conn = _database_connection(
+        DatabaseType.redshift,
+        s3_bucket_name="bucket",
+        s3_redshift_iam_role="arn:aws:iam::123456789012:role/redshift-s3",
+        iam_role_arn="arn:aws:iam::119836602066:role/tagger",
+    )
+
+    api_dict = conn.model_dump(exclude_none=True, by_alias=True, mode="json")
+
+    assert api_dict["s3_redshift_iam_role"] == "arn:aws:iam::123456789012:role/redshift-s3"
+    assert api_dict["iam_role_arn"] == "arn:aws:iam::119836602066:role/tagger"
