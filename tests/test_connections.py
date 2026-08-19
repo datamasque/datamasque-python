@@ -1441,7 +1441,20 @@ def test_database_connection_sends_tagging_iam_role_for_aws_hosted_engines(datab
     assert api_dict["iam_role_arn"] == "arn:aws:iam::119836602066:role/tagger"
 
 
-@pytest.mark.parametrize("database_type", [DatabaseType.db2i, DatabaseType.informix, DatabaseType.saphana])
+@pytest.mark.parametrize(
+    "database_type",
+    [
+        DatabaseType.db2i,
+        DatabaseType.informix,
+        DatabaseType.saphana,
+        # The two worth documenting rather than merely covering. `mssql_linked` inherits the field
+        # through `MssqlLinkedServerConnectionConfig` and is excluded only by its own enum value;
+        # `databricks_lakebase` is AWS-hosted, so it reads like an omission from the taggable set
+        # until you know it presents no endpoint tagging can act on.
+        DatabaseType.mssql_linked,
+        DatabaseType.databricks_lakebase,
+    ],
+)
 def test_database_connection_omits_tagging_iam_role_for_engines_that_cannot_be_aws_resources(database_type):
     """Mirrors how `s3_redshift_iam_role` is pruned: the server has no such field on these engines."""
     conn = _database_connection(database_type, iam_role_arn="arn:aws:iam::119836602066:role/tagger")
