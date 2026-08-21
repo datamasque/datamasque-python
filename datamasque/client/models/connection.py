@@ -289,6 +289,22 @@ class SnowflakeConnectionConfig(ConnectionConfig):
         return data
 
 
+# Engines that can sit behind an Amazon RDS, Aurora or Redshift endpoint, and so can carry a role
+# for DataMasque to assume when tagging the resource. Aurora needs no entry of its own: it uses
+# these same engines with a cluster endpoint.
+_AWS_TAGGABLE_DATABASE_TYPES = frozenset(
+    {
+        DatabaseType.postgres,
+        DatabaseType.mysql,
+        DatabaseType.mariadb,
+        DatabaseType.oracle,
+        DatabaseType.mssql,
+        DatabaseType.db2_luw,
+        DatabaseType.redshift,
+    }
+)
+
+
 class DatabaseConnectionConfig(ConnectionConfig):
     """
     Connection configuration for a SQL database.
@@ -309,6 +325,11 @@ class DatabaseConnectionConfig(ConnectionConfig):
     is_read_only: bool = False
     s3_bucket_name: Optional[str] = None
     s3_redshift_iam_role: Optional[str] = None
+    # An IAM role for DataMasque to assume when tagging this database's AWS resource after a run.
+    # Only the engines in `_AWS_TAGGABLE_DATABASE_TYPES` can be an RDS instance, Aurora cluster or
+    # Redshift cluster, so it is pruned for the rest. Distinct from `s3_redshift_iam_role`, which is
+    # the role the Redshift cluster itself uses to reach S3.
+    iam_role_arn: Optional[str] = None
 
     @model_validator(mode="after")
     def _reject_special_engines(self) -> "DatabaseConnectionConfig":
@@ -348,6 +369,8 @@ class DatabaseConnectionConfig(ConnectionConfig):
         if db_type is not DatabaseType.redshift:
             d.pop("s3_bucket_name", None)
             d.pop("s3_redshift_iam_role", None)
+        if db_type not in _AWS_TAGGABLE_DATABASE_TYPES:
+            d.pop("iam_role_arn", None)
         if not d.get("engine_options"):
             d.pop("engine_options", None)
         return d
