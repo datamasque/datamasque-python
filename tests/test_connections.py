@@ -7,6 +7,7 @@ from datamasque.client.exceptions import DataMasqueApiError, DataMasqueException
 from datamasque.client.models.connection import (
     AzureConnectionConfig,
     ConnectionId,
+    CosmosDbConnectionConfig,
     DatabaseConnectionConfig,
     DatabaseType,
     DatabricksConnectionConfig,
@@ -1358,6 +1359,42 @@ def test_connection_config_dispatch_picks_documentdb_subclass():
     conn = validate_connection(payload)
     assert isinstance(conn, DocumentDbConnectionConfig)
     assert conn.database_type is DatabaseType.documentdb
+
+
+def test_cosmosdb_connection_defaults_tls_on_and_retry_writes_off():
+    """
+    Cosmos DB mandates TLS and rejects retryable writes, so the config carries both as defaults.
+
+    Getting `retry_writes` wrong is silent on reads, so it fails only once a masking run writes.
+    """
+    conn = CosmosDbConnectionConfig(
+        name="cosmos",
+        host="dtq-cosmos.mongo.cosmos.azure.com",
+        port=10255,
+        database="people",
+        user="dtq-cosmos",
+        password="hunter2",
+    )
+    d = conn.model_dump(exclude_none=True, by_alias=True, mode="json")
+    assert d["db_type"] == "cosmosdb"
+    assert d["mask_type"] == "database"
+    assert d["tls"] is True
+    assert d["retry_writes"] is False
+    assert conn.database_type is DatabaseType.cosmosdb
+
+
+def test_connection_config_dispatch_picks_cosmosdb_subclass():
+    payload = {
+        "id": "cosmos-id-1",
+        "name": "cosmos",
+        "mask_type": "database",
+        "db_type": "cosmosdb",
+        "host": "dtq-cosmos.mongo.cosmos.azure.com",
+        "database": "people",
+    }
+    conn = validate_connection(payload)
+    assert isinstance(conn, CosmosDbConnectionConfig)
+    assert conn.database_type is DatabaseType.cosmosdb
 
 
 def test_database_connection_config_rejects_mongodb_database_type():

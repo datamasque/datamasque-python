@@ -2,6 +2,16 @@
 History
 =======
 
+1.3.0 (2026-09-04)
+------------------
+
+* Added ``CosmosDbConnectionConfig`` and the ``cosmosdb`` ``DatabaseType``, for Azure Cosmos DB for
+  MongoDB. Cosmos DB's MongoDB API is wire-compatible, so the config reuses ``MongoConnectionConfig``
+  and differs only by ``db_type`` and two defaults: ``tls`` on, because Cosmos only accepts TLS
+  connections, and ``retry_writes`` off, because Cosmos rejects retryable writes.
+
+Requires server version 3.26.18
+
 1.2.5 (2026-08-17)
 ------------------
 

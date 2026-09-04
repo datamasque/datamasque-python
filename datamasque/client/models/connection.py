@@ -45,6 +45,7 @@ class DatabaseType(Enum):
     snowflake = "snowflake"
     mongodb = "mongodb"
     documentdb = "documentdb"
+    cosmosdb = "cosmosdb"
     databricks_lakebase = "databricks_lakebase"
     databricks = "databricks"
     informix = "informix"
@@ -227,6 +228,26 @@ class DocumentDbConnectionConfig(MongoConnectionConfig):
     @property
     def database_type(self) -> DatabaseType:
         return DatabaseType.documentdb
+
+
+class CosmosDbConnectionConfig(MongoConnectionConfig):
+    """
+    Connection configuration for an Azure Cosmos DB for MongoDB account.
+
+    Cosmos DB's MongoDB API is wire-compatible,
+    so it reuses `MongoConnectionConfig` (including the TLS handling)
+    and differs only by `db_type`/`database_type` and two defaults:
+    Cosmos mandates TLS, and rejects retryable writes on every write path.
+    """
+
+    # Narrowing the inherited Literal is a deliberate Pydantic discriminator override.
+    db_type: Literal["cosmosdb"] = "cosmosdb"  # type: ignore[assignment]
+    tls: bool = True
+    retry_writes: bool = False
+
+    @property
+    def database_type(self) -> DatabaseType:
+        return DatabaseType.cosmosdb
 
 
 class SnowflakeConnectionConfig(ConnectionConfig):
@@ -490,6 +511,7 @@ DB_TYPE_MAP: dict[str, type[ConnectionConfig]] = {
     DatabaseType.dynamodb.value: DynamoConnectionConfig,
     DatabaseType.mongodb.value: MongoConnectionConfig,
     DatabaseType.documentdb.value: DocumentDbConnectionConfig,
+    DatabaseType.cosmosdb.value: CosmosDbConnectionConfig,
     DatabaseType.snowflake.value: SnowflakeConnectionConfig,
     DatabaseType.mssql_linked.value: MssqlLinkedServerConnectionConfig,
     DatabaseType.databricks.value: DatabricksConnectionConfig,
