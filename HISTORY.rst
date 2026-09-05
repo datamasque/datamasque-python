@@ -7,10 +7,17 @@ History
 
 * Added ``CosmosDbConnectionConfig`` and the ``cosmosdb`` ``DatabaseType``, for Azure Cosmos DB for
   MongoDB. Cosmos DB's MongoDB API is wire-compatible, so the config reuses ``MongoConnectionConfig``
-  and differs only by ``db_type`` and two defaults: ``tls`` on, because Cosmos only accepts TLS
-  connections, and ``retry_writes`` off, because Cosmos rejects retryable writes.
+  and differs only by ``db_type`` and two defaults: ``tls`` on, because Cosmos DB only accepts TLS
+  connections, and ``retry_writes`` off, because Cosmos DB rejects retryable writes.
 
-Requires server version 3.26.18
+* ``DatabaseConnectionConfig`` now rejects the ``documentdb`` and ``cosmosdb`` database types with a
+  message naming the class to use, as it already did for MongoDB, DynamoDB, Snowflake and Databricks.
+
+* The MongoDB serializer prunes ``tls`` and ``retry_writes`` against the concrete class's default
+  rather than MongoDB's, so a Cosmos DB config that sets either the other way now sends it instead
+  of leaving the server to apply its own default.
+
+Requires server version 3.26.17
 
 1.2.5 (2026-08-17)
 ------------------
