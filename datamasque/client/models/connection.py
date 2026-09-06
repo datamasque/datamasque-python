@@ -237,18 +237,18 @@ class DocumentDbConnectionConfig(MongoConnectionConfig):
 
 class CosmosDbConnectionConfig(MongoConnectionConfig):
     """
-    Connection configuration for an Azure Cosmos DB for MongoDB account.
+    Connection configuration for an Azure Cosmos DB account.
 
-    Cosmos DB's MongoDB API is wire-compatible, so it reuses `MongoConnectionConfig` and differs
-    only by `db_type`/`database_type` and two defaults: Cosmos DB only accepts TLS connections,
-    and rejects retryable writes.
+    Cosmos DB listens on 10255, only accepts TLS connections and rejects retryable writes, so it
+    differs from `MongoConnectionConfig` by `db_type`/`database_type` and those three defaults.
 
-    Both are defaults, not constraints. Setting either the other way sends it to the server, which
-    is what makes a masking run fail at write time with retryable writes on.
+    They are defaults, not constraints. Setting one the other way sends it to the server, which is
+    what makes a masking run fail at write time with retryable writes on.
     """
 
     # Narrowing the inherited Literal is a deliberate Pydantic discriminator override.
     db_type: Literal["cosmosdb"] = "cosmosdb"  # type: ignore[assignment]
+    port: int = 10255
     tls: bool = True
     retry_writes: bool = False
 

@@ -1362,10 +1362,10 @@ def test_connection_config_dispatch_picks_documentdb_subclass():
 
 
 def _cosmosdb_connection(**overrides) -> CosmosDbConnectionConfig:
+    """Build a Cosmos DB config, leaving the port to the connection type's own default."""
     return CosmosDbConnectionConfig(
         name="cosmos",
         host="dtq-cosmos.mongo.cosmos.azure.com",
-        port=10255,
         database="people",
         user="dtq-cosmos",
         password="hunter2",
@@ -1373,17 +1373,19 @@ def _cosmosdb_connection(**overrides) -> CosmosDbConnectionConfig:
     )
 
 
-def test_cosmosdb_connection_defaults_tls_on_and_retry_writes_off():
+def test_cosmosdb_connection_defaults_port_tls_and_retry_writes():
     """
-    Cosmos DB only accepts TLS connections and rejects retryable writes.
+    Cosmos DB listens on 10255, only accepts TLS connections and rejects retryable writes.
 
-    The config carries both as defaults, omitted from the payload because the server defaults
-    the same way for this connection type.
+    The config carries all three as defaults. `tls` and `retry_writes` are omitted from the payload
+    because the server defaults the same way for this connection type; the port is always sent.
     """
     conn = _cosmosdb_connection()
     d = conn.model_dump(exclude_none=True, by_alias=True, mode="json")
     assert d["db_type"] == "cosmosdb"
     assert d["mask_type"] == "database"
+    assert conn.port == 10255
+    assert d["port"] == 10255
     assert conn.tls is True
     assert conn.retry_writes is False
     assert "tls" not in d
