@@ -239,11 +239,12 @@ class CosmosDbConnectionConfig(MongoConnectionConfig):
     """
     Connection configuration for an Azure Cosmos DB account.
 
-    Cosmos DB listens on 10255, only accepts TLS connections and rejects retryable writes, so it
+    Cosmos DB listens on 10255, only accepts TLS connections and rejects retryable inserts, so it
     differs from `MongoConnectionConfig` by `db_type`/`database_type` and those three defaults.
 
-    They are defaults, not constraints. Setting one the other way sends it to the server, which is
-    what makes a masking run fail at write time with retryable writes on.
+    They are defaults, not constraints. Setting one the other way sends it to the server: with
+    retryable writes on, masking still runs (it only updates) but the run-history insert is
+    rejected, so the run is not recorded.
     """
 
     # Narrowing the inherited Literal is a deliberate Pydantic discriminator override.

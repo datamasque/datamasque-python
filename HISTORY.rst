@@ -8,7 +8,7 @@ History
 * Added ``CosmosDbConnectionConfig`` and the ``cosmosdb`` ``DatabaseType``, for Azure Cosmos DB.
   It differs from ``MongoConnectionConfig`` by ``db_type`` and three defaults: ``port`` 10255,
   ``tls`` on, because Cosmos DB only accepts TLS connections, and ``retry_writes`` off, because
-  Cosmos DB rejects retryable writes.
+  Cosmos DB rejects retryable inserts.
 
 * ``DatabaseConnectionConfig`` now rejects the ``documentdb`` and ``cosmosdb`` database types with a
   message naming the class to use, as it already did for MongoDB, DynamoDB, Snowflake and Databricks.
