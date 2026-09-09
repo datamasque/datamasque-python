@@ -2,6 +2,15 @@
 History
 =======
 
+1.3.1 (2026-09-09)
+------------------
+
+* Added ``max_length_unit`` to ``SchemaDiscoveryColumn``, typed by the new ``LengthUnit`` enum
+  (``chars`` or ``bytes``), reporting the unit a column's ``max_length`` is counted in.
+  It is ``None`` for results from older servers that do not report a unit.
+
+Requires server version 3.26.17
+
 1.3.0 (2026-09-04)
 ------------------
 

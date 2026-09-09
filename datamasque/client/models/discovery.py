@@ -367,6 +367,13 @@ class ReferencingForeignKey(BaseModel):
     referencing_column: str  # Dotted path: "schema.table.column".
 
 
+class LengthUnit(Enum):
+    """The unit a column's declared width (`max_length`) is counted in."""
+
+    chars = "chars"
+    bytes = "bytes"
+
+
 class SchemaDiscoveryColumn(BaseModel):
     """Column-level data in a schema discovery result."""
 
@@ -374,6 +381,8 @@ class SchemaDiscoveryColumn(BaseModel):
 
     data_type: Optional[str] = None
     max_length: Optional[int] = None
+    # None when the server does not report a unit (older runs count chars).
+    max_length_unit: Optional[LengthUnit] = None
     foreign_keys: list[ForeignKeyRef]
     discovery_matches: list[DiscoveryMatch]
     numeric_precision: Optional[int] = None

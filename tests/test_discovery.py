@@ -21,6 +21,7 @@ from datamasque.client import (
     FileRulesetGenerationRequest,
     FileRulesetGenerationWithRGConfigRequest,
     InDataDiscoveryConfig,
+    LengthUnit,
     RGConfig,
     RGConfigId,
     RulesetGenerationRequest,
@@ -793,6 +794,22 @@ def test_schema_discovery_result_parses_safe_data_preview():
     assert isinstance(preview, StringPreview)
     assert preview.sampled_from == "data/people.csv"
     assert preview.statistics_common.count_distinct == 988
+
+
+def test_schema_discovery_result_parses_max_length_unit() -> None:
+    row = _schema_discovery_row(1, "name")
+    row["data"]["max_length"] = 10
+    row["data"]["max_length_unit"] = "bytes"
+    result = SchemaDiscoveryResult.model_validate(row)
+    assert result.data.max_length == 10
+    assert result.data.max_length_unit is LengthUnit.bytes
+
+
+def test_schema_discovery_result_without_max_length_unit_is_none() -> None:
+    row = _schema_discovery_row(1, "name")
+    assert "max_length_unit" not in row["data"]
+    result = SchemaDiscoveryResult.model_validate(row)
+    assert result.data.max_length_unit is None
 
 
 def test_list_schema_discovery_results_follows_pagination(client):

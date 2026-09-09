@@ -68,31 +68,10 @@ Releasing to PyPI
    You can verify that the release appears at https://pypi.org/project/datamasque-python/,
    and Read the Docs has built the new tag
    at https://datamasque-python.readthedocs.io/.
-5. Create the GitHub Release (see below).
-
-Creating the GitHub Release
-===========================
-
-Do this after the PyPI publish has succeeded,
-so the release never points at a version nobody can install.
-
-1. On the repository home page,
-   find **Releases** in the right-hand sidebar under the *About* box,
-   and click it,
-   then **Draft a new release**.
-2. **Choose a tag** — pick the existing tag you pushed as part of releasing to PyPI.
-   Don't let GitHub create a new one; the tag should already exist from the release flow.
-3. Set the target to ``main``.
-4. Title it the same as the tag, e.g. ``v1.2.2``.
-5. Paste the ``HISTORY.rst`` entry for this version into the body, converted to Markdown.
-   **Generate release notes** is a reasonable starting point for the commit list,
-   but the hand-written changelog is what users read.
-6. Leave *Set as a pre-release* unticked for a normal release.
-7. Click **Publish release**.
-
-Creating releases can also be done from the ``gh`` CLI::
-
-    gh release create v1.2.2 --title v1.2.2 --notes-file notes.md
+5. The GitHub Release is created automatically once the PyPI publish succeeds.
+   ``release.yml`` runs a ``github-release`` job that creates the release for the pushed tag,
+   attaches the built distributions, and links to ``HISTORY.rst`` at that tag for the changelog.
+   Nothing to do by hand; just confirm it appears under **Releases** on the repository home page.
 
 Releasing a dev build to TestPyPI
 =================================
