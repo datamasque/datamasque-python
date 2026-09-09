@@ -45,6 +45,7 @@ class DatabaseType(Enum):
     snowflake = "snowflake"
     mongodb = "mongodb"
     documentdb = "documentdb"
+    cosmosdb = "cosmosdb"
     databricks_lakebase = "databricks_lakebase"
     databricks = "databricks"
     informix = "informix"
@@ -184,8 +185,11 @@ class MongoConnectionConfig(ConnectionConfig):
         password = d.pop("password", None)
         if password:
             d["dbpassword"] = password
+        # `tls` and `retry_writes` are pruned against this class's own default, not MongoDB's:
+        # the subclasses invert them, so a hardcoded comparison would drop the very value the
+        # caller set and let the server apply its default instead.
+        defaults = type(self).model_fields
         if not d.get("tls"):
-            d.pop("tls", None)
             d.pop("tls_ca_file", None)
             d.pop("tls_allow_invalid_certificates", None)
         else:
@@ -193,9 +197,11 @@ class MongoConnectionConfig(ConnectionConfig):
                 d.pop("tls_ca_file", None)
             if not d.get("tls_allow_invalid_certificates"):
                 d.pop("tls_allow_invalid_certificates", None)
+        if d.get("tls") == defaults["tls"].default:
+            d.pop("tls", None)
         if not d.get("direct_connection"):
             d.pop("direct_connection", None)
-        if d.get("retry_writes", True):
+        if d.get("retry_writes") == defaults["retry_writes"].default:
             d.pop("retry_writes", None)
         if not d.get("replica_set"):
             d.pop("replica_set", None)
@@ -227,6 +233,29 @@ class DocumentDbConnectionConfig(MongoConnectionConfig):
     @property
     def database_type(self) -> DatabaseType:
         return DatabaseType.documentdb
+
+
+class CosmosDbConnectionConfig(MongoConnectionConfig):
+    """
+    Connection configuration for an Azure Cosmos DB account.
+
+    Cosmos DB listens on 10255, only accepts TLS connections and rejects retryable inserts, so it
+    differs from `MongoConnectionConfig` by `db_type`/`database_type` and those three defaults.
+
+    They are defaults, not constraints. Setting one the other way sends it to the server: with
+    retryable writes on, masking still runs (it only updates) but the run-history insert is
+    rejected, so the run is not recorded.
+    """
+
+    # Narrowing the inherited Literal is a deliberate Pydantic discriminator override.
+    db_type: Literal["cosmosdb"] = "cosmosdb"  # type: ignore[assignment]
+    port: int = 10255
+    tls: bool = True
+    retry_writes: bool = False
+
+    @property
+    def database_type(self) -> DatabaseType:
+        return DatabaseType.cosmosdb
 
 
 class SnowflakeConnectionConfig(ConnectionConfig):
@@ -339,6 +368,10 @@ class DatabaseConnectionConfig(ConnectionConfig):
             raise ValueError("For Snowflake, use the SnowflakeConnectionConfig class instead")
         if self.database_type is DatabaseType.mongodb:
             raise ValueError("For MongoDB, use the MongoConnectionConfig class instead")
+        if self.database_type is DatabaseType.documentdb:
+            raise ValueError("For AWS DocumentDB, use the DocumentDbConnectionConfig class instead")
+        if self.database_type is DatabaseType.cosmosdb:
+            raise ValueError("For Azure Cosmos DB, use the CosmosDbConnectionConfig class instead")
         if self.database_type is DatabaseType.databricks:
             raise ValueError("For Databricks SQL Warehouse, use the DatabricksConnectionConfig class instead")
         return self
@@ -490,6 +523,7 @@ DB_TYPE_MAP: dict[str, type[ConnectionConfig]] = {
     DatabaseType.dynamodb.value: DynamoConnectionConfig,
     DatabaseType.mongodb.value: MongoConnectionConfig,
     DatabaseType.documentdb.value: DocumentDbConnectionConfig,
+    DatabaseType.cosmosdb.value: CosmosDbConnectionConfig,
     DatabaseType.snowflake.value: SnowflakeConnectionConfig,
     DatabaseType.mssql_linked.value: MssqlLinkedServerConnectionConfig,
     DatabaseType.databricks.value: DatabricksConnectionConfig,

@@ -7,6 +7,7 @@ from datamasque.client.exceptions import DataMasqueApiError, DataMasqueException
 from datamasque.client.models.connection import (
     AzureConnectionConfig,
     ConnectionId,
+    CosmosDbConnectionConfig,
     DatabaseConnectionConfig,
     DatabaseType,
     DatabricksConnectionConfig,
@@ -1360,17 +1361,85 @@ def test_connection_config_dispatch_picks_documentdb_subclass():
     assert conn.database_type is DatabaseType.documentdb
 
 
-def test_database_connection_config_rejects_mongodb_database_type():
-    """`DatabaseConnectionConfig` is for SQL engines; MongoDB users must use `MongoConnectionConfig`."""
-    with pytest.raises(ValueError, match="For MongoDB"):
+def _cosmosdb_connection(**overrides) -> CosmosDbConnectionConfig:
+    """Build a Cosmos DB config, leaving the port to the connection type's own default."""
+    return CosmosDbConnectionConfig(
+        name="cosmos",
+        host="dtq-cosmos.mongo.cosmos.azure.com",
+        database="people",
+        user="dtq-cosmos",
+        password="hunter2",
+        **overrides,
+    )
+
+
+def test_cosmosdb_connection_defaults_port_tls_and_retry_writes():
+    """
+    Cosmos DB listens on 10255, only accepts TLS connections and rejects retryable writes.
+
+    The config carries all three as defaults. `tls` and `retry_writes` are omitted from the payload
+    because the server defaults the same way for this connection type; the port is always sent.
+    """
+    conn = _cosmosdb_connection()
+    d = conn.model_dump(exclude_none=True, by_alias=True, mode="json")
+    assert d["db_type"] == "cosmosdb"
+    assert d["mask_type"] == "database"
+    assert conn.port == 10255
+    assert d["port"] == 10255
+    assert conn.tls is True
+    assert conn.retry_writes is False
+    assert "tls" not in d
+    assert "retry_writes" not in d
+    assert conn.database_type is DatabaseType.cosmosdb
+
+
+def test_cosmosdb_connection_sends_values_that_differ_from_its_own_defaults():
+    """
+    The Mongo serializer prunes a field whose value matches the default the server would apply.
+
+    Cosmos DB inverts two of MongoDB's defaults, so pruning against MongoDB's would drop exactly
+    the value the caller set and leave the server applying the opposite.
+    """
+    d = _cosmosdb_connection(tls=False, retry_writes=True).model_dump(exclude_none=True, by_alias=True, mode="json")
+    assert d["tls"] is False
+    assert d["retry_writes"] is True
+
+
+def test_connection_config_dispatch_picks_cosmosdb_subclass():
+    payload = {
+        "id": "cosmos-id-1",
+        "name": "cosmos",
+        "mask_type": "database",
+        "db_type": "cosmosdb",
+        "host": "dtq-cosmos.mongo.cosmos.azure.com",
+        "database": "people",
+    }
+    conn = validate_connection(payload)
+    assert isinstance(conn, CosmosDbConnectionConfig)
+    assert conn.database_type is DatabaseType.cosmosdb
+
+
+@pytest.mark.parametrize(
+    ("database_type", "message"),
+    [
+        (DatabaseType.mongodb, "For MongoDB"),
+        (DatabaseType.documentdb, "For AWS DocumentDB"),
+        (DatabaseType.cosmosdb, "For Azure Cosmos DB"),
+    ],
+)
+def test_database_connection_config_rejects_document_store_database_types(
+    database_type: DatabaseType, message: str
+) -> None:
+    """`DatabaseConnectionConfig` is for SQL engines; each document store has its own class."""
+    with pytest.raises(ValueError, match=message):
         DatabaseConnectionConfig(
-            name="mongo",
-            host="mongo.example",
+            name="doc-store",
+            host="doc-store.example",
             port=27017,
             database="people",
             user="alice",
             password="hunter2",
-            database_type=DatabaseType.mongodb,
+            database_type=database_type,
         )
 
 
