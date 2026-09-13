@@ -2,6 +2,18 @@
 History
 =======
 
+1.4.0 (unreleased)
+------------------
+
+* Added ``LicenseLock`` (``locked_at`` and ``editable_from``) and a read-only ``license_lock`` field on connection configs.
+  The server reports it only on instances whose license caps the number of connections,
+  once a connection's first run has finished successfully;
+  otherwise it is ``None``.
+  It is excluded when a config is serialized back to the API,
+  as it must never be sent on create or update.
+
+Requires server version 3.26.18
+
 1.3.1 (2026-09-09)
 ------------------
 
