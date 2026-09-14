@@ -1,5 +1,7 @@
 """Tests for `ConnectionClient` (CRUD + Snowflake-specific behaviour)."""
 
+from datetime import datetime, timezone
+
 import pytest
 import requests_mock
 
@@ -13,6 +15,7 @@ from datamasque.client.models.connection import (
     DatabricksConnectionConfig,
     DocumentDbConnectionConfig,
     DynamoConnectionConfig,
+    LicenseLock,
     MongoConnectionConfig,
     MountedShareConnectionConfig,
     MssqlLinkedServerConnectionConfig,
@@ -680,6 +683,68 @@ def test_s3_connection_model_validate():
     assert conn.is_file_mask_source is True
     assert conn.is_file_mask_destination is False
     assert conn.iam_role_arn == "arn:aws:iam::111122223333:role/s3-role"
+
+
+def test_connection_model_validate_parses_license_lock() -> None:
+    payload = {
+        "id": "88dabb63-aca5-4cc4-8f76-f78736a42f39",
+        "name": "s3",
+        "mask_type": "file",
+        "type": "s3_connection",
+        "base_directory": "data/",
+        "is_file_mask_source": True,
+        "is_file_mask_destination": False,
+        "bucket": "my-bucket",
+        "license_lock": {
+            "locked_at": "2026-01-01T12:00:00Z",
+            "editable_from": "2026-04-01T12:00:00Z",
+        },
+    }
+
+    conn = validate_connection(payload)
+
+    assert isinstance(conn.license_lock, LicenseLock)
+    assert conn.license_lock.locked_at == datetime(2026, 1, 1, 12, 0, tzinfo=timezone.utc)
+    assert conn.license_lock.editable_from == datetime(2026, 4, 1, 12, 0, tzinfo=timezone.utc)
+
+
+def test_connection_model_validate_null_license_lock() -> None:
+    payload = {
+        "id": "id-1",
+        "name": "s3",
+        "mask_type": "file",
+        "type": "s3_connection",
+        "base_directory": "",
+        "is_file_mask_source": True,
+        "is_file_mask_destination": False,
+        "bucket": "my-bucket",
+        "license_lock": None,
+    }
+
+    conn = validate_connection(payload)
+    assert conn.license_lock is None
+
+
+def test_license_lock_is_excluded_when_serializing() -> None:
+    # `license_lock` is server-populated and read-only, so it must never be sent back on create/update.
+    conn = S3ConnectionConfig.model_validate(
+        {
+            "id": "id-1",
+            "name": "s3",
+            "mask_type": "file",
+            "type": "s3_connection",
+            "base_directory": "",
+            "is_file_mask_source": True,
+            "is_file_mask_destination": False,
+            "bucket": "my-bucket",
+            "license_lock": {
+                "locked_at": "2026-01-01T12:00:00Z",
+                "editable_from": "2026-04-01T12:00:00Z",
+            },
+        }
+    )
+
+    assert "license_lock" not in conn.model_dump(by_alias=True, mode="json")
 
 
 def test_s3_connection_model_validate_no_iam_role():
