@@ -48,7 +48,6 @@ from datamasque.client.models.connection import (
     SalesforceConnectionConfig,
     SapAseConnectionConfig,
     SnowflakeConnectionConfig,
-    SnowflakeStageLocation,
     SseConfig,
     SseSelection,
 )
@@ -306,7 +305,6 @@ __all__ = [
     "SelectedFileData",
     "SnowflakeConnectionConfig",
     "SnowflakeKeyFile",
-    "SnowflakeStageLocation",
     "SseConfig",
     "SseSelection",
     "SslZipFile",

@@ -5,6 +5,15 @@ History
 1.5.0 (2026-10-07)
 ------------------
 
+* **Breaking:** Snowflake masking now stages inside Snowflake, so ``SnowflakeConnectionConfig``
+  no longer has the external staging fields ``s3_bucket_name``, ``iam_role_arn``,
+  ``snowflake_azure_container_name``, ``snowflake_azure_connection_string``,
+  ``snowflake_azure_connection_string_encrypted`` and ``snowflake_storage_integration_name``.
+  ``snowflake_stage_location`` and the ``SnowflakeStageLocation`` enum are removed: the server
+  detects a Snowflake SPCS deployment from its own environment, so the client no longer states it.
+* Snowflake connections listed from an older server still parse: the removed fields and
+  ``snowflake_stage_location`` are dropped rather than raising a validation error, and are not sent
+  back on ``create_or_update_connection``.
 * Added ``GcsConnectionConfig`` for Google Cloud Storage file connections (``type: gcs_connection``),
   with ``bucket`` and ``service_account_key``:
   the contents of a service account's JSON key file, or the ARN of an AWS Secrets Manager secret that holds it.

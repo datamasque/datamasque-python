@@ -8,7 +8,6 @@ from datamasque.client.models.connection import (
     DatabaseType,
     S3ConnectionConfig,
     SnowflakeConnectionConfig,
-    SnowflakeStageLocation,
 )
 
 fake = Faker()
@@ -117,44 +116,12 @@ def make_ok_response() -> Response:
     return response
 
 
-def snowflake_connection_config_s3():
+def snowflake_connection_config():
     return SnowflakeConnectionConfig(
-        name="snowflake_s3",
+        name="snowflake",
         database="test_db",
         user="snowflake_user",
         snowflake_account_id="ACCOUNT-123",
         snowflake_warehouse="test_warehouse",
-        snowflake_storage_integration_name="test_integration",
         password="test_password",
-        snowflake_stage_location=SnowflakeStageLocation.aws_s3,
-        s3_bucket_name="test-bucket",
-        iam_role_arn="arn:aws:iam::123456789012:role/test-role",
-    )
-
-
-def snowflake_connection_config_azure():
-    return SnowflakeConnectionConfig(
-        name="snowflake_azure",
-        database="test_db",
-        user="snowflake_user",
-        snowflake_account_id="ACCOUNT-456",
-        snowflake_warehouse="test_warehouse",
-        snowflake_storage_integration_name="test_integration",
-        password="test_password",
-        snowflake_stage_location=SnowflakeStageLocation.azure_blob_storage,
-        snowflake_azure_container_name="test-container",
-        snowflake_azure_connection_string="DefaultEndpointsProtocol=https;AccountName=test;AccountKey=test",
-    )
-
-
-def snowflake_connection_config_local():
-    return SnowflakeConnectionConfig(
-        name="snowflake_local",
-        database="test_db",
-        user="snowflake_user",
-        snowflake_account_id="ACCOUNT-789",
-        snowflake_warehouse="test_warehouse",
-        snowflake_storage_integration_name="test_integration",
-        password="test_password",
-        snowflake_stage_location=SnowflakeStageLocation.local,
     )
