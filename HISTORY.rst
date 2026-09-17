@@ -2,6 +2,23 @@
 History
 =======
 
+1.4.0 (2026-09-17)
+------------------
+
+* **Breaking:** Snowflake masking now stages inside Snowflake, so ``SnowflakeConnectionConfig``
+  no longer has the external staging fields ``s3_bucket_name``, ``iam_role_arn``,
+  ``snowflake_azure_container_name``, ``snowflake_azure_connection_string``,
+  ``snowflake_azure_connection_string_encrypted`` and ``snowflake_storage_integration_name``,
+  and ``SnowflakeStageLocation`` no longer has the ``local``, ``aws_s3`` and ``azure_blob_storage``
+  members. ``snowflake_stage_location`` is now either ``SnowflakeStageLocation.spcs``, for
+  DataMasque running inside Snowflake SPCS, or ``None``.
+
+* Snowflake connections listed from an older server still parse: the removed fields and any
+  external stage location are dropped rather than raising a validation error, and are not sent back
+  on ``create_or_update_connection``.
+
+Requires server version 3.26.18
+
 1.3.1 (2026-09-09)
 ------------------
 
