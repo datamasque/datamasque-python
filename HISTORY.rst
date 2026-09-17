@@ -2,6 +2,14 @@
 History
 =======
 
+1.3.2 (2026-09-17)
+------------------
+
+* Added ``unlicensed_feature_warnings`` to ``Ruleset``, naming the features the ruleset uses
+  that the server's license does not allow.
+
+Requires server version 3.26.18
+
 1.3.1 (2026-09-09)
 ------------------
 

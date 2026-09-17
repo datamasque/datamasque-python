@@ -177,6 +177,86 @@ def test_create_or_update_ruleset_validation_errors_empty_when_valid(client, rul
     assert result.validation_errors == []
 
 
+UNSTRUCTURED_WARNING = "Foundation license does not allow Unstructured Masking. Upgrade to Enterprise."
+SUBSETTING_WARNING = "Foundation license does not allow Subsetting. Upgrade to Enterprise."
+
+
+@pytest.mark.parametrize(
+    ("returned", "expected"),
+    [
+        ([UNSTRUCTURED_WARNING, SUBSETTING_WARNING], [UNSTRUCTURED_WARNING, SUBSETTING_WARNING]),
+        ([], []),
+        (None, None),
+    ],
+    ids=["warned", "fully_licensed", "not_yet_known"],
+)
+def test_create_or_update_ruleset_populates_unlicensed_feature_warnings(client, ruleset, returned, expected):
+    """Every warning the server sends is carried, and an empty list stays distinct from `None`."""
+    with requests_mock.Mocker() as m:
+        m.post(
+            "http://test-server/api/rulesets/?upsert=true",
+            json={"id": "2", "name": "test_ruleset", "is_valid": "valid", "unlicensed_feature_warnings": returned},
+            status_code=201,
+        )
+        result = client.create_or_update_ruleset(ruleset)
+
+    assert result.unlicensed_feature_warnings == expected
+
+
+def test_create_or_update_ruleset_unlicensed_feature_warnings_default_to_none(client, ruleset):
+    """A server that omits the field leaves the warnings unknown rather than empty."""
+    with requests_mock.Mocker() as m:
+        m.post(
+            "http://test-server/api/rulesets/?upsert=true",
+            json={"id": "2", "name": "test_ruleset", "is_valid": "in_progress"},
+            status_code=201,
+        )
+        result = client.create_or_update_ruleset(ruleset)
+
+    assert result.unlicensed_feature_warnings is None
+
+
+def test_list_rulesets_unlicensed_feature_warnings(client):
+    """Each listed ruleset carries its own `unlicensed_feature_warnings`, including `None` for an unvalidated one."""
+    with requests_mock.Mocker() as m:
+        m.get(
+            "http://test-server/api/v2/rulesets/",
+            json=[
+                {
+                    "id": "1",
+                    "name": "unstructured_ruleset",
+                    "mask_type": "database",
+                    "is_valid": "valid",
+                    "unlicensed_feature_warnings": [
+                        "Foundation license does not allow Unstructured Masking. Upgrade to Enterprise."
+                    ],
+                },
+                {
+                    "id": "2",
+                    "name": "licensed_ruleset",
+                    "mask_type": "database",
+                    "is_valid": "valid",
+                    "unlicensed_feature_warnings": [],
+                },
+                {
+                    "id": "3",
+                    "name": "unvalidated_ruleset",
+                    "mask_type": "database",
+                    "is_valid": "in_progress",
+                    "unlicensed_feature_warnings": None,
+                },
+            ],
+            status_code=200,
+        )
+        rulesets = client.list_rulesets()
+
+    assert rulesets[0].unlicensed_feature_warnings == [
+        "Foundation license does not allow Unstructured Masking. Upgrade to Enterprise."
+    ]
+    assert rulesets[1].unlicensed_feature_warnings == []
+    assert rulesets[2].unlicensed_feature_warnings is None
+
+
 def test_create_or_update_ruleset_does_not_send_read_only_fields(client, ruleset):
     """Read-only server fields must never be echoed back into a re-submit's request body."""
     with requests_mock.Mocker() as m:
@@ -187,6 +267,9 @@ def test_create_or_update_ruleset_does_not_send_read_only_fields(client, ruleset
                 "name": "test_ruleset",
                 "is_valid": "invalid",
                 "validation_errors": [{"message": "bad", "validation_error_type": "ruleset"}],
+                "unlicensed_feature_warnings": [
+                    "Foundation license does not allow Unstructured Masking. Upgrade to Enterprise."
+                ],
             },
             status_code=201,
         )
@@ -196,7 +279,7 @@ def test_create_or_update_ruleset_does_not_send_read_only_fields(client, ruleset
         client.create_or_update_ruleset(ruleset)
 
     body = m.last_request.json()
-    for read_only_field in ("id", "is_valid", "validation_errors"):
+    for read_only_field in ("id", "is_valid", "validation_errors", "unlicensed_feature_warnings"):
         assert read_only_field not in body
     # Input fields are still present.
     assert body["config_yaml"] == "version: '1.0'\ntasks: []"
