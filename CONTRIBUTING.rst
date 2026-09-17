@@ -149,6 +149,12 @@ Pull requests
 5. Open a PR against ``main`` and describe what the change does and why.
 6. The maintainers will review and either merge, request changes, or close with an explanation.
 
+Changelog
+=========
+
+Create a new version heading in ``HISTORY.rst``,
+and add one concise bullet point for each high-level change.
+
 Commit messages
 ===============
 

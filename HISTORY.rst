@@ -11,6 +11,8 @@ History
   otherwise it is ``None``.
   It is excluded when a config is serialized back to the API,
   as it must never be sent on create or update.
+* Added ``unlicensed_feature_warnings`` to ``Ruleset`` and ``RulesetLibrary``, naming the features each uses
+  that the server's license does not allow.
 
 Requires server version 3.26.18
 
