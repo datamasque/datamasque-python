@@ -44,7 +44,6 @@ from datamasque.client.models.connection import (
     MssqlLinkedServerConnectionConfig,
     S3ConnectionConfig,
     SnowflakeConnectionConfig,
-    SnowflakeStageLocation,
     SseConfig,
     SseSelection,
 )
@@ -298,7 +297,6 @@ __all__ = [
     "SelectedFileData",
     "SnowflakeConnectionConfig",
     "SnowflakeKeyFile",
-    "SnowflakeStageLocation",
     "SseConfig",
     "SseSelection",
     "SslZipFile",
