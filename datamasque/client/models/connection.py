@@ -1,5 +1,6 @@
 """Connection configuration models for the DataMasque API."""
 
+from datetime import datetime
 from enum import Enum
 from typing import Any, Callable, Literal, NewType, Optional
 
@@ -99,6 +100,21 @@ class SseConfig(BaseModel):
         return self
 
 
+class LicenseLock(BaseModel):
+    """
+    Read-only license-lock metadata for a connection.
+
+    The server reports this only on instances whose license has a finite connection cap,
+    once the connection's first run has finished successfully;
+    otherwise it is `null`.
+    """
+
+    model_config = ConfigDict(extra="allow")
+
+    locked_at: datetime
+    editable_from: datetime
+
+
 class ConnectionConfig(BaseModel):
     """
     Base class for all connection configurations.
@@ -111,6 +127,8 @@ class ConnectionConfig(BaseModel):
 
     name: str
     id: Optional[ConnectionId] = None
+    # Server-populated and read-only, so it is excluded when serializing a config back to the API.
+    license_lock: Optional[LicenseLock] = Field(default=None, exclude=True)
 
 
 class DynamoConnectionConfig(ConnectionConfig):
