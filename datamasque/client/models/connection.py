@@ -2,7 +2,7 @@
 
 from datetime import datetime
 from enum import Enum
-from typing import Annotated, Any, Callable, Literal, NewType, Optional
+from typing import Any, Callable, Literal, NewType, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, model_serializer, model_validator
 
@@ -128,7 +128,7 @@ class ConnectionConfig(BaseModel):
     name: str
     id: Optional[ConnectionId] = None
     # Server-populated and read-only, so it is excluded when serializing a config back to the API.
-    license_lock: Annotated[Optional[LicenseLock], Field(exclude=True)] = None
+    license_lock: Optional[LicenseLock] = Field(default=None, exclude=True)
 
 
 class DynamoConnectionConfig(ConnectionConfig):
