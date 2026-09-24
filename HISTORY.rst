@@ -11,8 +11,16 @@ History
   otherwise it is ``None``.
   It is excluded when a config is serialized back to the API,
   as it must never be sent on create or update.
+
 * Added ``unlicensed_feature_warnings`` to ``Ruleset`` and ``RulesetLibrary``, naming the features each uses
   that the server's license does not allow.
+
+* Added read-only ``target_frozen``, ``frozen_target_fields`` and ``deletion_frozen`` fields on connection configs.
+  ``target_frozen`` is ``True`` while the connection's protected fields are locked under the license edit lock,
+  ``frozen_target_fields`` lists those locked field names (empty when not frozen),
+  and ``deletion_frozen`` is whether deleting the connection is currently blocked
+  (it can differ from ``target_frozen``: deletion stays allowed while over the connection cap).
+  All three are excluded when a config is serialized back to the API.
 
 Requires server version 3.26.18
 

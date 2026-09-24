@@ -129,6 +129,13 @@ class ConnectionConfig(BaseModel):
     id: Optional[ConnectionId] = None
     # Server-populated and read-only, so it is excluded when serializing a config back to the API.
     license_lock: Optional[LicenseLock] = Field(default=None, exclude=True)
+    # Whether the connection's protected fields are currently locked under the license edit lock.
+    target_frozen: bool = Field(default=False, exclude=True)
+    # The protected field names currently locked; empty when `target_frozen` is False.
+    frozen_target_fields: list[str] = Field(default_factory=list, exclude=True)
+    # Whether deleting the connection is currently blocked. Not always equal to `target_frozen`:
+    # deletion stays allowed while over the connection cap, so a downgrade can be recovered from.
+    deletion_frozen: bool = Field(default=False, exclude=True)
 
 
 class DynamoConnectionConfig(ConnectionConfig):

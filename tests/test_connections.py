@@ -726,6 +726,49 @@ def test_connection_model_validate_null_license_lock() -> None:
     assert conn.license_lock is None
 
 
+def test_connection_model_validate_parses_freeze_fields() -> None:
+    payload = {
+        "id": "db-1",
+        "name": "pg",
+        "mask_type": "database",
+        "db_type": "postgres",
+        "host": "h",
+        "port": 5432,
+        "database": "d",
+        "user": "u",
+        "schema": "public",
+        "target_frozen": True,
+        "frozen_target_fields": ["host", "port"],
+        "deletion_frozen": True,
+    }
+
+    conn = validate_connection(payload)
+
+    assert conn.target_frozen is True
+    assert conn.frozen_target_fields == ["host", "port"]
+    assert conn.deletion_frozen is True
+
+
+def test_connection_freeze_fields_default_when_absent() -> None:
+    payload = {
+        "id": "db-1",
+        "name": "pg",
+        "mask_type": "database",
+        "db_type": "postgres",
+        "host": "h",
+        "port": 5432,
+        "database": "d",
+        "user": "u",
+        "schema": "public",
+    }
+
+    conn = validate_connection(payload)
+
+    assert conn.target_frozen is False
+    assert conn.frozen_target_fields == []
+    assert conn.deletion_frozen is False
+
+
 _LICENSE_LOCK_PAYLOAD = {"locked_at": "2026-01-01T12:00:00Z", "editable_from": "2026-04-01T12:00:00Z"}
 
 
@@ -816,12 +859,25 @@ _LICENSE_LOCK_PAYLOAD = {"locked_at": "2026-01-01T12:00:00Z", "editable_from": "
         ),
     ],
 )
-def test_license_lock_is_excluded_when_serializing(config_class: type[ConnectionConfig], payload: dict) -> None:
-    # `license_lock` is server-populated and read-only, so it must never be sent back on create/update.
-    # Cover the subclasses with custom `@model_serializer` overrides, not just the default serializer.
-    conn = config_class.model_validate({**payload, "license_lock": _LICENSE_LOCK_PAYLOAD})
+def test_read_only_server_fields_are_excluded_when_serializing(
+    config_class: type[ConnectionConfig], payload: dict
+) -> None:
+    # `license_lock` and the target-freeze fields are server-populated and read-only, so they must
+    # never be sent back on create/update. Cover the subclasses with custom `@model_serializer`
+    # overrides, not just the default serializer.
+    conn = config_class.model_validate(
+        {
+            **payload,
+            "license_lock": _LICENSE_LOCK_PAYLOAD,
+            "target_frozen": True,
+            "frozen_target_fields": ["host"],
+            "deletion_frozen": True,
+        }
+    )
 
-    assert "license_lock" not in conn.model_dump(by_alias=True, mode="json")
+    dumped = conn.model_dump(by_alias=True, mode="json")
+    for field in ("license_lock", "target_frozen", "frozen_target_fields", "deletion_frozen"):
+        assert field not in dumped
 
 
 def test_s3_connection_model_validate_no_iam_role():
