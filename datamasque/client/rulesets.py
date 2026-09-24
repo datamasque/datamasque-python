@@ -20,7 +20,7 @@ class RulesetClient(BaseClient):
         """
         Creates or updates a ruleset.
 
-        Populates the given ruleset's `id`, `is_valid`, `validation_errors`,
+        Populates the given ruleset's `id`, `is_valid`, `validation_errors`, `unlicensed_feature_warnings`,
         and `git` fields from the server response, and returns the same ruleset instance for convenience.
         """
 
@@ -30,6 +30,7 @@ class RulesetClient(BaseClient):
         ruleset.id = created.id
         ruleset.is_valid = created.is_valid
         ruleset.validation_errors = created.validation_errors
+        ruleset.unlicensed_feature_warnings = created.unlicensed_feature_warnings
         ruleset.git = created.git
 
         if response.status_code == 201:
