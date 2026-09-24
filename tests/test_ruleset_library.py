@@ -1,7 +1,7 @@
 """Tests for ruleset library support in the DataMasque client."""
 
 from datetime import datetime
-from typing import Any
+from typing import Any, Optional
 
 import pytest
 import requests_mock
@@ -739,3 +739,37 @@ def test_create_ruleset_library_collapses_git_snapshot(
     assert result.git.commit_sha == "abc123"
     assert result.git.repo_url == "https://git.example.com/repo.git"
     assert result.git.synced_at == datetime.fromisoformat("2025-06-01T10:00:00+00:00")
+
+
+UNSTRUCTURED_WARNING = "Foundation license does not allow Unstructured Masking. Upgrade to Enterprise."
+
+
+@pytest.mark.parametrize("returned", [[UNSTRUCTURED_WARNING], [], None])
+def test_create_and_update_ruleset_library_populate_unlicensed_feature_warnings(
+    client: DataMasqueClient, ruleset_library: RulesetLibrary, returned: Optional[list[str]]
+) -> None:
+    """`None` (not yet validated) stays distinct from `[]` (no warnings) on both the create and the update path."""
+    response = {
+        "id": LIBRARY_ID_1,
+        "name": "test_library",
+        "namespace": "test_ns",
+        "config_yaml": "version: '1.0'\nfunctions: []",
+        "is_valid": "valid",
+        "unlicensed_feature_warnings": returned,
+        "created": "2025-06-01T10:00:00Z",
+        "modified": "2025-06-01T10:00:00Z",
+    }
+
+    with requests_mock.Mocker() as m:
+        m.post("http://test-server/api/ruleset-libraries/", json=response, status_code=201)
+        m.put(f"http://test-server/api/ruleset-libraries/{LIBRARY_ID_1}/", json=response)
+
+        created = client.create_ruleset_library(ruleset_library)
+        assert created.unlicensed_feature_warnings == returned
+        assert "unlicensed_feature_warnings" not in m.last_request.json()
+
+        created.unlicensed_feature_warnings = ["stale"]
+        updated = client.update_ruleset_library(created)
+
+    assert updated.unlicensed_feature_warnings == returned
+    assert "unlicensed_feature_warnings" not in m.last_request.json()

@@ -1,5 +1,6 @@
 """Connection configuration models for the DataMasque API."""
 
+from datetime import datetime
 from enum import Enum
 from typing import Any, Callable, Literal, NewType, Optional
 
@@ -99,6 +100,22 @@ class SseConfig(BaseModel):
         return self
 
 
+class LicenseLock(BaseModel):
+    """
+    Read-only license-lock metadata for a connection.
+
+    The server reports this only on instances whose license has a finite connection cap
+    and counts this connection's type against that cap,
+    once the connection's first run has finished successfully;
+    otherwise it is `null`.
+    """
+
+    model_config = ConfigDict(extra="allow")
+
+    locked_at: datetime
+    editable_from: datetime
+
+
 class ConnectionConfig(BaseModel):
     """
     Base class for all connection configurations.
@@ -111,6 +128,16 @@ class ConnectionConfig(BaseModel):
 
     name: str
     id: Optional[ConnectionId] = None
+    # Server-populated and read-only, so it is excluded when serializing a config back to the API.
+    license_lock: Optional[LicenseLock] = Field(default=None, exclude=True)
+    # Whether the connection's protected fields are currently locked under the license edit lock.
+    target_frozen: bool = Field(default=False, exclude=True)
+    # The protected fields currently locked, as server config keys (e.g. `schema`, not `db_schema`);
+    # empty when `target_frozen` is False.
+    frozen_target_fields: list[str] = Field(default_factory=list, exclude=True)
+    # Whether deleting the connection is currently blocked. Not always equal to `target_frozen`:
+    # deletion stays allowed while over the connection cap, so a downgrade can be recovered from.
+    deletion_frozen: bool = Field(default=False, exclude=True)
 
 
 class DynamoConnectionConfig(ConnectionConfig):

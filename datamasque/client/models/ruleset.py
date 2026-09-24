@@ -46,3 +46,10 @@ class Ruleset(GitTrackedEntity):
     is_valid: Optional[ValidationStatus] = Field(default=None, exclude=True)
     validation_errors: list[ValidationErrorDetails] = Field(default_factory=list, exclude=True)
     """Validation errors surfaced by the server; empty when valid."""
+    unlicensed_feature_warnings: Optional[list[str]] = Field(default=None, exclude=True)
+    """
+    At most one sentence, naming every feature the ruleset uses that the server's license does not allow.
+    Empty when the ruleset needs nothing its license withholds,
+    and `None` when the server does not know which features the ruleset uses, for example before it has passed
+    validation. `None` is not the same as having no warnings.
+    """

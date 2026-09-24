@@ -1,11 +1,14 @@
 """Tests for `ConnectionClient` (CRUD + Snowflake-specific behaviour)."""
 
+from datetime import datetime, timezone
+
 import pytest
 import requests_mock
 
 from datamasque.client.exceptions import DataMasqueApiError, DataMasqueException
 from datamasque.client.models.connection import (
     AzureConnectionConfig,
+    ConnectionConfig,
     ConnectionId,
     CosmosDbConnectionConfig,
     DatabaseConnectionConfig,
@@ -13,6 +16,7 @@ from datamasque.client.models.connection import (
     DatabricksConnectionConfig,
     DocumentDbConnectionConfig,
     DynamoConnectionConfig,
+    LicenseLock,
     MongoConnectionConfig,
     MountedShareConnectionConfig,
     MssqlLinkedServerConnectionConfig,
@@ -680,6 +684,200 @@ def test_s3_connection_model_validate():
     assert conn.is_file_mask_source is True
     assert conn.is_file_mask_destination is False
     assert conn.iam_role_arn == "arn:aws:iam::111122223333:role/s3-role"
+
+
+def test_connection_model_validate_parses_license_lock() -> None:
+    payload = {
+        "id": "88dabb63-aca5-4cc4-8f76-f78736a42f39",
+        "name": "s3",
+        "mask_type": "file",
+        "type": "s3_connection",
+        "base_directory": "data/",
+        "is_file_mask_source": True,
+        "is_file_mask_destination": False,
+        "bucket": "my-bucket",
+        "license_lock": {
+            "locked_at": "2026-01-01T12:00:00Z",
+            "editable_from": "2026-04-01T12:00:00Z",
+        },
+    }
+
+    conn = validate_connection(payload)
+
+    assert isinstance(conn.license_lock, LicenseLock)
+    assert conn.license_lock.locked_at == datetime(2026, 1, 1, 12, 0, tzinfo=timezone.utc)
+    assert conn.license_lock.editable_from == datetime(2026, 4, 1, 12, 0, tzinfo=timezone.utc)
+
+
+def test_connection_model_validate_null_license_lock() -> None:
+    payload = {
+        "id": "id-1",
+        "name": "s3",
+        "mask_type": "file",
+        "type": "s3_connection",
+        "base_directory": "",
+        "is_file_mask_source": True,
+        "is_file_mask_destination": False,
+        "bucket": "my-bucket",
+        "license_lock": None,
+    }
+
+    conn = validate_connection(payload)
+    assert conn.license_lock is None
+
+
+def test_connection_model_validate_parses_freeze_fields() -> None:
+    payload = {
+        "id": "db-1",
+        "name": "pg",
+        "mask_type": "database",
+        "db_type": "postgres",
+        "host": "h",
+        "port": 5432,
+        "database": "d",
+        "user": "u",
+        "schema": "public",
+        "target_frozen": True,
+        "frozen_target_fields": ["host", "port"],
+        "deletion_frozen": True,
+    }
+
+    conn = validate_connection(payload)
+
+    assert conn.target_frozen is True
+    assert conn.frozen_target_fields == ["host", "port"]
+    assert conn.deletion_frozen is True
+
+
+def test_connection_freeze_fields_default_when_absent() -> None:
+    payload = {
+        "id": "db-1",
+        "name": "pg",
+        "mask_type": "database",
+        "db_type": "postgres",
+        "host": "h",
+        "port": 5432,
+        "database": "d",
+        "user": "u",
+        "schema": "public",
+    }
+
+    conn = validate_connection(payload)
+
+    assert conn.target_frozen is False
+    assert conn.frozen_target_fields == []
+    assert conn.deletion_frozen is False
+
+
+_LICENSE_LOCK_PAYLOAD = {"locked_at": "2026-01-01T12:00:00Z", "editable_from": "2026-04-01T12:00:00Z"}
+
+
+@pytest.mark.parametrize(
+    "config_class, payload",
+    [
+        # Default serializer.
+        (
+            S3ConnectionConfig,
+            {
+                "id": "id-1",
+                "name": "s3",
+                "mask_type": "file",
+                "type": "s3_connection",
+                "base_directory": "",
+                "is_file_mask_source": True,
+                "is_file_mask_destination": False,
+                "bucket": "my-bucket",
+            },
+        ),
+        # Each subclass below overrides `@model_serializer`, so exclusion must be proven for each.
+        (
+            DatabaseConnectionConfig,
+            {
+                "id": "db-1",
+                "name": "pg",
+                "mask_type": "database",
+                "db_type": "postgres",
+                "host": "h",
+                "port": 5432,
+                "database": "d",
+                "user": "u",
+                "schema": "public",
+                "is_read_only": False,
+            },
+        ),
+        (
+            DynamoConnectionConfig,
+            {
+                "id": "dyn-1",
+                "name": "dyn",
+                "mask_type": "database",
+                "db_type": "dynamo_db",
+                "s3_bucket_name": "bucket",
+                "dynamo_append_datetime": False,
+                "dynamo_append_suffix": "-masked",
+                "dynamo_replace_tables": True,
+                "dynamo_default_region": "us-east-1",
+            },
+        ),
+        (
+            MongoConnectionConfig,
+            {
+                "id": "mongo-1",
+                "name": "mongo",
+                "mask_type": "database",
+                "db_type": "mongodb",
+                "host": "mongo.example",
+                "port": 27017,
+                "database": "people",
+                "user": "alice",
+                "auth_source": "admin",
+                "tls": True,
+                "direct_connection": False,
+                "replica_set": "rs0",
+                "is_read_only": False,
+            },
+        ),
+        (
+            SnowflakeConnectionConfig,
+            {
+                "id": "sf-1",
+                "name": "snowflake",
+                "mask_type": "database",
+                "db_type": "snowflake",
+                "user": "snowman",
+                "database": "icicle",
+                "snowflake_account_id": "ABCDEF-123456",
+                "snowflake_warehouse": "warehouse1",
+                "snowflake_storage_integration_name": "mysi",
+                "host": "snowflake.com",
+                "port": 443,
+                "s3_bucket_name": "ice-bucket",
+                "iam_role_arn": "role",
+                "snowflake_stage_location": "aws_s3",
+                "is_read_only": False,
+            },
+        ),
+    ],
+)
+def test_read_only_server_fields_are_excluded_when_serializing(
+    config_class: type[ConnectionConfig], payload: dict
+) -> None:
+    # `license_lock` and the target-freeze fields are server-populated and read-only, so they must
+    # never be sent back on create/update. Cover the subclasses with custom `@model_serializer`
+    # overrides, not just the default serializer.
+    conn = config_class.model_validate(
+        {
+            **payload,
+            "license_lock": _LICENSE_LOCK_PAYLOAD,
+            "target_frozen": True,
+            "frozen_target_fields": ["host"],
+            "deletion_frozen": True,
+        }
+    )
+
+    dumped = conn.model_dump(by_alias=True, mode="json")
+    for field in ("license_lock", "target_frozen", "frozen_target_fields", "deletion_frozen"):
+        assert field not in dumped
 
 
 def test_s3_connection_model_validate_no_iam_role():
