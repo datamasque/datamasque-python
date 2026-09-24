@@ -23,8 +23,10 @@ class RulesetLibrary(GitTrackedEntity):
     """Validation errors surfaced by the server; empty when valid."""
     unlicensed_feature_warnings: Optional[list[str]] = Field(default=None, exclude=True)
     """
-    One sentence per feature the library uses that the server's license does not allow.
-    Empty when the license allows every feature, and `None` until the library has passed validation.
+    At most one sentence, naming every feature the library uses that the server's license does not allow.
+    Empty when the license allows every feature,
+    and `None` when the server does not know which features the library uses, for example before it has passed
+    validation.
     """
     created: Optional[datetime] = Field(default=None, exclude=True)
     modified: Optional[datetime] = Field(default=None, exclude=True)

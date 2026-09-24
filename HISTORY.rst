@@ -6,18 +6,19 @@ History
 ------------------
 
 * Added ``LicenseLock`` (``locked_at`` and ``editable_from``) and a read-only ``license_lock`` field on connection configs.
-  The server reports it only on instances whose license caps the number of connections,
+  The server reports it only on instances whose license caps the number of connections
+  and counts that connection's type against the cap,
   once a connection's first run has finished successfully;
   otherwise it is ``None``.
   It is excluded when a config is serialized back to the API,
   as it must never be sent on create or update.
 
-* Added ``unlicensed_feature_warnings`` to ``Ruleset`` and ``RulesetLibrary``, naming the features each uses
-  that the server's license does not allow.
+* Added ``unlicensed_feature_warnings`` to ``Ruleset`` and ``RulesetLibrary``: at most one sentence naming the features
+  each uses that the server's license does not allow.
 
 * Added read-only ``target_frozen``, ``frozen_target_fields`` and ``deletion_frozen`` fields on connection configs.
   ``target_frozen`` is ``True`` while the connection's protected fields are locked under the license edit lock,
-  ``frozen_target_fields`` lists those locked field names (empty when not frozen),
+  ``frozen_target_fields`` lists those locked fields as server config keys, such as ``schema`` (empty when not frozen),
   and ``deletion_frozen`` is whether deleting the connection is currently blocked
   (it can differ from ``target_frozen``: deletion stays allowed while over the connection cap).
   All three are excluded when a config is serialized back to the API.
