@@ -53,15 +53,6 @@ class DatabaseType(Enum):
     saphana = "saphana"
 
 
-class SnowflakeStageLocation(str, Enum):
-    """Storage backend for a Snowflake connection's external stage."""
-
-    local = "local"  # Not supported for production use
-    aws_s3 = "aws_s3"
-    azure_blob_storage = "azure_blob_storage"
-    spcs = "spcs"  # DataMasque running inside Snowflake SPCS; staged on the container's own storage
-
-
 class SseSelection(Enum):
     """Mirrors the available options in the AWS console for DynamoDB Server-Side Encryption."""
 
@@ -285,6 +276,19 @@ class CosmosDbConnectionConfig(MongoConnectionConfig):
         return DatabaseType.cosmosdb
 
 
+# Servers before 3.26.18 still return these on Snowflake connections. With `extra="allow"`
+# they would be sent back on create/update unless dropped here.
+_SNOWFLAKE_EXTERNAL_STAGE_KEYS = (
+    "s3_bucket_name",
+    "iam_role_arn",
+    "snowflake_azure_container_name",
+    "snowflake_azure_connection_string",
+    "snowflake_azure_connection_string_encrypted",
+    "snowflake_storage_integration_name",
+    "snowflake_stage_location",
+)
+
+
 class SnowflakeConnectionConfig(ConnectionConfig):
     """
     Connection configuration for a Snowflake database.
@@ -294,14 +298,14 @@ class SnowflakeConnectionConfig(ConnectionConfig):
     """
 
     database: str
-    # Optional because DataMasque-in-SPCS connections leave these unset: the agent uses the
-    # container's OAuth token + SNOWFLAKE_HOST/SNOWFLAKE_ACCOUNT env and the app-owned QUERY_WAREHOUSE,
-    # so user/account/storage-integration/warehouse are null for stage_location=spcs. Mirrors the app's
-    # canonical model (agent .../schemas/connection/connection.py), which types these `| None = None`.
+    # Optional because connections leave these unset when DataMasque runs inside Snowflake SPCS:
+    # the server detects SPCS from its environment and the agent uses the container's OAuth token,
+    # the SNOWFLAKE_HOST/SNOWFLAKE_ACCOUNT env and the app-owned QUERY_WAREHOUSE, so user/account/
+    # warehouse are None. Mirrors the app's canonical model
+    # (agent .../schemas/connection/connection.py), which types these `| None = None`.
     user: Optional[str] = None
     snowflake_account_id: Optional[str] = None
     snowflake_warehouse: Optional[str] = None
-    snowflake_storage_integration_name: Optional[str] = None
     host: str = ""
     port: Optional[int] = None
     db_schema: Optional[str] = Field(default=None, alias="schema")
@@ -310,12 +314,6 @@ class SnowflakeConnectionConfig(ConnectionConfig):
     password: Optional[str] = None
     snowflake_private_key: Optional[FileId] = None
     snowflake_private_key_passphrase: Optional[str] = None
-    snowflake_stage_location: Optional[SnowflakeStageLocation] = None
-    s3_bucket_name: Optional[str] = None
-    iam_role_arn: Optional[str] = None
-    snowflake_azure_container_name: Optional[str] = None
-    snowflake_azure_connection_string: Optional[str] = None
-    snowflake_azure_connection_string_encrypted: Optional[str] = None
 
     mask_type: Literal["database"] = "database"
     db_type: Literal["snowflake"] = "snowflake"
@@ -338,9 +336,9 @@ class SnowflakeConnectionConfig(ConnectionConfig):
 
     @model_validator(mode="before")
     @classmethod
-    def _strip_encrypted_password(cls, data: dict) -> dict:
+    def _strip_server_only_fields(cls, data: dict) -> dict:
         if isinstance(data, dict):
-            for key in ("password_encrypted", "dbpassword"):
+            for key in ("password_encrypted", "dbpassword", *_SNOWFLAKE_EXTERNAL_STAGE_KEYS):
                 data.pop(key, None)
         return data
 
