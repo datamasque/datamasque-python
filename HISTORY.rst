@@ -2,7 +2,7 @@
 History
 =======
 
-1.4.0 (unreleased)
+1.4.0 (2026-09-25)
 ------------------
 
 * Added ``LicenseLock`` (``locked_at`` and ``editable_from``) and a read-only ``license_lock`` field on connection configs.
