@@ -16,6 +16,7 @@ from datamasque.client.models.connection import (
     DatabricksConnectionConfig,
     DocumentDbConnectionConfig,
     DynamoConnectionConfig,
+    GcsConnectionConfig,
     LicenseLock,
     MongoConnectionConfig,
     MountedShareConnectionConfig,
@@ -979,6 +980,45 @@ def test_azure_connection_model_validate_blanks_encrypted_connection_string():
     assert conn.container == "mycontainer"
     assert conn.connection_string is None
     assert conn.id == "490502e5-5bf6-4abb-b67b-c6091d40ecf0"
+
+
+def test_gcs_connection_model_validate_blanks_encrypted_service_account_key():
+    payload = {
+        "id": "0f9f5d2e-8d1a-4a1f-9f57-3f2c1b0c9a11",
+        "name": "gcs",
+        "mask_type": "file",
+        "type": "gcs_connection",
+        "base_directory": "inbound",
+        "bucket": "my-gcs-bucket",
+        "is_file_mask_source": True,
+        "is_file_mask_destination": False,
+        # The API only returns the encrypted form; the plaintext is never sent back.
+        "service_account_key_encrypted": "some_base64_here",
+    }
+
+    conn = validate_connection(payload)
+
+    assert isinstance(conn, GcsConnectionConfig)
+    assert conn.bucket == "my-gcs-bucket"
+    assert conn.base_directory == "inbound"
+    assert conn.service_account_key is None
+    assert conn.id == "0f9f5d2e-8d1a-4a1f-9f57-3f2c1b0c9a11"
+
+
+def test_gcs_connection_serializes_the_key_for_create():
+    conn = GcsConnectionConfig(
+        name="gcs",
+        bucket="my-gcs-bucket",
+        service_account_key='{"type": "service_account"}',
+        is_file_mask_source=True,
+    )
+
+    payload = conn.model_dump(exclude_none=True)
+
+    assert payload["type"] == "gcs_connection"
+    assert payload["mask_type"] == "file"
+    assert payload["service_account_key"] == '{"type": "service_account"}'
+    assert "service_account_key_encrypted" not in payload
 
 
 def test_mounted_share_connection_model_validate():

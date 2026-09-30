@@ -508,6 +508,31 @@ class AzureConnectionConfig(FileConnectionConfig):
         return data
 
 
+class GcsConnectionConfig(FileConnectionConfig):
+    """
+    Connection configuration for a Google Cloud Storage bucket.
+
+    `service_account_key` holds the contents of a service account's JSON key file,
+    or the ARN of an AWS Secrets Manager secret that holds it.
+    It comes back encrypted from `list_connections`
+    and is write-only in practice.
+
+    Requires server version 3.26.19.
+    """
+
+    type: Literal["gcs_connection"] = "gcs_connection"
+    bucket: str = ""
+    service_account_key: Optional[str] = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def _strip_encrypted_service_account_key(cls, data: dict) -> dict:
+        if isinstance(data, dict):
+            # The API returns the encrypted form; drop it so `service_account_key` stays None.
+            data.pop("service_account_key_encrypted", None)
+        return data
+
+
 class MountedShareConnectionConfig(FileConnectionConfig):
     """Connection configuration for a mounted file share."""
 
@@ -543,6 +568,7 @@ class DatabricksConnectionConfig(ConnectionConfig):
 FILE_TYPE_MAP: dict[str, type[FileConnectionConfig]] = {
     "s3_connection": S3ConnectionConfig,
     "azure_blob_connection": AzureConnectionConfig,
+    "gcs_connection": GcsConnectionConfig,
     "mounted_share_connection": MountedShareConnectionConfig,
 }
 

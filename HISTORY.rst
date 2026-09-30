@@ -2,6 +2,17 @@
 History
 =======
 
+1.4.1 (unreleased)
+------------------
+
+* Added ``GcsConnectionConfig`` for Google Cloud Storage file connections (``type: gcs_connection``),
+  with ``bucket`` and a write-only ``service_account_key``:
+  the contents of a service account's JSON key file, or the ARN of an AWS Secrets Manager secret that holds it.
+  The server returns the key encrypted, which is dropped on read, as for the Azure connection string.
+  ``validate_connection`` and ``list_connections`` accept the new type.
+
+Requires server version 3.26.19
+
 1.4.0 (2026-09-25)
 ------------------
 
