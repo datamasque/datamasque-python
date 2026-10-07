@@ -51,6 +51,9 @@ class DatabaseType(Enum):
     databricks = "databricks"
     informix = "informix"
     saphana = "saphana"
+    cassandra = "cassandra"
+    sybase = "sybase"
+    salesforce = "salesforce"
 
 
 class SnowflakeStageLocation(str, Enum):
@@ -366,7 +369,8 @@ class DatabaseConnectionConfig(ConnectionConfig):
     Connection configuration for a SQL database.
 
     Use `DynamoConnectionConfig` for DynamoDB, `SnowflakeConnectionConfig` for Snowflake,
-    and `MongoConnectionConfig` for MongoDB.
+    `MongoConnectionConfig` for MongoDB, `CassandraConnectionConfig` for Apache Cassandra,
+    `SybaseConnectionConfig` for SAP ASE and `SalesforceConnectionConfig` for Salesforce.
     """
 
     host: str
@@ -401,6 +405,12 @@ class DatabaseConnectionConfig(ConnectionConfig):
             raise ValueError("For Azure Cosmos DB, use the CosmosDbConnectionConfig class instead")
         if self.database_type is DatabaseType.databricks:
             raise ValueError("For Databricks SQL Warehouse, use the DatabricksConnectionConfig class instead")
+        if self.database_type is DatabaseType.cassandra:
+            raise ValueError("For Apache Cassandra, use the CassandraConnectionConfig class instead")
+        if self.database_type is DatabaseType.sybase:
+            raise ValueError("For SAP ASE (Sybase), use the SybaseConnectionConfig class instead")
+        if self.database_type is DatabaseType.salesforce:
+            raise ValueError("For Salesforce, use the SalesforceConnectionConfig class instead")
         return self
 
     mask_type: Literal["database"] = "database"
@@ -565,6 +575,140 @@ class DatabricksConnectionConfig(ConnectionConfig):
         return data
 
 
+class CassandraConnectionConfig(ConnectionConfig):
+    """
+    Connection configuration for an Apache Cassandra keyspace.
+
+    `database` is the keyspace.
+    `user` and `password` are optional, but a username needs a password.
+    Set `direct_connection` when the node addresses the cluster advertises are unreachable,
+    for example behind NAT or in containers.
+
+    Requires server version 3.26.19.
+    """
+
+    host: str
+    port: int = 9042
+    database: str
+    user: Optional[str] = None
+    password: Optional[str] = None
+    local_datacenter: Optional[str] = None
+    tls: bool = False
+    direct_connection: bool = False
+    is_read_only: bool = False
+
+    mask_type: Literal["database"] = "database"
+    db_type: Literal["cassandra"] = "cassandra"
+
+    @property
+    def database_type(self) -> DatabaseType:
+        return DatabaseType.cassandra
+
+    @model_serializer(mode="wrap")
+    def _serialize(self, handler: Callable) -> dict:
+        d = handler(self)
+        # The server expects the password under the `dbpassword` key.
+        password = d.pop("password", None)
+        if password is not None:
+            d["dbpassword"] = password
+        return d
+
+    @model_validator(mode="before")
+    @classmethod
+    def _strip_encrypted_password(cls, data: dict) -> dict:
+        if isinstance(data, dict):
+            for key in ("password_encrypted", "dbpassword"):
+                data.pop(key, None)
+        return data
+
+
+class SybaseConnectionConfig(ConnectionConfig):
+    """
+    Connection configuration for an SAP ASE (Sybase) database.
+
+    ASE has no schema setting: the schema is the table owner,
+    and an unqualified name resolves to the connecting user's table first, then to `dbo`'s.
+    With `tls` on, the server certificate is always verified;
+    `tls_server_name` only changes the name it is verified against.
+
+    Requires server version 3.26.19.
+    """
+
+    host: str
+    port: int = 5000
+    database: str
+    user: str
+    password: Optional[str] = None
+    tls: bool = False
+    tls_server_name: Optional[str] = None
+    connect_timeout: Optional[int] = None
+    is_read_only: bool = False
+
+    mask_type: Literal["database"] = "database"
+    db_type: Literal["sybase"] = "sybase"
+
+    @property
+    def database_type(self) -> DatabaseType:
+        return DatabaseType.sybase
+
+    @model_serializer(mode="wrap")
+    def _serialize(self, handler: Callable) -> dict:
+        d = handler(self)
+        # The server expects the password under the `dbpassword` key.
+        password = d.pop("password", None)
+        if password is not None:
+            d["dbpassword"] = password
+        return d
+
+    @model_validator(mode="before")
+    @classmethod
+    def _strip_encrypted_password(cls, data: dict) -> dict:
+        if isinstance(data, dict):
+            for key in ("password_encrypted", "dbpassword"):
+                data.pop(key, None)
+        return data
+
+
+class SalesforceConnectionConfig(ConnectionConfig):
+    """
+    Connection configuration for a Salesforce org.
+
+    Salesforce is reached over HTTPS with an OAuth JWT bearer assertion,
+    so it carries no host, port, database or password.
+    `login_url` is the org's My Domain URL and is sent verbatim as the JWT audience,
+    which Salesforce compares exactly.
+    `salesforce_private_key_path` is relative to the DataMasque files sandbox,
+    or to the connection fileset when one is attached.
+    `salesforce_private_key_passphrase` is only needed for an encrypted key,
+    and comes back encrypted from `list_connections`, so it is write-only in practice.
+
+    Requires server version 3.26.19.
+    """
+
+    instance_url: str
+    login_url: str
+    client_id: str
+    user: str
+    salesforce_private_key_path: str
+    salesforce_private_key_passphrase: Optional[str] = None
+    api_version: str = "62.0"
+    is_read_only: bool = False
+
+    mask_type: Literal["database"] = "database"
+    db_type: Literal["salesforce"] = "salesforce"
+
+    @property
+    def database_type(self) -> DatabaseType:
+        return DatabaseType.salesforce
+
+    @model_validator(mode="before")
+    @classmethod
+    def _strip_encrypted_passphrase(cls, data: dict) -> dict:
+        if isinstance(data, dict):
+            data.pop("salesforce_private_key_passphrase_encrypted", None)
+        return data
+
+
 FILE_TYPE_MAP: dict[str, type[FileConnectionConfig]] = {
     "s3_connection": S3ConnectionConfig,
     "azure_blob_connection": AzureConnectionConfig,
@@ -580,6 +724,9 @@ DB_TYPE_MAP: dict[str, type[ConnectionConfig]] = {
     DatabaseType.snowflake.value: SnowflakeConnectionConfig,
     DatabaseType.mssql_linked.value: MssqlLinkedServerConnectionConfig,
     DatabaseType.databricks.value: DatabricksConnectionConfig,
+    DatabaseType.cassandra.value: CassandraConnectionConfig,
+    DatabaseType.sybase.value: SybaseConnectionConfig,
+    DatabaseType.salesforce.value: SalesforceConnectionConfig,
     # others use the default `DatabaseConnectionConfig`
 }
 

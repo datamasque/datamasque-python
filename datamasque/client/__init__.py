@@ -29,6 +29,7 @@ from datamasque.client.exceptions import (
 from datamasque.client.ifm import DataMasqueIfmClient
 from datamasque.client.models.connection import (
     AzureConnectionConfig,
+    CassandraConnectionConfig,
     ConnectionConfig,
     ConnectionId,
     CosmosDbConnectionConfig,
@@ -44,10 +45,12 @@ from datamasque.client.models.connection import (
     MountedShareConnectionConfig,
     MssqlLinkedServerConnectionConfig,
     S3ConnectionConfig,
+    SalesforceConnectionConfig,
     SnowflakeConnectionConfig,
     SnowflakeStageLocation,
     SseConfig,
     SseSelection,
+    SybaseConnectionConfig,
 )
 from datamasque.client.models.data_selection import (
     HashColumnsTableConfig,
@@ -180,6 +183,7 @@ __all__ = [
     "AzureConnectionConfig",
     "BooleanPreview",
     "BooleanStatistics",
+    "CassandraConnectionConfig",
     "ColumnKind",
     "ColumnPreview",
     "CommonStatistics",
@@ -289,6 +293,7 @@ __all__ = [
     "S3ConnectionConfig",
     "SafeDataPreview",
     "SafeDataPreviewOptions",
+    "SalesforceConnectionConfig",
     "SchemaDiscoveryColumn",
     "SchemaDiscoveryFromConfigRequest",
     "SchemaDiscoveryPage",
@@ -308,6 +313,7 @@ __all__ = [
     "StringPreview",
     "StringStatistics",
     "SwitchableLicenseMetadata",
+    "SybaseConnectionConfig",
     "TableConstraints",
     "TableReference",
     "TableReferenceFormat",

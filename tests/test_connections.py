@@ -8,6 +8,7 @@ import requests_mock
 from datamasque.client.exceptions import DataMasqueApiError, DataMasqueException
 from datamasque.client.models.connection import (
     AzureConnectionConfig,
+    CassandraConnectionConfig,
     ConnectionConfig,
     ConnectionId,
     CosmosDbConnectionConfig,
@@ -22,10 +23,12 @@ from datamasque.client.models.connection import (
     MountedShareConnectionConfig,
     MssqlLinkedServerConnectionConfig,
     S3ConnectionConfig,
+    SalesforceConnectionConfig,
     SnowflakeConnectionConfig,
     SnowflakeStageLocation,
     SseConfig,
     SseSelection,
+    SybaseConnectionConfig,
     validate_connection,
 )
 from tests.helpers import (
@@ -1790,3 +1793,201 @@ def test_redshift_connection_keeps_its_cluster_s3_role_separate_from_its_tagging
 
     assert api_dict["s3_redshift_iam_role"] == "arn:aws:iam::123456789012:role/redshift-s3"
     assert api_dict["iam_role_arn"] == "arn:aws:iam::119836602066:role/tagger"
+
+
+@pytest.mark.parametrize(
+    ("database_type", "message"),
+    [
+        (DatabaseType.cassandra, "For Apache Cassandra"),
+        (DatabaseType.sybase, "For SAP ASE"),
+        (DatabaseType.salesforce, "For Salesforce"),
+    ],
+)
+def test_database_connection_config_rejects_engines_with_their_own_class(
+    database_type: DatabaseType, message: str
+) -> None:
+    with pytest.raises(ValueError, match=message):
+        DatabaseConnectionConfig(
+            name="own-class",
+            host="db.example",
+            port=1,
+            database="people",
+            user="alice",
+            password="hunter2",
+            database_type=database_type,
+        )
+
+
+def test_cassandra_connection_serializes_password_as_dbpassword():
+    conn = CassandraConnectionConfig(
+        name="cassandra",
+        host="cassandra.example",
+        database="people",
+        user="alice",
+        password="hunter2",
+        local_datacenter="dc1",
+    )
+
+    d = conn.model_dump(exclude_none=True, by_alias=True, mode="json")
+
+    assert d["db_type"] == "cassandra"
+    assert d["mask_type"] == "database"
+    assert d["port"] == 9042
+    assert d["database"] == "people"
+    assert d["dbpassword"] == "hunter2"
+    assert "password" not in d
+    assert d["local_datacenter"] == "dc1"
+    assert d["tls"] is False
+    assert d["direct_connection"] is False
+    assert conn.database_type is DatabaseType.cassandra
+
+
+def test_cassandra_connection_without_credentials_omits_user_and_password():
+    """Cassandra allows unauthenticated access; the server rejects a username sent without a password."""
+    d = CassandraConnectionConfig(name="cassandra", host="cassandra.example", database="people").model_dump(
+        exclude_none=True, by_alias=True, mode="json"
+    )
+
+    assert "user" not in d
+    assert "dbpassword" not in d
+
+
+def test_connection_config_dispatch_picks_cassandra_subclass():
+    payload = {
+        "id": "cassandra-id-1",
+        "name": "cassandra",
+        "mask_type": "database",
+        "db_type": "cassandra",
+        "host": "cassandra.example",
+        "port": 9042,
+        "database": "people",
+        "user": "alice",
+        "password_encrypted": "some_base64_here",
+        "tls": True,
+        "direct_connection": True,
+    }
+
+    conn = validate_connection(payload)
+
+    assert isinstance(conn, CassandraConnectionConfig)
+    assert conn.password is None
+    assert conn.tls is True
+    assert conn.direct_connection is True
+    assert "password_encrypted" not in conn.model_dump()
+
+
+def test_sybase_connection_serializes_without_a_schema():
+    """ASE has no schema setting: the schema is the table owner."""
+    conn = SybaseConnectionConfig(
+        name="sybase",
+        host="ase.example",
+        database="people",
+        user="sa",
+        password="hunter2",
+        tls=True,
+        tls_server_name="ase.internal.example",
+        connect_timeout=30,
+    )
+
+    d = conn.model_dump(exclude_none=True, by_alias=True, mode="json")
+
+    assert d["db_type"] == "sybase"
+    assert d["mask_type"] == "database"
+    assert d["port"] == 5000
+    assert d["dbpassword"] == "hunter2"
+    assert "password" not in d
+    assert "schema" not in d
+    assert d["tls"] is True
+    assert d["tls_server_name"] == "ase.internal.example"
+    assert d["connect_timeout"] == 30
+    assert conn.database_type is DatabaseType.sybase
+
+
+def test_sybase_connection_omits_unset_tls_options():
+    d = SybaseConnectionConfig(name="sybase", host="ase.example", database="people", user="sa").model_dump(
+        exclude_none=True, by_alias=True, mode="json"
+    )
+
+    assert "tls_server_name" not in d
+    assert "connect_timeout" not in d
+    assert "dbpassword" not in d
+
+
+def test_connection_config_dispatch_picks_sybase_subclass():
+    payload = {
+        "id": "sybase-id-1",
+        "name": "sybase",
+        "mask_type": "database",
+        "db_type": "sybase",
+        "host": "ase.example",
+        "port": 5000,
+        "database": "people",
+        "user": "sa",
+        "password_encrypted": "some_base64_here",
+    }
+
+    conn = validate_connection(payload)
+
+    assert isinstance(conn, SybaseConnectionConfig)
+    assert conn.password is None
+    assert conn.database_type is DatabaseType.sybase
+
+
+def test_salesforce_connection_serializes_for_create():
+    conn = SalesforceConnectionConfig(
+        name="salesforce",
+        instance_url="https://example--uat.sandbox.my.salesforce.com",
+        login_url="https://example--uat.sandbox.my.salesforce.com",
+        client_id="3MVG9consumerkey",
+        user="masking@example.com.uat",
+        salesforce_private_key_path="salesforce-masking.key",
+        salesforce_private_key_passphrase="hunter2",
+    )
+
+    d = conn.model_dump(exclude_none=True, by_alias=True, mode="json")
+
+    assert d["db_type"] == "salesforce"
+    assert d["mask_type"] == "database"
+    assert d["login_url"] == "https://example--uat.sandbox.my.salesforce.com"
+    assert d["salesforce_private_key_path"] == "salesforce-masking.key"
+    assert d["salesforce_private_key_passphrase"] == "hunter2"
+    assert d["api_version"] == "62.0"
+    assert "host" not in d
+    assert "dbpassword" not in d
+    assert conn.database_type is DatabaseType.salesforce
+
+
+def test_salesforce_connection_without_passphrase_omits_it():
+    """An unencrypted private key needs no passphrase."""
+    d = SalesforceConnectionConfig(
+        name="salesforce",
+        instance_url="https://example.my.salesforce.com",
+        login_url="https://example.my.salesforce.com",
+        client_id="3MVG9consumerkey",
+        user="masking@example.com",
+        salesforce_private_key_path="salesforce-masking.key",
+    ).model_dump(exclude_none=True, by_alias=True, mode="json")
+
+    assert "salesforce_private_key_passphrase" not in d
+
+
+def test_connection_config_dispatch_picks_salesforce_subclass():
+    payload = {
+        "id": "salesforce-id-1",
+        "name": "salesforce",
+        "mask_type": "database",
+        "db_type": "salesforce",
+        "instance_url": "https://example.my.salesforce.com",
+        "login_url": "https://example.my.salesforce.com",
+        "client_id": "3MVG9consumerkey",
+        "user": "masking@example.com",
+        "salesforce_private_key_path": "salesforce-masking.key",
+        "salesforce_private_key_passphrase_encrypted": "some_base64_here",
+        "api_version": "62.0",
+    }
+
+    conn = validate_connection(payload)
+
+    assert isinstance(conn, SalesforceConnectionConfig)
+    assert conn.salesforce_private_key_passphrase is None
+    assert "salesforce_private_key_passphrase_encrypted" not in conn.model_dump()
