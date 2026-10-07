@@ -524,8 +524,6 @@ class GcsConnectionConfig(FileConnectionConfig):
 
     `service_account_key` holds the contents of a service account's JSON key file,
     or the ARN of an AWS Secrets Manager secret that holds it.
-    It comes back encrypted from `list_connections`
-    and is write-only in practice.
 
     Requires server version 3.26.19.
     """
@@ -679,8 +677,7 @@ class SalesforceConnectionConfig(ConnectionConfig):
     which Salesforce compares exactly.
     `salesforce_private_key_path` is relative to the DataMasque files sandbox,
     or to the connection fileset when one is attached.
-    `salesforce_private_key_passphrase` is only needed for an encrypted key,
-    and comes back encrypted from `list_connections`, so it is write-only in practice.
+    `salesforce_private_key_passphrase` is only needed for an encrypted key.
 
     Requires server version 3.26.19.
     """

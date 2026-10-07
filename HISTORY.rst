@@ -6,9 +6,8 @@ History
 ------------------
 
 * Added ``GcsConnectionConfig`` for Google Cloud Storage file connections (``type: gcs_connection``),
-  with ``bucket`` and a write-only ``service_account_key``:
+  with ``bucket`` and ``service_account_key``:
   the contents of a service account's JSON key file, or the ARN of an AWS Secrets Manager secret that holds it.
-  The server returns the key encrypted, which is dropped on read, as for the Azure connection string.
   ``validate_connection`` and ``list_connections`` accept the new type.
 * Added ``CassandraConnectionConfig`` for Apache Cassandra (``db_type: cassandra``).
   ``database`` is the keyspace; ``user`` and ``password`` are optional,
@@ -19,7 +18,7 @@ History
 * Added ``SalesforceConnectionConfig`` for Salesforce (``db_type: salesforce``),
   which signs in with an OAuth JWT bearer assertion
   (``instance_url``, ``login_url``, ``client_id``, ``user`` and ``salesforce_private_key_path``,
-  with an optional write-only ``salesforce_private_key_passphrase``).
+  with an optional ``salesforce_private_key_passphrase``).
 * ``DatabaseType`` gains ``cassandra``, ``sybase`` and ``salesforce``.
   ``DatabaseConnectionConfig`` rejects them in favour of the classes above,
   and ``validate_connection`` and ``list_connections`` dispatch to those classes.
