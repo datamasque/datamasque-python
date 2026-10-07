@@ -2,7 +2,7 @@
 History
 =======
 
-1.4.1 (unreleased)
+1.5.0 (2026-10-07)
 ------------------
 
 * Added ``GcsConnectionConfig`` for Google Cloud Storage file connections (``type: gcs_connection``),
@@ -10,6 +10,19 @@ History
   the contents of a service account's JSON key file, or the ARN of an AWS Secrets Manager secret that holds it.
   The server returns the key encrypted, which is dropped on read, as for the Azure connection string.
   ``validate_connection`` and ``list_connections`` accept the new type.
+* Added ``CassandraConnectionConfig`` for Apache Cassandra (``db_type: cassandra``).
+  ``database`` is the keyspace; ``user`` and ``password`` are optional,
+  and ``local_datacenter``, ``tls`` and ``direct_connection`` are supported.
+* Added ``SybaseConnectionConfig`` for SAP ASE (``db_type: sybase``),
+  with ``tls``, ``tls_server_name`` and ``connect_timeout``.
+  It sends no ``schema``: in ASE the schema is the table owner.
+* Added ``SalesforceConnectionConfig`` for Salesforce (``db_type: salesforce``),
+  which signs in with an OAuth JWT bearer assertion
+  (``instance_url``, ``login_url``, ``client_id``, ``user`` and ``salesforce_private_key_path``,
+  with an optional write-only ``salesforce_private_key_passphrase``).
+* ``DatabaseType`` gains ``cassandra``, ``sybase`` and ``salesforce``.
+  ``DatabaseConnectionConfig`` rejects them in favour of the classes above,
+  and ``validate_connection`` and ``list_connections`` dispatch to those classes.
 
 Requires server version 3.26.19
 
