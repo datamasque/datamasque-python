@@ -2,7 +2,7 @@
 
 from datetime import datetime
 from enum import Enum
-from typing import Any, Callable, Literal, NewType, Optional
+from typing import Any, Callable, ClassVar, Literal, NewType, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, model_serializer, model_validator
 
@@ -195,6 +195,9 @@ class MongoConnectionConfig(ConnectionConfig):
     mask_type: Literal["database"] = "database"
     db_type: Literal["mongodb"] = "mongodb"
 
+    # Whether `retry_writes` is sent even when it equals this class's default.
+    always_send_retry_writes: ClassVar[bool] = False
+
     @property
     def database_type(self) -> DatabaseType:
         return DatabaseType.mongodb
@@ -222,7 +225,7 @@ class MongoConnectionConfig(ConnectionConfig):
             d.pop("tls", None)
         if not d.get("direct_connection"):
             d.pop("direct_connection", None)
-        if d.get("retry_writes") == defaults["retry_writes"].default:
+        if not self.always_send_retry_writes and d.get("retry_writes") == defaults["retry_writes"].default:
             d.pop("retry_writes", None)
         if not d.get("replica_set"):
             d.pop("replica_set", None)
@@ -241,15 +244,22 @@ class MongoConnectionConfig(ConnectionConfig):
 
 class DocumentDbConnectionConfig(MongoConnectionConfig):
     """
-    Connection configuration for an AWS DocumentDB cluster.
+    Connection configuration for an Amazon DocumentDB cluster.
 
     DocumentDB is MongoDB wire-compatible,
-    so it reuses `MongoConnectionConfig` (including the TLS handling)
-    and only differs by `db_type`/`database_type`.
+    so it reuses `MongoConnectionConfig` (including the TLS handling).
+    It differs by `db_type`/`database_type` and by `retry_writes`,
+    which defaults to `False` because DocumentDB engine versions before 8.0.2 reject retryable writes.
+
+    `retry_writes` is always sent. Some server versions store `true` for a DocumentDB connection
+    that leaves the field out, and DocumentDB then rejects the run-history insert.
     """
 
     # Narrowing the inherited Literal is a deliberate Pydantic discriminator override.
     db_type: Literal["documentdb"] = "documentdb"  # type: ignore[assignment]
+    retry_writes: bool = False
+
+    always_send_retry_writes: ClassVar[bool] = True
 
     @property
     def database_type(self) -> DatabaseType:
