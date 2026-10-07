@@ -46,11 +46,11 @@ from datamasque.client.models.connection import (
     MssqlLinkedServerConnectionConfig,
     S3ConnectionConfig,
     SalesforceConnectionConfig,
+    SapAseConnectionConfig,
     SnowflakeConnectionConfig,
     SnowflakeStageLocation,
     SseConfig,
     SseSelection,
-    SybaseConnectionConfig,
 )
 from datamasque.client.models.data_selection import (
     HashColumnsTableConfig,
@@ -294,6 +294,7 @@ __all__ = [
     "SafeDataPreview",
     "SafeDataPreviewOptions",
     "SalesforceConnectionConfig",
+    "SapAseConnectionConfig",
     "SchemaDiscoveryColumn",
     "SchemaDiscoveryFromConfigRequest",
     "SchemaDiscoveryPage",
@@ -313,7 +314,6 @@ __all__ = [
     "StringPreview",
     "StringStatistics",
     "SwitchableLicenseMetadata",
-    "SybaseConnectionConfig",
     "TableConstraints",
     "TableReference",
     "TableReferenceFormat",

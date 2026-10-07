@@ -52,7 +52,7 @@ class DatabaseType(Enum):
     informix = "informix"
     saphana = "saphana"
     cassandra = "cassandra"
-    sybase = "sybase"
+    sap_ase = "sap_ase"
     salesforce = "salesforce"
 
 
@@ -370,7 +370,7 @@ class DatabaseConnectionConfig(ConnectionConfig):
 
     Use `DynamoConnectionConfig` for DynamoDB, `SnowflakeConnectionConfig` for Snowflake,
     `MongoConnectionConfig` for MongoDB, `CassandraConnectionConfig` for Apache Cassandra,
-    `SybaseConnectionConfig` for SAP ASE (Sybase) and `SalesforceConnectionConfig` for Salesforce.
+    `SapAseConnectionConfig` for SAP ASE (Sybase) and `SalesforceConnectionConfig` for Salesforce.
     """
 
     host: str
@@ -407,8 +407,8 @@ class DatabaseConnectionConfig(ConnectionConfig):
             raise ValueError("For Databricks SQL Warehouse, use the DatabricksConnectionConfig class instead")
         if self.database_type is DatabaseType.cassandra:
             raise ValueError("For Apache Cassandra, use the CassandraConnectionConfig class instead")
-        if self.database_type is DatabaseType.sybase:
-            raise ValueError("For SAP ASE (Sybase), use the SybaseConnectionConfig class instead")
+        if self.database_type is DatabaseType.sap_ase:
+            raise ValueError("For SAP ASE (Sybase), use the SapAseConnectionConfig class instead")
         if self.database_type is DatabaseType.salesforce:
             raise ValueError("For Salesforce, use the SalesforceConnectionConfig class instead")
         return self
@@ -620,7 +620,7 @@ class CassandraConnectionConfig(ConnectionConfig):
         return data
 
 
-class SybaseConnectionConfig(ConnectionConfig):
+class SapAseConnectionConfig(ConnectionConfig):
     """
     Connection configuration for an SAP ASE (Sybase) database.
 
@@ -643,11 +643,11 @@ class SybaseConnectionConfig(ConnectionConfig):
     is_read_only: bool = False
 
     mask_type: Literal["database"] = "database"
-    db_type: Literal["sybase"] = "sybase"
+    db_type: Literal["sap_ase"] = "sap_ase"
 
     @property
     def database_type(self) -> DatabaseType:
-        return DatabaseType.sybase
+        return DatabaseType.sap_ase
 
     @model_serializer(mode="wrap")
     def _serialize(self, handler: Callable) -> dict:
@@ -722,7 +722,7 @@ DB_TYPE_MAP: dict[str, type[ConnectionConfig]] = {
     DatabaseType.mssql_linked.value: MssqlLinkedServerConnectionConfig,
     DatabaseType.databricks.value: DatabricksConnectionConfig,
     DatabaseType.cassandra.value: CassandraConnectionConfig,
-    DatabaseType.sybase.value: SybaseConnectionConfig,
+    DatabaseType.sap_ase.value: SapAseConnectionConfig,
     DatabaseType.salesforce.value: SalesforceConnectionConfig,
     # others use the default `DatabaseConnectionConfig`
 }

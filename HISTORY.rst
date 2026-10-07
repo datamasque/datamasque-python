@@ -12,14 +12,14 @@ History
 * Added ``CassandraConnectionConfig`` for Apache Cassandra (``db_type: cassandra``).
   ``database`` is the keyspace; ``user`` and ``password`` are optional,
   and ``local_datacenter``, ``tls`` and ``direct_connection`` are supported.
-* Added ``SybaseConnectionConfig`` for SAP ASE (Sybase) (``db_type: sybase``),
+* Added ``SapAseConnectionConfig`` for SAP ASE (Sybase) (``db_type: sap_ase``),
   with ``tls``, ``tls_server_name`` and ``connect_timeout``.
   It sends no ``schema``: in ASE the schema is the table owner.
 * Added ``SalesforceConnectionConfig`` for Salesforce (``db_type: salesforce``),
   which signs in with an OAuth JWT bearer assertion
   (``instance_url``, ``login_url``, ``client_id``, ``user`` and ``salesforce_private_key_path``,
   with an optional ``salesforce_private_key_passphrase``).
-* ``DatabaseType`` gains ``cassandra``, ``sybase`` and ``salesforce``.
+* ``DatabaseType`` gains ``cassandra``, ``sap_ase`` and ``salesforce``.
   ``DatabaseConnectionConfig`` rejects them in favour of the classes above,
   and ``validate_connection`` and ``list_connections`` dispatch to those classes.
 

@@ -24,11 +24,11 @@ from datamasque.client.models.connection import (
     MssqlLinkedServerConnectionConfig,
     S3ConnectionConfig,
     SalesforceConnectionConfig,
+    SapAseConnectionConfig,
     SnowflakeConnectionConfig,
     SnowflakeStageLocation,
     SseConfig,
     SseSelection,
-    SybaseConnectionConfig,
     validate_connection,
 )
 from tests.helpers import (
@@ -1799,7 +1799,7 @@ def test_redshift_connection_keeps_its_cluster_s3_role_separate_from_its_tagging
     ("database_type", "message"),
     [
         (DatabaseType.cassandra, "For Apache Cassandra"),
-        (DatabaseType.sybase, "For SAP ASE"),
+        (DatabaseType.sap_ase, "For SAP ASE"),
         (DatabaseType.salesforce, "For Salesforce"),
     ],
 )
@@ -1876,10 +1876,10 @@ def test_connection_config_dispatch_picks_cassandra_subclass():
     assert "password_encrypted" not in conn.model_dump()
 
 
-def test_sybase_connection_serializes_without_a_schema():
+def test_sap_ase_connection_serializes_without_a_schema():
     """ASE has no schema setting: the schema is the table owner."""
-    conn = SybaseConnectionConfig(
-        name="sybase",
+    conn = SapAseConnectionConfig(
+        name="sap_ase",
         host="ase.example",
         database="people",
         user="sa",
@@ -1891,7 +1891,7 @@ def test_sybase_connection_serializes_without_a_schema():
 
     d = conn.model_dump(exclude_none=True, by_alias=True, mode="json")
 
-    assert d["db_type"] == "sybase"
+    assert d["db_type"] == "sap_ase"
     assert d["mask_type"] == "database"
     assert d["port"] == 5000
     assert d["dbpassword"] == "hunter2"
@@ -1900,11 +1900,11 @@ def test_sybase_connection_serializes_without_a_schema():
     assert d["tls"] is True
     assert d["tls_server_name"] == "ase.internal.example"
     assert d["connect_timeout"] == 30
-    assert conn.database_type is DatabaseType.sybase
+    assert conn.database_type is DatabaseType.sap_ase
 
 
-def test_sybase_connection_omits_unset_tls_options():
-    d = SybaseConnectionConfig(name="sybase", host="ase.example", database="people", user="sa").model_dump(
+def test_sap_ase_connection_omits_unset_tls_options():
+    d = SapAseConnectionConfig(name="sap_ase", host="ase.example", database="people", user="sa").model_dump(
         exclude_none=True, by_alias=True, mode="json"
     )
 
@@ -1913,12 +1913,12 @@ def test_sybase_connection_omits_unset_tls_options():
     assert "dbpassword" not in d
 
 
-def test_connection_config_dispatch_picks_sybase_subclass():
+def test_connection_config_dispatch_picks_sap_ase_subclass():
     payload = {
-        "id": "sybase-id-1",
-        "name": "sybase",
+        "id": "sap-ase-id-1",
+        "name": "sap_ase",
         "mask_type": "database",
-        "db_type": "sybase",
+        "db_type": "sap_ase",
         "host": "ase.example",
         "port": 5000,
         "database": "people",
@@ -1928,9 +1928,9 @@ def test_connection_config_dispatch_picks_sybase_subclass():
 
     conn = validate_connection(payload)
 
-    assert isinstance(conn, SybaseConnectionConfig)
+    assert isinstance(conn, SapAseConnectionConfig)
     assert conn.password is None
-    assert conn.database_type is DatabaseType.sybase
+    assert conn.database_type is DatabaseType.sap_ase
 
 
 def test_salesforce_connection_serializes_for_create():
