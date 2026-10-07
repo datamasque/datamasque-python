@@ -27,7 +27,9 @@ History
 * Added ``SalesforceConnectionConfig`` for Salesforce (``db_type: salesforce``),
   which signs in with an OAuth JWT bearer assertion
   (``instance_url``, ``login_url``, ``client_id``, ``user`` and ``salesforce_private_key_path``,
-  with an optional ``salesforce_private_key_passphrase``).
+  with an optional ``salesforce_private_key_passphrase`` and ``api_version``).
+  Salesforce is a preview connection type on server 3.26.19:
+  creating one fails until an administrator enables preview features.
 * ``DatabaseType`` gains ``cassandra``, ``sap_ase`` and ``salesforce``.
   ``DatabaseConnectionConfig`` rejects them in favour of the classes above,
   and ``validate_connection`` and ``list_connections`` dispatch to those classes.

@@ -676,8 +676,12 @@ class SalesforceConnectionConfig(ConnectionConfig):
     `salesforce_private_key_path` is relative to the DataMasque files sandbox,
     or to the connection fileset when one is attached.
     `salesforce_private_key_passphrase` is only needed for an encrypted key.
+    `api_version` is the server's default unless set.
 
     Requires server version 3.26.19.
+    Salesforce is a preview connection type there:
+    the server refuses to create one until an administrator enables preview features
+    under Settings, Preview Features.
     """
 
     instance_url: str
@@ -686,7 +690,9 @@ class SalesforceConnectionConfig(ConnectionConfig):
     user: str
     salesforce_private_key_path: str
     salesforce_private_key_passphrase: Optional[str] = None
-    api_version: str = "62.0"
+    # Left unset so the server applies its own default, which it stores on the connection.
+    # A default here would keep pinning new connections to it after the server moves on.
+    api_version: Optional[str] = None
     is_read_only: bool = False
 
     mask_type: Literal["database"] = "database"

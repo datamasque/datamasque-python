@@ -1750,7 +1750,8 @@ def test_salesforce_connection_serializes_for_create():
     assert d["login_url"] == "https://example--uat.sandbox.my.salesforce.com"
     assert d["salesforce_private_key_path"] == "salesforce-masking.key"
     assert d["salesforce_private_key_passphrase"] == "hunter2"
-    assert d["api_version"] == "62.0"
+    # Unset, so the server applies its own default.
+    assert "api_version" not in d
     assert "host" not in d
     assert "dbpassword" not in d
     assert conn.database_type is DatabaseType.salesforce
@@ -1790,3 +1791,5 @@ def test_connection_config_dispatch_picks_salesforce_subclass():
     assert isinstance(conn, SalesforceConnectionConfig)
     assert conn.salesforce_private_key_passphrase is None
     assert "salesforce_private_key_passphrase_encrypted" not in conn.model_dump()
+    # The version the server stored is kept, so sending the connection back does not change it.
+    assert conn.model_dump(exclude_none=True)["api_version"] == "62.0"
