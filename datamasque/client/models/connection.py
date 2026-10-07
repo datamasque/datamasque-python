@@ -51,15 +51,9 @@ class DatabaseType(Enum):
     databricks = "databricks"
     informix = "informix"
     saphana = "saphana"
-
-
-class SnowflakeStageLocation(str, Enum):
-    """Storage backend for a Snowflake connection's external stage."""
-
-    local = "local"  # Not supported for production use
-    aws_s3 = "aws_s3"
-    azure_blob_storage = "azure_blob_storage"
-    spcs = "spcs"  # DataMasque running inside Snowflake SPCS; staged on the container's own storage
+    cassandra = "cassandra"
+    sap_ase = "sap_ase"
+    salesforce = "salesforce"
 
 
 class SseSelection(Enum):
@@ -285,6 +279,19 @@ class CosmosDbConnectionConfig(MongoConnectionConfig):
         return DatabaseType.cosmosdb
 
 
+# Servers before 3.26.18 still return these on Snowflake connections. With `extra="allow"`
+# they would be sent back on create/update unless dropped here.
+_SNOWFLAKE_EXTERNAL_STAGE_KEYS = (
+    "s3_bucket_name",
+    "iam_role_arn",
+    "snowflake_azure_container_name",
+    "snowflake_azure_connection_string",
+    "snowflake_azure_connection_string_encrypted",
+    "snowflake_storage_integration_name",
+    "snowflake_stage_location",
+)
+
+
 class SnowflakeConnectionConfig(ConnectionConfig):
     """
     Connection configuration for a Snowflake database.
@@ -294,14 +301,14 @@ class SnowflakeConnectionConfig(ConnectionConfig):
     """
 
     database: str
-    # Optional because DataMasque-in-SPCS connections leave these unset: the agent uses the
-    # container's OAuth token + SNOWFLAKE_HOST/SNOWFLAKE_ACCOUNT env and the app-owned QUERY_WAREHOUSE,
-    # so user/account/storage-integration/warehouse are null for stage_location=spcs. Mirrors the app's
-    # canonical model (agent .../schemas/connection/connection.py), which types these `| None = None`.
+    # Optional because connections leave these unset when DataMasque runs inside Snowflake SPCS:
+    # the server detects SPCS from its environment and the agent uses the container's OAuth token,
+    # the SNOWFLAKE_HOST/SNOWFLAKE_ACCOUNT env and the app-owned QUERY_WAREHOUSE, so user/account/
+    # warehouse are None. Mirrors the app's canonical model
+    # (agent .../schemas/connection/connection.py), which types these `| None = None`.
     user: Optional[str] = None
     snowflake_account_id: Optional[str] = None
     snowflake_warehouse: Optional[str] = None
-    snowflake_storage_integration_name: Optional[str] = None
     host: str = ""
     port: Optional[int] = None
     db_schema: Optional[str] = Field(default=None, alias="schema")
@@ -310,12 +317,6 @@ class SnowflakeConnectionConfig(ConnectionConfig):
     password: Optional[str] = None
     snowflake_private_key: Optional[FileId] = None
     snowflake_private_key_passphrase: Optional[str] = None
-    snowflake_stage_location: Optional[SnowflakeStageLocation] = None
-    s3_bucket_name: Optional[str] = None
-    iam_role_arn: Optional[str] = None
-    snowflake_azure_container_name: Optional[str] = None
-    snowflake_azure_connection_string: Optional[str] = None
-    snowflake_azure_connection_string_encrypted: Optional[str] = None
 
     mask_type: Literal["database"] = "database"
     db_type: Literal["snowflake"] = "snowflake"
@@ -338,9 +339,9 @@ class SnowflakeConnectionConfig(ConnectionConfig):
 
     @model_validator(mode="before")
     @classmethod
-    def _strip_encrypted_password(cls, data: dict) -> dict:
+    def _strip_server_only_fields(cls, data: dict) -> dict:
         if isinstance(data, dict):
-            for key in ("password_encrypted", "dbpassword"):
+            for key in ("password_encrypted", "dbpassword", *_SNOWFLAKE_EXTERNAL_STAGE_KEYS):
                 data.pop(key, None)
         return data
 
@@ -366,7 +367,8 @@ class DatabaseConnectionConfig(ConnectionConfig):
     Connection configuration for a SQL database.
 
     Use `DynamoConnectionConfig` for DynamoDB, `SnowflakeConnectionConfig` for Snowflake,
-    and `MongoConnectionConfig` for MongoDB.
+    `MongoConnectionConfig` for MongoDB, `CassandraConnectionConfig` for Apache Cassandra,
+    `SapAseConnectionConfig` for SAP ASE (Sybase) and `SalesforceConnectionConfig` for Salesforce.
     """
 
     host: str
@@ -401,6 +403,12 @@ class DatabaseConnectionConfig(ConnectionConfig):
             raise ValueError("For Azure Cosmos DB, use the CosmosDbConnectionConfig class instead")
         if self.database_type is DatabaseType.databricks:
             raise ValueError("For Databricks SQL Warehouse, use the DatabricksConnectionConfig class instead")
+        if self.database_type is DatabaseType.cassandra:
+            raise ValueError("For Apache Cassandra, use the CassandraConnectionConfig class instead")
+        if self.database_type is DatabaseType.sap_ase:
+            raise ValueError("For SAP ASE (Sybase), use the SapAseConnectionConfig class instead")
+        if self.database_type is DatabaseType.salesforce:
+            raise ValueError("For Salesforce, use the SalesforceConnectionConfig class instead")
         return self
 
     mask_type: Literal["database"] = "database"
@@ -508,6 +516,29 @@ class AzureConnectionConfig(FileConnectionConfig):
         return data
 
 
+class GcsConnectionConfig(FileConnectionConfig):
+    """
+    Connection configuration for a Google Cloud Storage bucket.
+
+    `service_account_key` holds the contents of a service account's JSON key file,
+    or the ARN of an AWS Secrets Manager secret that holds it.
+
+    Requires server version 3.26.19.
+    """
+
+    type: Literal["gcs_connection"] = "gcs_connection"
+    bucket: str = ""
+    service_account_key: Optional[str] = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def _strip_encrypted_service_account_key(cls, data: dict) -> dict:
+        if isinstance(data, dict):
+            # The API returns the encrypted form; drop it so `service_account_key` stays None.
+            data.pop("service_account_key_encrypted", None)
+        return data
+
+
 class MountedShareConnectionConfig(FileConnectionConfig):
     """Connection configuration for a mounted file share."""
 
@@ -540,9 +571,149 @@ class DatabricksConnectionConfig(ConnectionConfig):
         return data
 
 
+class CassandraConnectionConfig(ConnectionConfig):
+    """
+    Connection configuration for an Apache Cassandra keyspace.
+
+    `database` is the keyspace.
+    `user` and `password` are optional, but a username needs a password.
+    Set `direct_connection` when the node addresses the cluster advertises are unreachable,
+    for example behind NAT or in containers.
+
+    Requires server version 3.26.19.
+    """
+
+    host: str
+    port: int = 9042
+    database: str
+    user: Optional[str] = None
+    password: Optional[str] = None
+    local_datacenter: Optional[str] = None
+    tls: bool = False
+    direct_connection: bool = False
+    is_read_only: bool = False
+
+    mask_type: Literal["database"] = "database"
+    db_type: Literal["cassandra"] = "cassandra"
+
+    @property
+    def database_type(self) -> DatabaseType:
+        return DatabaseType.cassandra
+
+    @model_serializer(mode="wrap")
+    def _serialize(self, handler: Callable) -> dict:
+        d = handler(self)
+        # The server expects the password under the `dbpassword` key.
+        password = d.pop("password", None)
+        if password is not None:
+            d["dbpassword"] = password
+        return d
+
+    @model_validator(mode="before")
+    @classmethod
+    def _strip_encrypted_password(cls, data: dict) -> dict:
+        if isinstance(data, dict):
+            for key in ("password_encrypted", "dbpassword"):
+                data.pop(key, None)
+        return data
+
+
+class SapAseConnectionConfig(ConnectionConfig):
+    """
+    Connection configuration for an SAP ASE (Sybase) database.
+
+    ASE has no schema setting: the schema is the table owner,
+    and an unqualified name resolves to the connecting user's table first, then to `dbo`'s.
+    With `tls` on, the server certificate is always verified;
+    `tls_server_name` only changes the name it is verified against.
+
+    Requires server version 3.26.19.
+    """
+
+    host: str
+    port: int = 5000
+    database: str
+    user: str
+    password: Optional[str] = None
+    tls: bool = False
+    tls_server_name: Optional[str] = None
+    connect_timeout: Optional[int] = None
+    is_read_only: bool = False
+
+    mask_type: Literal["database"] = "database"
+    db_type: Literal["sap_ase"] = "sap_ase"
+
+    @property
+    def database_type(self) -> DatabaseType:
+        return DatabaseType.sap_ase
+
+    @model_serializer(mode="wrap")
+    def _serialize(self, handler: Callable) -> dict:
+        d = handler(self)
+        # The server expects the password under the `dbpassword` key.
+        password = d.pop("password", None)
+        if password is not None:
+            d["dbpassword"] = password
+        return d
+
+    @model_validator(mode="before")
+    @classmethod
+    def _strip_encrypted_password(cls, data: dict) -> dict:
+        if isinstance(data, dict):
+            for key in ("password_encrypted", "dbpassword"):
+                data.pop(key, None)
+        return data
+
+
+class SalesforceConnectionConfig(ConnectionConfig):
+    """
+    Connection configuration for a Salesforce org.
+
+    Salesforce is reached over HTTPS with an OAuth JWT bearer assertion,
+    so it carries no host, port, database or password.
+    `login_url` is the org's My Domain URL and is sent verbatim as the JWT audience,
+    which Salesforce compares exactly.
+    `salesforce_private_key_path` is relative to the DataMasque files sandbox,
+    or to the connection fileset when one is attached.
+    `salesforce_private_key_passphrase` is only needed for an encrypted key.
+    `api_version` is the server's default unless set.
+
+    Requires server version 3.26.19.
+    Salesforce is a preview connection type there:
+    the server refuses to create one until an administrator enables preview features
+    under Settings, Preview Features.
+    """
+
+    instance_url: str
+    login_url: str
+    client_id: str
+    user: str
+    salesforce_private_key_path: str
+    salesforce_private_key_passphrase: Optional[str] = None
+    # Left unset so the server applies its own default, which it stores on the connection.
+    # A default here would keep pinning new connections to it after the server moves on.
+    api_version: Optional[str] = None
+    is_read_only: bool = False
+
+    mask_type: Literal["database"] = "database"
+    db_type: Literal["salesforce"] = "salesforce"
+
+    @property
+    def database_type(self) -> DatabaseType:
+        return DatabaseType.salesforce
+
+    @model_validator(mode="before")
+    @classmethod
+    def _strip_encrypted_passphrase(cls, data: dict) -> dict:
+        if isinstance(data, dict):
+            data.pop("salesforce_private_key_passphrase_encrypted", None)
+        return data
+
+
 FILE_TYPE_MAP: dict[str, type[FileConnectionConfig]] = {
     "s3_connection": S3ConnectionConfig,
     "azure_blob_connection": AzureConnectionConfig,
+    "gcs_connection": GcsConnectionConfig,
     "mounted_share_connection": MountedShareConnectionConfig,
 }
 
@@ -554,6 +725,9 @@ DB_TYPE_MAP: dict[str, type[ConnectionConfig]] = {
     DatabaseType.snowflake.value: SnowflakeConnectionConfig,
     DatabaseType.mssql_linked.value: MssqlLinkedServerConnectionConfig,
     DatabaseType.databricks.value: DatabricksConnectionConfig,
+    DatabaseType.cassandra.value: CassandraConnectionConfig,
+    DatabaseType.sap_ase.value: SapAseConnectionConfig,
+    DatabaseType.salesforce.value: SalesforceConnectionConfig,
     # others use the default `DatabaseConnectionConfig`
 }
 

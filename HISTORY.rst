@@ -2,6 +2,40 @@
 History
 =======
 
+1.5.0 (2026-10-07)
+------------------
+
+* **Breaking:** Snowflake masking now stages inside Snowflake, so ``SnowflakeConnectionConfig``
+  no longer has the external staging fields ``s3_bucket_name``, ``iam_role_arn``,
+  ``snowflake_azure_container_name``, ``snowflake_azure_connection_string``,
+  ``snowflake_azure_connection_string_encrypted`` and ``snowflake_storage_integration_name``.
+  ``snowflake_stage_location`` and the ``SnowflakeStageLocation`` enum are removed: the server
+  detects a Snowflake SPCS deployment from its own environment, so the client no longer states it.
+* Snowflake connections listed from an older server still parse: the removed fields and
+  ``snowflake_stage_location`` are dropped rather than raising a validation error, and are not sent
+  back on ``create_or_update_connection``.
+* Added ``GcsConnectionConfig`` for Google Cloud Storage file connections (``type: gcs_connection``),
+  with ``bucket`` and ``service_account_key``:
+  the contents of a service account's JSON key file, or the ARN of an AWS Secrets Manager secret that holds it.
+  ``validate_connection`` and ``list_connections`` accept the new type.
+* Added ``CassandraConnectionConfig`` for Apache Cassandra (``db_type: cassandra``).
+  ``database`` is the keyspace; ``user`` and ``password`` are optional,
+  and ``local_datacenter``, ``tls`` and ``direct_connection`` are supported.
+* Added ``SapAseConnectionConfig`` for SAP ASE (Sybase) (``db_type: sap_ase``),
+  with ``tls``, ``tls_server_name`` and ``connect_timeout``.
+  It sends no ``schema``: in ASE the schema is the table owner.
+* Added ``SalesforceConnectionConfig`` for Salesforce (``db_type: salesforce``),
+  which signs in with an OAuth JWT bearer assertion
+  (``instance_url``, ``login_url``, ``client_id``, ``user`` and ``salesforce_private_key_path``,
+  with an optional ``salesforce_private_key_passphrase`` and ``api_version``).
+  Salesforce is a preview connection type on server 3.26.19:
+  creating one fails until an administrator enables preview features.
+* ``DatabaseType`` gains ``cassandra``, ``sap_ase`` and ``salesforce``.
+  ``DatabaseConnectionConfig`` rejects them in favour of the classes above,
+  and ``validate_connection`` and ``list_connections`` dispatch to those classes.
+
+Requires server version 3.26.19
+
 1.4.0 (2026-09-25)
 ------------------
 

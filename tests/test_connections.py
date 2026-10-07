@@ -8,6 +8,7 @@ import requests_mock
 from datamasque.client.exceptions import DataMasqueApiError, DataMasqueException
 from datamasque.client.models.connection import (
     AzureConnectionConfig,
+    CassandraConnectionConfig,
     ConnectionConfig,
     ConnectionId,
     CosmosDbConnectionConfig,
@@ -16,22 +17,22 @@ from datamasque.client.models.connection import (
     DatabricksConnectionConfig,
     DocumentDbConnectionConfig,
     DynamoConnectionConfig,
+    GcsConnectionConfig,
     LicenseLock,
     MongoConnectionConfig,
     MountedShareConnectionConfig,
     MssqlLinkedServerConnectionConfig,
     S3ConnectionConfig,
+    SalesforceConnectionConfig,
+    SapAseConnectionConfig,
     SnowflakeConnectionConfig,
-    SnowflakeStageLocation,
     SseConfig,
     SseSelection,
     validate_connection,
 )
 from tests.helpers import (
     sample_mounted_share_connection_json,
-    snowflake_connection_config_azure,
-    snowflake_connection_config_local,
-    snowflake_connection_config_s3,
+    snowflake_connection_config,
 )
 
 
@@ -235,11 +236,8 @@ def test_list_connnections(client):
                     "snowflake_role": "snowballs do indeed roll",
                     "snowflake_account_id": "ABCDEF-123456",
                     "snowflake_warehouse": "warehouse1",
-                    "snowflake_storage_integration_name": "mysi",
                     "host": "snowflake.com",
                     "port": 443,
-                    "s3_bucket_name": "ice-bucket",
-                    "iam_role_arn": "swiss roll",
                     "is_read_only": False,
                     "password_encrypted": "some_base64_here",
                     "id": "f0557fb3-1c9a-4cb1-bcf4-9699cf496bf7",
@@ -257,8 +255,6 @@ def test_list_connnections(client):
                     "name": "snowflake_minimal_with_key",
                     "snowflake_account_id": "ACCOUNT-1234",
                     "snowflake_warehouse": "clothing_store",
-                    "snowflake_storage_integration_name": "kennards",
-                    "s3_bucket_name": "champagne-bucket",
                     "snowflake_private_key": "2831289a-4398-abcd-4112-fe09a1239f89",
                     "snowflake_private_key_passphrase_encrypted": "some base64 here",
                     "id": "f0557fb3-1c9a-4cb1-bcf4-9699cf496bf7",
@@ -339,9 +335,6 @@ def test_list_connnections(client):
         assert snowflake_connection.snowflake_role == "snowballs do indeed roll"
         assert snowflake_connection.snowflake_account_id == "ABCDEF-123456"
         assert snowflake_connection.snowflake_warehouse == "warehouse1"
-        assert snowflake_connection.snowflake_storage_integration_name == "mysi"
-        assert snowflake_connection.s3_bucket_name == "ice-bucket"
-        assert snowflake_connection.iam_role_arn == "swiss roll"
         assert snowflake_connection.is_read_only is False
 
         minimal_snowflake_connection = connections[8]
@@ -355,9 +348,6 @@ def test_list_connnections(client):
         assert minimal_snowflake_connection.snowflake_role == ""
         assert minimal_snowflake_connection.snowflake_account_id == "ACCOUNT-1234"
         assert minimal_snowflake_connection.snowflake_warehouse == "clothing_store"
-        assert minimal_snowflake_connection.snowflake_storage_integration_name == "kennards"
-        assert minimal_snowflake_connection.s3_bucket_name == "champagne-bucket"
-        assert minimal_snowflake_connection.iam_role_arn is None
         assert minimal_snowflake_connection.is_read_only is False
         assert minimal_snowflake_connection.snowflake_private_key == "2831289a-4398-abcd-4112-fe09a1239f89"
 
@@ -421,39 +411,20 @@ def test_delete_connection_that_does_not_exist(client):
     assert m.request_history[0].method == "GET"
 
 
-@pytest.mark.parametrize(
-    "config_func,expected_stage_location,expected_fields,unexpected_fields",
-    [
-        (
-            snowflake_connection_config_s3,
-            "aws_s3",
-            ["s3_bucket_name", "iam_role_arn"],
-            ["snowflake_azure_container_name", "snowflake_azure_connection_string"],
-        ),
-        (
-            snowflake_connection_config_azure,
-            "azure_blob_storage",
-            ["snowflake_azure_container_name", "snowflake_azure_connection_string"],
-            ["s3_bucket_name", "iam_role_arn"],
-        ),
-        (
-            snowflake_connection_config_local,
-            "local",
-            [],
-            [
-                "s3_bucket_name",
-                "iam_role_arn",
-                "snowflake_azure_container_name",
-                "snowflake_azure_connection_string",
-            ],
-        ),
-    ],
+# Removed from Snowflake connections in server 3.26.18.
+SNOWFLAKE_EXTERNAL_STAGE_FIELDS = (
+    "s3_bucket_name",
+    "iam_role_arn",
+    "snowflake_azure_container_name",
+    "snowflake_azure_connection_string",
+    "snowflake_azure_connection_string_encrypted",
+    "snowflake_storage_integration_name",
 )
-def test_create_snowflake_connection_with_staging_platform(
-    client, config_func, expected_stage_location, expected_fields, unexpected_fields
-):
-    """Test creating Snowflake connections with different staging platforms."""
-    config = config_func()
+
+
+def test_create_snowflake_connection(client):
+    """Creating a Snowflake connection sends none of the removed fields."""
+    config = snowflake_connection_config()
 
     with requests_mock.Mocker() as m:
         m.get("http://test-server/api/connections/", json=[], status_code=200)
@@ -462,71 +433,30 @@ def test_create_snowflake_connection_with_staging_platform(
         result = client.create_or_update_connection(config)
         assert result.id == ConnectionId("2")
 
-        # Verify the correct data was sent
         request_data = m.last_request.json()
-        assert request_data["snowflake_stage_location"] == expected_stage_location
-
-        # Check expected fields are present
-        for field in expected_fields:
-            assert field in request_data
-
-        # Check unexpected fields are not present
-        for field in unexpected_fields:
+        assert request_data["dbpassword"] == "test_password"
+        assert request_data["schema"] == ""
+        assert "snowflake_stage_location" not in request_data
+        for field in SNOWFLAKE_EXTERNAL_STAGE_FIELDS:
             assert field not in request_data
 
 
-@pytest.mark.parametrize(
-    "config_func,expected_stage_location,expected_fields,unexpected_fields",
-    [
-        (
-            snowflake_connection_config_s3,
-            SnowflakeStageLocation.aws_s3,
-            {
-                "s3_bucket_name": "test-bucket",
-                "iam_role_arn": "arn:aws:iam::123456789012:role/test-role",
-            },
-            ["snowflake_azure_container_name", "snowflake_azure_connection_string"],
-        ),
-        (
-            snowflake_connection_config_azure,
-            SnowflakeStageLocation.azure_blob_storage,
-            {
-                "snowflake_azure_container_name": "test-container",
-                "snowflake_azure_connection_string": "DefaultEndpointsProtocol=https;AccountName=test;AccountKey=test",
-            },
-            ["s3_bucket_name", "iam_role_arn"],
-        ),
-        (
-            snowflake_connection_config_local,
-            SnowflakeStageLocation.local,
-            {},
-            [
-                "s3_bucket_name",
-                "iam_role_arn",
-                "snowflake_azure_container_name",
-                "snowflake_azure_connection_string",
-            ],
-        ),
-    ],
-)
-def test_snowflake_connection_model_dump(config_func, expected_stage_location, expected_fields, unexpected_fields):
-    """Test that Snowflake connections serialize correctly for each staging platform."""
-    config = config_func()
+def test_snowflake_connection_model_dump_omits_external_stage_fields():
+    config = snowflake_connection_config()
     api_dict = config.model_dump(exclude_none=True, by_alias=True, mode="json")
 
-    assert api_dict["snowflake_stage_location"] == expected_stage_location
-
-    # Check expected fields and their values
-    for field, value in expected_fields.items():
-        assert api_dict[field] == value
-
-    # Check unexpected fields are not present
-    for field in unexpected_fields:
+    assert "snowflake_stage_location" not in api_dict
+    for field in SNOWFLAKE_EXTERNAL_STAGE_FIELDS:
         assert field not in api_dict
 
 
-def test_list_snowflake_connections_with_different_platforms(client):
-    """Test listing Snowflake connections returns correct staging platform information."""
+def test_list_snowflake_connection_from_older_server_drops_external_stage(client):
+    """
+    A connection listed by a server older than 3.26.18 still parses.
+
+    Those servers return the external stage location and its storage settings.
+    The SDK drops them and does not send them back on update.
+    """
     with requests_mock.Mocker() as m:
         m.get(
             "http://test-server/api/connections/",
@@ -547,118 +477,17 @@ def test_list_snowflake_connections_with_different_platforms(client):
                     "id": "s3-connection-id",
                     "mask_type": "database",
                 },
-                {
-                    "version": "1.0",
-                    "user": "azure_user",
-                    "db_type": "snowflake",
-                    "database": "azure_db",
-                    "name": "snowflake_azure",
-                    "snowflake_account_id": "AZURE-ACCOUNT",
-                    "snowflake_warehouse": "azure_warehouse",
-                    "snowflake_storage_integration_name": "azure_integration",
-                    "snowflake_azure_container_name": "azure-container",
-                    "snowflake_azure_connection_string_encrypted": "encrypted_azure_string",
-                    "snowflake_stage_location": "azure_blob_storage",
-                    "password_encrypted": "encrypted",
-                    "id": "azure-connection-id",
-                    "mask_type": "database",
-                },
-                {
-                    "version": "1.0",
-                    "user": "local_user",
-                    "db_type": "snowflake",
-                    "database": "local_db",
-                    "name": "snowflake_local",
-                    "snowflake_account_id": "LOCAL-ACCOUNT",
-                    "snowflake_warehouse": "local_warehouse",
-                    "snowflake_storage_integration_name": "local_integration",
-                    "snowflake_stage_location": "local",
-                    "password_encrypted": "encrypted",
-                    "id": "local-connection-id",
-                    "mask_type": "database",
-                },
             ],
             status_code=200,
         )
 
-        connections = client.list_connections()
-        snowflake_connections = [c for c in connections if isinstance(c, SnowflakeConnectionConfig)]
-        assert len(snowflake_connections) == 3
+        (conn,) = client.list_connections()
 
-        # Check S3 connection
-        s3_conn = next(c for c in snowflake_connections if c.name == "snowflake_s3")
-        assert s3_conn.snowflake_stage_location is SnowflakeStageLocation.aws_s3
-        assert s3_conn.s3_bucket_name == "s3-bucket"
-        assert s3_conn.iam_role_arn == "arn:aws:iam::123456789012:role/s3-role"
-        assert s3_conn.snowflake_azure_container_name is None
-        assert s3_conn.snowflake_azure_connection_string is None
-
-        # Check Azure connection
-        azure_conn = next(c for c in snowflake_connections if c.name == "snowflake_azure")
-        assert azure_conn.snowflake_stage_location is SnowflakeStageLocation.azure_blob_storage
-        assert azure_conn.snowflake_azure_container_name == "azure-container"
-        assert azure_conn.snowflake_azure_connection_string is None  # Encrypted, so empty
-        assert azure_conn.s3_bucket_name is None
-        assert azure_conn.iam_role_arn is None
-
-        # Check local connection
-        local_conn = next(c for c in snowflake_connections if c.name == "snowflake_local")
-        assert local_conn.snowflake_stage_location is SnowflakeStageLocation.local
-        assert local_conn.s3_bucket_name is None
-        assert local_conn.iam_role_arn is None
-        assert local_conn.snowflake_azure_container_name is None
-        assert local_conn.snowflake_azure_connection_string is None
-
-
-@pytest.mark.parametrize(
-    "stage_location,missing_fields,error_message",
-    [
-        (
-            SnowflakeStageLocation.azure_blob_storage,
-            {
-                "snowflake_azure_container_name": None,
-                "snowflake_azure_connection_string": None,
-            },
-            "Missing Azure fields",
-        ),
-        (
-            SnowflakeStageLocation.aws_s3,
-            {
-                "s3_bucket_name": None,
-                "iam_role_arn": None,  # IAM role is optional, so only s3_bucket_name is truly required
-            },
-            "Missing S3 bucket",
-        ),
-    ],
-)
-def test_create_snowflake_connection_missing_required_fields(client, stage_location, missing_fields, error_message):
-    """Test that creating a Snowflake connection with missing required fields fails appropriately."""
-    config_dict = {
-        "name": f"invalid_{stage_location.value}",
-        "database": "test_db",
-        "user": "snowflake_user",
-        "snowflake_account_id": "ACCOUNT-123",
-        "snowflake_warehouse": "test_warehouse",
-        "snowflake_storage_integration_name": "test_integration",
-        "password": "test_password",
-        "snowflake_stage_location": stage_location,
-    }
-
-    # Add the missing fields
-    config_dict.update(missing_fields)
-
-    config = SnowflakeConnectionConfig(**config_dict)
-
-    with requests_mock.Mocker() as m:
-        m.get("http://test-server/api/connections/", json=[], status_code=200)
-        m.post(
-            "http://test-server/api/connections/",
-            json={"error": error_message},
-            status_code=400,
-        )
-
-        with pytest.raises(DataMasqueApiError):
-            client.create_or_update_connection(config)
+    assert isinstance(conn, SnowflakeConnectionConfig)
+    api_dict = conn.model_dump(exclude_none=True, by_alias=True, mode="json")
+    assert "snowflake_stage_location" not in api_dict
+    for field in SNOWFLAKE_EXTERNAL_STAGE_FIELDS:
+        assert field not in api_dict
 
 
 def test_s3_connection_model_validate():
@@ -981,6 +810,45 @@ def test_azure_connection_model_validate_blanks_encrypted_connection_string():
     assert conn.id == "490502e5-5bf6-4abb-b67b-c6091d40ecf0"
 
 
+def test_gcs_connection_model_validate_blanks_encrypted_service_account_key():
+    payload = {
+        "id": "0f9f5d2e-8d1a-4a1f-9f57-3f2c1b0c9a11",
+        "name": "gcs",
+        "mask_type": "file",
+        "type": "gcs_connection",
+        "base_directory": "inbound",
+        "bucket": "my-gcs-bucket",
+        "is_file_mask_source": True,
+        "is_file_mask_destination": False,
+        # The API only returns the encrypted form; the plaintext is never sent back.
+        "service_account_key_encrypted": "some_base64_here",
+    }
+
+    conn = validate_connection(payload)
+
+    assert isinstance(conn, GcsConnectionConfig)
+    assert conn.bucket == "my-gcs-bucket"
+    assert conn.base_directory == "inbound"
+    assert conn.service_account_key is None
+    assert conn.id == "0f9f5d2e-8d1a-4a1f-9f57-3f2c1b0c9a11"
+
+
+def test_gcs_connection_serializes_the_key_for_create():
+    conn = GcsConnectionConfig(
+        name="gcs",
+        bucket="my-gcs-bucket",
+        service_account_key='{"type": "service_account"}',
+        is_file_mask_source=True,
+    )
+
+    payload = conn.model_dump(exclude_none=True)
+
+    assert payload["type"] == "gcs_connection"
+    assert payload["mask_type"] == "file"
+    assert payload["service_account_key"] == '{"type": "service_account"}'
+    assert "service_account_key_encrypted" not in payload
+
+
 def test_mounted_share_connection_model_validate():
     payload = sample_mounted_share_connection_json(id="7ba07e3d-f917-4bee-bfc0-c42b9b01a06e", name="mount")
 
@@ -1122,7 +990,9 @@ def test_dynamo_connection_model_validate_without_sse_uses_default():
     assert conn.dynamo_default_sse == SseConfig(selection=SseSelection.dynamodb_owned, kms_key_id=None)
 
 
-def test_snowflake_connection_model_validate_with_stage_location():
+@pytest.mark.parametrize("stage_location", ["aws_s3", "azure_blob_storage", "local", "spcs"])
+def test_snowflake_connection_model_validate_drops_external_stage_location(stage_location):
+    """Stage locations from servers older than 3.26.18 are dropped and not sent back."""
     payload = {
         "id": "f0557fb3-1c9a-4cb1-bcf4-9699cf496bf7",
         "name": "snowflake",
@@ -1139,49 +1009,23 @@ def test_snowflake_connection_model_validate_with_stage_location():
         "port": 443,
         "s3_bucket_name": "ice-bucket",
         "iam_role_arn": "swiss roll",
-        "snowflake_stage_location": "aws_s3",
+        "snowflake_azure_container_name": "ice-container",
+        "snowflake_azure_connection_string_encrypted": "encrypted",
+        "snowflake_stage_location": stage_location,
         "is_read_only": False,
     }
 
     conn = SnowflakeConnectionConfig.model_validate(payload)
 
     assert isinstance(conn, SnowflakeConnectionConfig)
-    assert conn.snowflake_stage_location is SnowflakeStageLocation.aws_s3
-    assert conn.iam_role_arn == "swiss roll"
     assert conn.password is None
+    api_dict = conn.model_dump(exclude_none=True, by_alias=True, mode="json")
+    assert "snowflake_stage_location" not in api_dict
+    for field in SNOWFLAKE_EXTERNAL_STAGE_FIELDS:
+        assert field not in api_dict
 
 
-def test_snowflake_connection_model_validate_with_spcs_stage_location():
-    """
-    A Snowflake connection staged in SPCS must deserialise (regression for ui-testing MR !185).
-
-    When DataMasque runs inside Snowflake SPCS it saves connections with
-    `snowflake_stage_location=spcs`. Listing connections deserialises every
-    one, so an unknown stage value used to raise `ValidationError` and break
-    `create_or_update_connection` for unrelated connections on a shared instance.
-    """
-    payload = {
-        "id": "a1b2c3d4-0000-0000-0000-000000000000",
-        "name": "snowflake_spcs",
-        "mask_type": "database",
-        "db_type": "snowflake",
-        "user": "snowman",
-        "database": "icicle",
-        "snowflake_account_id": "ABCDEF-123456",
-        "snowflake_warehouse": "warehouse1",
-        "snowflake_storage_integration_name": "mysi",
-        "snowflake_stage_location": "spcs",
-    }
-
-    conn = SnowflakeConnectionConfig.model_validate(payload)
-
-    assert conn.snowflake_stage_location is SnowflakeStageLocation.spcs
-    # SPCS staging carries no external-storage fields.
-    assert conn.s3_bucket_name is None
-    assert conn.snowflake_azure_container_name is None
-
-
-def test_snowflake_connection_model_validate_without_stage_location():
+def test_snowflake_connection_model_validate_minimal_payload():
     payload = {
         "id": "id-3",
         "name": "snowflake",
@@ -1191,12 +1035,10 @@ def test_snowflake_connection_model_validate_without_stage_location():
         "database": "igloo",
         "snowflake_account_id": "ACCOUNT-1234",
         "snowflake_warehouse": "clothing_store",
-        "snowflake_storage_integration_name": "kennards",
     }
 
     conn = SnowflakeConnectionConfig.model_validate(payload)
 
-    assert conn.snowflake_stage_location is None
     assert conn.host == ""
     assert conn.port is None
     assert conn.db_schema is None
@@ -1750,3 +1592,204 @@ def test_redshift_connection_keeps_its_cluster_s3_role_separate_from_its_tagging
 
     assert api_dict["s3_redshift_iam_role"] == "arn:aws:iam::123456789012:role/redshift-s3"
     assert api_dict["iam_role_arn"] == "arn:aws:iam::119836602066:role/tagger"
+
+
+@pytest.mark.parametrize(
+    ("database_type", "message"),
+    [
+        (DatabaseType.cassandra, "For Apache Cassandra"),
+        (DatabaseType.sap_ase, "For SAP ASE"),
+        (DatabaseType.salesforce, "For Salesforce"),
+    ],
+)
+def test_database_connection_config_rejects_engines_with_their_own_class(
+    database_type: DatabaseType, message: str
+) -> None:
+    with pytest.raises(ValueError, match=message):
+        DatabaseConnectionConfig(
+            name="own-class",
+            host="db.example",
+            port=1,
+            database="people",
+            user="alice",
+            password="hunter2",
+            database_type=database_type,
+        )
+
+
+def test_cassandra_connection_serializes_password_as_dbpassword():
+    conn = CassandraConnectionConfig(
+        name="cassandra",
+        host="cassandra.example",
+        database="people",
+        user="alice",
+        password="hunter2",
+        local_datacenter="dc1",
+    )
+
+    d = conn.model_dump(exclude_none=True, by_alias=True, mode="json")
+
+    assert d["db_type"] == "cassandra"
+    assert d["mask_type"] == "database"
+    assert d["port"] == 9042
+    assert d["database"] == "people"
+    assert d["dbpassword"] == "hunter2"
+    assert "password" not in d
+    assert d["local_datacenter"] == "dc1"
+    assert d["tls"] is False
+    assert d["direct_connection"] is False
+    assert conn.database_type is DatabaseType.cassandra
+
+
+def test_cassandra_connection_without_credentials_omits_user_and_password():
+    """Cassandra allows unauthenticated access; the server rejects a username sent without a password."""
+    d = CassandraConnectionConfig(name="cassandra", host="cassandra.example", database="people").model_dump(
+        exclude_none=True, by_alias=True, mode="json"
+    )
+
+    assert "user" not in d
+    assert "dbpassword" not in d
+
+
+def test_connection_config_dispatch_picks_cassandra_subclass():
+    payload = {
+        "id": "cassandra-id-1",
+        "name": "cassandra",
+        "mask_type": "database",
+        "db_type": "cassandra",
+        "host": "cassandra.example",
+        "port": 9042,
+        "database": "people",
+        "user": "alice",
+        "password_encrypted": "some_base64_here",
+        "tls": True,
+        "direct_connection": True,
+    }
+
+    conn = validate_connection(payload)
+
+    assert isinstance(conn, CassandraConnectionConfig)
+    assert conn.password is None
+    assert conn.tls is True
+    assert conn.direct_connection is True
+    assert "password_encrypted" not in conn.model_dump()
+
+
+def test_sap_ase_connection_serializes_without_a_schema():
+    """ASE has no schema setting: the schema is the table owner."""
+    conn = SapAseConnectionConfig(
+        name="sap_ase",
+        host="ase.example",
+        database="people",
+        user="sa",
+        password="hunter2",
+        tls=True,
+        tls_server_name="ase.internal.example",
+        connect_timeout=30,
+    )
+
+    d = conn.model_dump(exclude_none=True, by_alias=True, mode="json")
+
+    assert d["db_type"] == "sap_ase"
+    assert d["mask_type"] == "database"
+    assert d["port"] == 5000
+    assert d["dbpassword"] == "hunter2"
+    assert "password" not in d
+    assert "schema" not in d
+    assert d["tls"] is True
+    assert d["tls_server_name"] == "ase.internal.example"
+    assert d["connect_timeout"] == 30
+    assert conn.database_type is DatabaseType.sap_ase
+
+
+def test_sap_ase_connection_omits_unset_tls_options():
+    d = SapAseConnectionConfig(name="sap_ase", host="ase.example", database="people", user="sa").model_dump(
+        exclude_none=True, by_alias=True, mode="json"
+    )
+
+    assert "tls_server_name" not in d
+    assert "connect_timeout" not in d
+    assert "dbpassword" not in d
+
+
+def test_connection_config_dispatch_picks_sap_ase_subclass():
+    payload = {
+        "id": "sap-ase-id-1",
+        "name": "sap_ase",
+        "mask_type": "database",
+        "db_type": "sap_ase",
+        "host": "ase.example",
+        "port": 5000,
+        "database": "people",
+        "user": "sa",
+        "password_encrypted": "some_base64_here",
+    }
+
+    conn = validate_connection(payload)
+
+    assert isinstance(conn, SapAseConnectionConfig)
+    assert conn.password is None
+    assert conn.database_type is DatabaseType.sap_ase
+
+
+def test_salesforce_connection_serializes_for_create():
+    conn = SalesforceConnectionConfig(
+        name="salesforce",
+        instance_url="https://example--uat.sandbox.my.salesforce.com",
+        login_url="https://example--uat.sandbox.my.salesforce.com",
+        client_id="3MVG9consumerkey",
+        user="masking@example.com.uat",
+        salesforce_private_key_path="salesforce-masking.key",
+        salesforce_private_key_passphrase="hunter2",
+    )
+
+    d = conn.model_dump(exclude_none=True, by_alias=True, mode="json")
+
+    assert d["db_type"] == "salesforce"
+    assert d["mask_type"] == "database"
+    assert d["login_url"] == "https://example--uat.sandbox.my.salesforce.com"
+    assert d["salesforce_private_key_path"] == "salesforce-masking.key"
+    assert d["salesforce_private_key_passphrase"] == "hunter2"
+    # Unset, so the server applies its own default.
+    assert "api_version" not in d
+    assert "host" not in d
+    assert "dbpassword" not in d
+    assert conn.database_type is DatabaseType.salesforce
+
+
+def test_salesforce_connection_without_passphrase_omits_it():
+    """An unencrypted private key needs no passphrase."""
+    d = SalesforceConnectionConfig(
+        name="salesforce",
+        instance_url="https://example.my.salesforce.com",
+        login_url="https://example.my.salesforce.com",
+        client_id="3MVG9consumerkey",
+        user="masking@example.com",
+        salesforce_private_key_path="salesforce-masking.key",
+    ).model_dump(exclude_none=True, by_alias=True, mode="json")
+
+    assert "salesforce_private_key_passphrase" not in d
+
+
+def test_connection_config_dispatch_picks_salesforce_subclass():
+    payload = {
+        "id": "salesforce-id-1",
+        "name": "salesforce",
+        "mask_type": "database",
+        "db_type": "salesforce",
+        "instance_url": "https://example.my.salesforce.com",
+        "login_url": "https://example.my.salesforce.com",
+        "client_id": "3MVG9consumerkey",
+        "user": "masking@example.com",
+        "salesforce_private_key_path": "salesforce-masking.key",
+        "salesforce_private_key_passphrase_encrypted": "some_base64_here",
+        "api_version": "62.0",
+    }
+
+    conn = validate_connection(payload)
+
+    assert isinstance(conn, SalesforceConnectionConfig)
+    assert conn.salesforce_private_key_passphrase is None
+    assert "salesforce_private_key_passphrase_encrypted" not in conn.model_dump()
+    # The version the server stored is kept, so sending the connection back does not change it.
+    assert conn.model_dump(exclude_none=True)["api_version"] == "62.0"
