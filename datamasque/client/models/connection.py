@@ -370,7 +370,7 @@ class DatabaseConnectionConfig(ConnectionConfig):
 
     Use `DynamoConnectionConfig` for DynamoDB, `SnowflakeConnectionConfig` for Snowflake,
     `MongoConnectionConfig` for MongoDB, `CassandraConnectionConfig` for Apache Cassandra,
-    `SybaseConnectionConfig` for SAP ASE and `SalesforceConnectionConfig` for Salesforce.
+    `SybaseConnectionConfig` for SAP ASE (Sybase) and `SalesforceConnectionConfig` for Salesforce.
     """
 
     host: str

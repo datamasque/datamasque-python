@@ -12,7 +12,7 @@ History
 * Added ``CassandraConnectionConfig`` for Apache Cassandra (``db_type: cassandra``).
   ``database`` is the keyspace; ``user`` and ``password`` are optional,
   and ``local_datacenter``, ``tls`` and ``direct_connection`` are supported.
-* Added ``SybaseConnectionConfig`` for SAP ASE (``db_type: sybase``),
+* Added ``SybaseConnectionConfig`` for SAP ASE (Sybase) (``db_type: sybase``),
   with ``tls``, ``tls_server_name`` and ``connect_timeout``.
   It sends no ``schema``: in ASE the schema is the table owner.
 * Added ``SalesforceConnectionConfig`` for Salesforce (``db_type: salesforce``),
