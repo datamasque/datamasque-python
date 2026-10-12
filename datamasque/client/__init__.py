@@ -121,6 +121,7 @@ from datamasque.client.models.ifm import (
     RulesetPlanUpdateRequest,
 )
 from datamasque.client.models.license import LicenseInfo, SwitchableLicenseMetadata
+from datamasque.client.models.project import Project, ProjectCreateRequest, ProjectId
 from datamasque.client.models.rg_config import RGConfig, RGConfigId
 from datamasque.client.models.ruleset import Ruleset, RulesetId, RulesetType
 from datamasque.client.models.ruleset_library import RulesetLibrary, RulesetLibraryId
@@ -291,6 +292,9 @@ __all__ = [
     "PatternComposition",
     "PatternEntry",
     "PatternsStatistics",
+    "Project",
+    "ProjectCreateRequest",
+    "ProjectId",
     "RGConfig",
     "RGConfigId",
     "RGConfigNotFoundError",
