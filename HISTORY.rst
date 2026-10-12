@@ -2,6 +2,12 @@
 History
 =======
 
+1.7.0 (unreleased)
+------------------
+
+* Added ``create_project``, which takes a ``ProjectCreateRequest`` and returns the created ``Project``.
+  Only admin users can create projects, and API tokens cannot.
+
 1.6.0 (unreleased)
 ------------------
 
