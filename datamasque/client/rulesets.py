@@ -20,14 +20,18 @@ class RulesetClient(BaseClient):
         """
         Creates or updates a ruleset.
 
-        Populates the given ruleset's `id`, `is_valid`, `validation_errors`, `unlicensed_feature_warnings`,
+        The ruleset goes into its `project`, or the client's `default_project` when that is unset.
+        An existing ruleset with the same name and type in that project is updated.
+
+        Populates the given ruleset's `id`, `project`, `is_valid`, `validation_errors`, `unlicensed_feature_warnings`,
         and `git` fields from the server response, and returns the same ruleset instance for convenience.
         """
 
-        data = ruleset.model_dump(exclude_none=True, by_alias=True, mode="json")
+        data = ruleset.model_dump(exclude_none=True, by_alias=True, mode="json") | self._project_field(ruleset.project)
         response = self.make_request("POST", "/api/rulesets/", data=data, params={"upsert": "true"})
         created = Ruleset.model_validate(response.json())
         ruleset.id = created.id
+        ruleset.project = created.project
         ruleset.is_valid = created.is_valid
         ruleset.validation_errors = created.validation_errors
         ruleset.unlicensed_feature_warnings = created.unlicensed_feature_warnings

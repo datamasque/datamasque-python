@@ -74,18 +74,20 @@ class DiscoveryConfigClient(BaseClient):
         """
         Creates a new discovery config on the server.
 
+        The config goes into its `project`, or the client's `default_project` when that is unset.
         Sets the config's server-assigned fields
-        (`id`, `is_valid`, `validation_error`, `validation_error_details`, `created`, `modified`)
+        (`id`, `project`, `is_valid`, `validation_error`, `validation_error_details`, `created`, `modified`)
         and returns the config.
         """
 
         if not config.yaml:
             raise ValueError("Cannot create a discovery config without YAML content (yaml is empty)")
 
-        data = config.model_dump(exclude_none=True, by_alias=True, mode="json")
+        data = config.model_dump(exclude_none=True, by_alias=True, mode="json") | self._project_field(config.project)
         response = self.make_request("POST", "/api/discovery/configs/", data=data)
         created = DiscoveryConfig.model_validate(response.json())
         config.id = created.id
+        config.project = created.project
         config.is_valid = created.is_valid
         config.validation_error = created.validation_error
         config.validation_error_details = created.validation_error_details
