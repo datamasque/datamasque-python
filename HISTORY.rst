@@ -2,6 +2,20 @@
 History
 =======
 
+1.6.0 (unreleased)
+------------------
+
+* Added a read-only ``project`` field to ``ConnectionConfig``, ``Ruleset``, ``RulesetLibrary``, ``DiscoveryConfig``,
+  ``DiscoveryConfigLibrary``, ``RGConfig`` and ``TableReference``:
+  the ``<id>-<slug>`` reference of the project the resource belongs to, such as ``1-default``.
+  It is ``None`` until the resource is created on the server,
+  and is excluded when a model is serialized back to the API,
+  so creating a resource places it in the server's default project.
+* ``RunInfo`` and ``UnfinishedRun`` gain a required ``project`` field:
+  the run's project, taken from its ruleset's project when the run starts.
+
+Requires server version 3.26.20
+
 1.5.0 (2026-10-07)
 ------------------
 
