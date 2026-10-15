@@ -23,6 +23,7 @@ from datamasque.client.exceptions import (
     InvalidDiscoveryConfigError,
     InvalidLibraryError,
     InvalidRulesetError,
+    ProjectDeleteConflictError,
     RGConfigNotFoundError,
     RunNotCancellableError,
 )
@@ -121,7 +122,13 @@ from datamasque.client.models.ifm import (
     RulesetPlanUpdateRequest,
 )
 from datamasque.client.models.license import LicenseInfo, SwitchableLicenseMetadata
-from datamasque.client.models.project import Project, ProjectCreateRequest, ProjectId
+from datamasque.client.models.project import (
+    Project,
+    ProjectCreateRequest,
+    ProjectDeleteConflict,
+    ProjectDeleteConflictReason,
+    ProjectId,
+)
 from datamasque.client.models.rg_config import RGConfig, RGConfigId
 from datamasque.client.models.ruleset import Ruleset, RulesetId, RulesetType
 from datamasque.client.models.ruleset_library import RulesetLibrary, RulesetLibraryId
@@ -294,6 +301,9 @@ __all__ = [
     "PatternsStatistics",
     "Project",
     "ProjectCreateRequest",
+    "ProjectDeleteConflict",
+    "ProjectDeleteConflictError",
+    "ProjectDeleteConflictReason",
     "ProjectId",
     "RGConfig",
     "RGConfigId",
