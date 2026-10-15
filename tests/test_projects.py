@@ -40,7 +40,7 @@ def test_create_project(client: DataMasqueClient) -> None:
 
 
 def test_create_project_returns_the_name_and_description_as_stored(client: DataMasqueClient) -> None:
-    """The server trims surrounding whitespace from the name and description."""
+    """Whitespace in the name and description is sent as given, and the server's stored values are returned."""
     request = ProjectCreateRequest(name="  Banking ", description=" Customer banking data  ")
 
     with requests_mock.Mocker() as m:
