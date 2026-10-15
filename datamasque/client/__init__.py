@@ -129,6 +129,13 @@ from datamasque.client.models.project import (
     ProjectDeleteConflictReason,
     ProjectId,
 )
+from datamasque.client.models.resource import (
+    ConnectionResource,
+    DiscoveryConfigResource,
+    Resource,
+    ResourceTypeName,
+    RulesetResource,
+)
 from datamasque.client.models.rg_config import RGConfig, RGConfigId
 from datamasque.client.models.ruleset import Ruleset, RulesetId, RulesetType
 from datamasque.client.models.ruleset_library import RulesetLibrary, RulesetLibraryId
@@ -216,6 +223,7 @@ __all__ = [
     "CommonStatistics",
     "ConnectionConfig",
     "ConnectionId",
+    "ConnectionResource",
     "ConstraintColumns",
     "DataMasqueApiError",
     "DataMasqueClient",
@@ -237,6 +245,7 @@ __all__ = [
     "DiscoveryConfigLibrary",
     "DiscoveryConfigLibraryId",
     "DiscoveryConfigNotFoundError",
+    "DiscoveryConfigResource",
     "DiscoveryConfigType",
     "DiscoveryKind",
     "DiscoveryMatch",
@@ -309,6 +318,8 @@ __all__ = [
     "RGConfigId",
     "RGConfigNotFoundError",
     "ReferencingForeignKey",
+    "Resource",
+    "ResourceTypeName",
     "Ruleset",
     "RulesetGenerationRequest",
     "RulesetGenerationWithRGConfigRequest",
@@ -320,6 +331,7 @@ __all__ = [
     "RulesetPlanOptions",
     "RulesetPlanPartialUpdateRequest",
     "RulesetPlanUpdateRequest",
+    "RulesetResource",
     "RulesetType",
     "RunConnectionRef",
     "RunId",
