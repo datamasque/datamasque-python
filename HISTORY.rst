@@ -6,6 +6,7 @@ History
 ------------------
 
 * Added project models and management APIs.
+* Added ``list_resources``, which lists resources of every type across projects.
 
 1.6.0 (unreleased)
 ------------------
