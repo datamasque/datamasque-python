@@ -92,6 +92,14 @@ datamasque.client.projects module
    :undoc-members:
    :show-inheritance:
 
+datamasque.client.resources module
+----------------------------------
+
+.. automodule:: datamasque.client.resources
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 datamasque.client.rg_configs module
 -----------------------------------
 
