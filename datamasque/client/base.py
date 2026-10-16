@@ -317,8 +317,14 @@ class BaseClient:
         params: Optional[dict] = None,
         page_size: int = 100,
     ) -> Iterator[_T]:
+        """Iterate every `T` across all pages of an admin-server list endpoint."""
+
+        for results in self._iter_pages(path, params=params, page_size=page_size):
+            yield from (model.model_validate(item) for item in results)
+
+    def _iter_pages(self, path: str, *, params: Optional[dict] = None, page_size: int = 100) -> Iterator[Any]:
         """
-        Iterate every `T` across all pages of an admin-server list endpoint.
+        Iterate the `results` of each page of an admin-server list endpoint.
 
         Opts into pagination by sending `limit`/`offset` on the first request,
         then follows the absolute `next` URL returned by the server.
@@ -334,7 +340,7 @@ class BaseClient:
         while url:
             response = self.make_request("GET", url, params=current_params)
             data = response.json()
-            yield from (model.model_validate(item) for item in data["results"])
+            yield data["results"]
             url = data.get("next")
             # The `next` URL is absolute and already contains the pagination cursor;
             # do not re-send our initial params alongside it.

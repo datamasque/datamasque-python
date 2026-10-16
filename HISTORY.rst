@@ -5,8 +5,8 @@ History
 1.7.0 (unreleased)
 ------------------
 
-* Added ``create_project``, which takes a ``ProjectCreateRequest`` and returns the created ``Project``.
-  Only admin users can create projects, and API tokens cannot.
+* Added project models and management APIs.
+* Added ``list_resources``, which lists resources of every type across projects.
 
 1.6.0 (unreleased)
 ------------------
