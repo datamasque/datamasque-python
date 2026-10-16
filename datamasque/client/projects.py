@@ -27,9 +27,8 @@ class ProjectClient(BaseClient):
         """
         Creates a new project on the server, and returns it as the server stored it.
 
-        Only admin users can create projects, and API tokens cannot.
-        A name the server rejects (see `ProjectCreateRequest`) raises `DataMasqueApiError` with status 400,
-        and a caller who is not an admin user raises it with status 403.
+        Raises:
+            DataMasqueApiError: the server rejects the name (see `ProjectCreateRequest`), or any other non-2xx response.
         """
 
         data = request.model_dump(mode="json")
