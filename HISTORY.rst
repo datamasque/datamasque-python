@@ -7,6 +7,13 @@ History
 
 * Added ``create_project``, which takes a ``ProjectCreateRequest`` and returns the created ``Project``.
   Only admin users can create projects, and API tokens cannot.
+* Added ``default_project`` to ``DataMasqueInstanceConfig``.
+  A create sends the model's ``project``, or ``default_project`` when that is unset,
+  for connections, rulesets, discovery configs, RG configs and table references.
+  ``upload_file`` and ``upload_file_if_not_exists`` take a ``project`` argument, defaulting the same way.
+  With neither set, the request names no project and the server chooses one;
+  a server with several active projects may reject it.
+  Updating a connection leaves it in its current project.
 
 1.6.0 (unreleased)
 ------------------

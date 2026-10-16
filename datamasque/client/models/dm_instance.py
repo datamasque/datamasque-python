@@ -42,6 +42,12 @@ class DataMasqueInstanceConfig(BaseModel):
     Create the token in Snowsight (User profile → Programmatic access tokens)
     for an account that can reach the SPCS app.
     Leave unset for instances that are not hosted on SPCS."""
+    default_project: Optional[str] = None
+    """The project a create or upload goes into when it names none, as a `<id>-<slug>` reference (e.g. `1-default`)
+    or a bare project id.
+
+    Applies to connections, rulesets, discovery configs, RG configs, table references and uploaded files.
+    Leave unset to let the server choose; a server with several active projects may reject a create that names none."""
 
     @model_validator(mode="after")
     def _validate_auth_source(self) -> "DataMasqueInstanceConfig":

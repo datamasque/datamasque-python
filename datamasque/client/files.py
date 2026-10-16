@@ -15,6 +15,7 @@ class FileClient(BaseClient):
         file_type: Type[FileTypeT],
         file_name: str,
         file_path_or_content: Union[str, bytes, Path],
+        project: Optional[str] = None,
     ) -> FileTypeT:
         """
         Uploads a file of the given type to the DataMasque server.
@@ -22,6 +23,7 @@ class FileClient(BaseClient):
         `file_type` must be a concrete subclass of `DataMasqueFile`
         (`SeedFile`, `OracleWalletFile`, `SslZipFile`, `SnowflakeKeyFile`).
         `file_path_or_content` may be a path (as `str` or `Path`), raw `bytes`, or a file-like object.
+        The file goes into `project`, or the client's `default_project` when that is unset.
         """
 
         name, content = read_file_or_content(file_path_or_content, file_name)
@@ -30,7 +32,7 @@ class FileClient(BaseClient):
         response = self.make_request(
             "POST",
             file_type.get_url(),
-            data={"name": file_name, **file_type.get_extra_form_data()},
+            data={"name": file_name, **file_type.get_extra_form_data(), **self._project_field(project)},
             files=[
                 UploadFile(
                     field_name=file_type.get_content_param_name(),
@@ -72,13 +74,16 @@ class FileClient(BaseClient):
         matching_files = [f for f in self.list_files_of_type(file_type) if f.name == name]
         return matching_files[0] if matching_files else None
 
-    def upload_file_if_not_exists(self, file_type: Type[FileTypeT], file_path: Union[str, Path]) -> Optional[FileTypeT]:
+    def upload_file_if_not_exists(
+        self, file_type: Type[FileTypeT], file_path: Union[str, Path], project: Optional[str] = None
+    ) -> Optional[FileTypeT]:
         """
         Upload a file only if one with the same name doesn't already exist.
 
         Args:
             file_type: A concrete subclass of `DataMasqueFile` (e.g., SeedFile, OracleWalletFile).
             file_path: Path to the file to upload.
+            project: The project to upload into; the client's `default_project` when unset.
 
         Returns:
             The uploaded file object if a new file was uploaded, or None if a file
@@ -89,4 +94,4 @@ class FileClient(BaseClient):
         if self.get_file_of_type_by_name(file_type, file_path.name) is not None:
             return None
 
-        return self.upload_file(file_type, file_path.name, file_path)
+        return self.upload_file(file_type, file_path.name, file_path, project=project)

@@ -22,7 +22,12 @@ class ConnectionClient(BaseClient):
         return [validate_connection(payload) for payload in response.json()]
 
     def create_or_update_connection(self, connection_config: ConnectionConfig) -> ConnectionConfig:
-        """Creates or updates the connection in DM, and sets the `id` field on the given `connection_config`."""
+        """
+        Creates or updates the connection in DM, and sets `id` and `project` on the given `connection_config`.
+
+        A new connection goes into its `project`, or the client's `default_project` when that is unset.
+        An update leaves the connection in its current project.
+        """
 
         connection_id = connection_config.id
 
@@ -37,6 +42,7 @@ class ConnectionClient(BaseClient):
             "version": "1.0",
         } | connection_config.model_dump(exclude_none=True, by_alias=True, mode="json")
         if connection_id is None:
+            data |= self._project_field(connection_config.project)
             response = self.make_request("POST", "/api/connections/", data=data)
         else:
             response = self.make_request("PUT", f"/api/connections/{connection_id}/", data=data)
@@ -45,6 +51,7 @@ class ConnectionClient(BaseClient):
         server_connection_id = ConnectionId(connection_data["id"])
         logger.debug("%s creation successful", type(connection_config).__name__)
         connection_config.id = server_connection_id
+        connection_config.project = connection_data.get("project")
         return connection_config
 
     def delete_connection_by_id_if_exists(self, connection_id: ConnectionId) -> None:

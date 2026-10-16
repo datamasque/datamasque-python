@@ -66,7 +66,8 @@ class TableReferenceClient(BaseClient):
         """
         Creates a new table reference on the server.
 
-        Sets the table reference's server-assigned fields (`id`, `created`, `modified`)
+        The table reference goes into its `project`, or the client's `default_project` when that is unset.
+        Sets the table reference's server-assigned fields (`id`, `project`, `created`, `modified`)
         and its `options` as stored by the server (with any omitted option filled in with its default),
         then returns the table reference.
         """
@@ -74,9 +75,11 @@ class TableReferenceClient(BaseClient):
         data = table_reference.model_dump(by_alias=True, mode="json")
         if data.get("options") is None:
             data.pop("options", None)
+        data |= self._project_field(table_reference.project)
         response = self.make_request("POST", "/api/table-references/", data=data)
         created = TableReference.model_validate(response.json())
         table_reference.id = created.id
+        table_reference.project = created.project
         table_reference.options = created.options
         table_reference.created = created.created
         table_reference.modified = created.modified

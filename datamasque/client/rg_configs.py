@@ -72,14 +72,16 @@ class RGConfigClient(BaseClient):
         """
         Creates a new RG config on the server.
 
+        The config goes into its `project`, or the client's `default_project` when that is unset.
         Sets the config's server-assigned fields
-        (`id`, `is_valid`, `validation_errors`, `created`, `modified`) and returns the config.
+        (`id`, `project`, `is_valid`, `validation_errors`, `created`, `modified`) and returns the config.
         """
 
-        data = config.model_dump(exclude_none=True, by_alias=True, mode="json")
+        data = config.model_dump(exclude_none=True, by_alias=True, mode="json") | self._project_field(config.project)
         response = self.make_request("POST", "/api/ruleset-generation-configs/", data=data)
         created = RGConfig.model_validate(response.json())
         config.id = created.id
+        config.project = created.project
         config.is_valid = created.is_valid
         config.validation_errors = created.validation_errors
         config.created = created.created

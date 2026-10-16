@@ -130,6 +130,7 @@ class BaseClient:
     password: Optional[str]
     verify_ssl: bool
     token_source: Optional[Callable[[], str]]
+    default_project: Optional[str]
 
     def __init__(self, connection_config: DataMasqueInstanceConfig) -> None:
         self.base_url = connection_config.base_url
@@ -137,9 +138,20 @@ class BaseClient:
         self.password = connection_config.password
         self.verify_ssl = connection_config.verify_ssl
         self.token_source = connection_config.token_source
+        self.default_project = connection_config.default_project
         self._session = _build_session(self.verify_ssl)
         if connection_config.spcs_pat:
             install_spcs_gateway_auth(self._session, connection_config.spcs_pat)
+
+    def _project_field(self, project: Optional[str]) -> dict[str, str]:
+        """
+        Return the `project` field a create request sends: `project` if set, else the client's `default_project`.
+
+        Empty when neither is set, so the server picks the project.
+        """
+
+        chosen = project or self.default_project
+        return {"project": chosen} if chosen else {}
 
     @contextmanager
     def _maybe_suppress_insecure_warning(self) -> Iterator[None]:
