@@ -1,5 +1,5 @@
 import logging
-from typing import Union
+from typing import Iterator, Union
 
 from requests import Response
 
@@ -22,6 +22,35 @@ def _get_conflicts(response: Response) -> list[ProjectDeleteConflict]:
 
 class ProjectClient(BaseClient):
     """Project API methods. Mixed into `DataMasqueClient`."""
+
+    def iter_projects(self, *, include_archived: bool = False) -> Iterator[Project]:
+        """
+        Lazily iterate projects via the paginated endpoint.
+
+        Archived projects are skipped unless `include_archived` is set.
+        """
+
+        params = {"include_archived": "true"} if include_archived else None
+        return self._iter_paginated("/api/projects/", model=Project, params=params)
+
+    def list_projects(self, *, include_archived: bool = False) -> list[Project]:
+        """
+        Lists projects.
+
+        Archived projects are left out unless `include_archived` is set.
+        """
+
+        return list(self.iter_projects(include_archived=include_archived))
+
+    def get_project(self, project: Union[ProjectId, Project]) -> Project:
+        """
+        Retrieves a single project, given as a `Project` or its `ProjectId`.
+
+        Archived projects can be retrieved too.
+        """
+
+        response = self.make_request("GET", f"/api/projects/{unwrap_project_id(project)}/")
+        return Project.model_validate(response.json())
 
     def create_project(self, request: ProjectCreateRequest) -> Project:
         """
