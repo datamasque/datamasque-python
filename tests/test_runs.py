@@ -26,7 +26,7 @@ from datamasque.client.models.runs import (
     UnfinishedRun,
 )
 from datamasque.client.models.status import MaskingRunStatus
-from tests.helpers import fake
+from tests.helpers import PROJECT, fake
 
 
 def test_get_run_log(client):
@@ -125,7 +125,7 @@ def unfinished_run_json(
         "destination_connection": destination[0] or None,
         "destination_connection_name": destination[1],
         "ruleset_name": f"ruleset_{run_id}",
-        "project": "1-default",
+        "project": PROJECT,
         "status": status,
     }
 
@@ -438,6 +438,7 @@ def test_masking_run_request_requires_ruleset():
 def test_masking_run_request_accepts_connection_config_and_ruleset_objects():
     """Callers may pass full `ConnectionConfig` / `Ruleset` objects; their IDs are extracted at construction."""
     connection = DatabaseConnectionConfig(
+        project=PROJECT,
         id=ConnectionId("conn-uuid"),
         name="prod_db",
         db_type=DatabaseType.postgres,
@@ -447,6 +448,7 @@ def test_masking_run_request_accepts_connection_config_and_ruleset_objects():
         user="masker",
     )
     dest = DatabaseConnectionConfig(
+        project=PROJECT,
         id=ConnectionId("dest-uuid"),
         name="staging_db",
         db_type=DatabaseType.postgres,
@@ -456,6 +458,7 @@ def test_masking_run_request_accepts_connection_config_and_ruleset_objects():
         user="masker",
     )
     ruleset = Ruleset(
+        project=PROJECT,
         id=RulesetId("rs-uuid"),
         name="my_ruleset",
         yaml="version: '1.0'",
@@ -473,6 +476,7 @@ def test_masking_run_request_accepts_connection_config_and_ruleset_objects():
 def test_masking_run_request_rejects_unpersisted_connection():
     """A `ConnectionConfig` without an `id` means the caller hasn't created it yet — raise at construction."""
     connection = DatabaseConnectionConfig(
+        project=PROJECT,
         name="not_yet_created",
         db_type=DatabaseType.postgres,
         host="localhost",
@@ -486,7 +490,7 @@ def test_masking_run_request_rejects_unpersisted_connection():
 
 def test_masking_run_request_rejects_unpersisted_ruleset():
     """Same check on the ruleset side."""
-    ruleset = Ruleset(name="fresh_ruleset", yaml="version: '1.0'", ruleset_type=RulesetType.database)
+    ruleset = Ruleset(project=PROJECT, name="fresh_ruleset", yaml="version: '1.0'", ruleset_type=RulesetType.database)
     with pytest.raises(ValueError, match="has not been created yet"):
         MaskingRunRequest(connection="conn-1", ruleset=ruleset)
 

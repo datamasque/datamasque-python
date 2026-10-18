@@ -121,13 +121,15 @@ class ConnectionConfig(BaseModel):
     model_config = ConfigDict(extra="allow", populate_by_name=True)
 
     name: str
+    project: Optional[str] = None
+    """
+    The project it belongs to: the `<id>-<slug>` reference a GET returns, such as `Project.reference`,
+    or the project's ID as a string.
+    Left as `None`, a create goes into the server's default project.
+    """
     id: Optional[ConnectionId] = None
     # Server-populated and read-only, so it is excluded when serializing a config back to the API.
     license_lock: Optional[LicenseLock] = Field(default=None, exclude=True)
-    # Its project's `<id>-<slug>` reference, e.g. `1-default`;
-    # `None` until it is created on the server.
-    # Server-populated, so excluded when serializing.
-    project: Optional[str] = Field(default=None, exclude=True)
     # Whether the connection's protected fields are currently locked under the license edit lock.
     target_frozen: bool = Field(default=False, exclude=True)
     # The protected fields currently locked, as server config keys (e.g. `schema`, not `db_schema`);

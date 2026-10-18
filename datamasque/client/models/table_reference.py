@@ -73,6 +73,12 @@ class TableReference(BaseModel):
     model_config = ConfigDict(extra="allow", populate_by_name=True)
 
     name: str
+    project: Optional[str] = None
+    """
+    The project it belongs to: the `<id>-<slug>` reference a GET returns, such as `Project.reference`,
+    or the project's ID as a string.
+    Left as `None`, a create goes into the server's default project.
+    """
     connection: Union[ConnectionId, ConnectionConfig]
     """The connection the data lives in. Accepts a `ConnectionId` or a `ConnectionConfig` (its `id` is extracted)."""
     source: str
@@ -81,8 +87,6 @@ class TableReference(BaseModel):
 
     # Server-populated read-only fields, excluded from request bodies.
     id: Optional[TableReferenceId] = Field(default=None, exclude=True)
-    project: Optional[str] = Field(default=None, exclude=True)
-    """Its project's `<id>-<slug>` reference, e.g. `1-default`; `None` until it is created on the server."""
     created: Optional[datetime] = Field(default=None, exclude=True)
     modified: Optional[datetime] = Field(default=None, exclude=True)
 

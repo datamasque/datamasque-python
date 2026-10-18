@@ -1,11 +1,11 @@
 """Tests for project support in the DataMasque client."""
 
 from datetime import datetime
-from typing import Union
+from typing import Callable, Union
 
 import pytest
 import requests_mock
-from pydantic import ValidationError
+from pydantic import BaseModel, ValidationError
 
 from datamasque.client import (
     DataMasqueApiError,
@@ -17,6 +17,17 @@ from datamasque.client import (
     ProjectDeleteConflictReason,
     ProjectId,
 )
+from datamasque.client.exceptions import DataMasqueException
+from datamasque.client.models.connection import ConnectionId, S3ConnectionConfig
+from datamasque.client.models.discovery_config import DiscoveryConfig
+from datamasque.client.models.discovery_config_library import DiscoveryConfigLibrary
+from datamasque.client.models.rg_config import RGConfig
+from datamasque.client.models.ruleset import Ruleset, RulesetType
+from datamasque.client.models.ruleset_library import RulesetLibrary
+from datamasque.client.models.table_reference import TableReference
+from tests.helpers import PROJECT, PROJECT_ID, active_projects_page
+
+CREATED_ID = "aaaaaaaa-1111-2222-3333-444444444444"
 
 BANKING_PROJECT = {
     "id": 7,
@@ -266,3 +277,141 @@ def test_get_missing_project_raises(client: DataMasqueClient) -> None:
             client.get_project(ProjectId(99))
 
     assert exc_info.value.response.status_code == 404
+
+
+EMPTY_PAGE = {"count": 0, "next": None, "previous": None, "results": []}
+
+CREATE_OR_UPDATE_WITHOUT_A_PROJECT = [
+    pytest.param(
+        lambda: S3ConnectionConfig(name="s3", bucket="b", base_directory=""),
+        "create_or_update_connection",
+        "/api/connections/",
+        [],
+        id="connection",
+    ),
+    pytest.param(
+        lambda: RGConfig(name="rg", yaml="labels: []"),
+        "create_or_update_rg_config",
+        "/api/ruleset-generation-configs/",
+        EMPTY_PAGE,
+        id="rg_config",
+    ),
+    pytest.param(
+        lambda: RulesetLibrary(name="lib", yaml="version: '1.0'"),
+        "create_or_update_ruleset_library",
+        "/api/ruleset-libraries/",
+        EMPTY_PAGE,
+        id="ruleset_library",
+    ),
+    pytest.param(
+        lambda: DiscoveryConfig(name="dc", yaml="labels: []", config_type="database"),
+        "create_or_update_discovery_config",
+        "/api/discovery/configs/",
+        EMPTY_PAGE,
+        id="discovery_config",
+    ),
+    pytest.param(
+        lambda: DiscoveryConfigLibrary(name="dcl", yaml="labels: []"),
+        "create_or_update_discovery_config_library",
+        "/api/discovery/config-libraries/",
+        [],
+        id="discovery_config_library",
+    ),
+    pytest.param(
+        lambda: TableReference(name="tr", connection=ConnectionId("1"), source="customers.csv"),
+        "create_or_update_table_reference",
+        "/api/table-references/",
+        [],
+        id="table_reference",
+    ),
+]
+"""
+Each `create_or_update_*` that looks up the existing resource itself:
+a factory for a resource with no `project`, the method, the path it looks up and creates on,
+and that path's empty listing.
+"""
+
+RULESET_WITHOUT_A_PROJECT = pytest.param(
+    lambda: Ruleset(name="rs", yaml="version: '1.0'\ntasks: []", ruleset_type=RulesetType.database),
+    "create_or_update_ruleset",
+    "/api/rulesets/",
+    None,
+    id="ruleset",
+)
+"""`create_or_update_ruleset`, which leaves finding the existing ruleset to the server's upsert."""
+
+
+@pytest.mark.parametrize("make_resource, method, path, empty_listing", CREATE_OR_UPDATE_WITHOUT_A_PROJECT)
+def test_create_or_update_without_a_project_uses_the_only_active_project(
+    client: DataMasqueClient,
+    make_resource: Callable[[], BaseModel],
+    method: str,
+    path: str,
+    empty_listing: object,
+) -> None:
+    """The lookup is in the only active project, and the create leaves the choice of project to the server."""
+    resource = make_resource()
+    created = resource.model_dump(mode="json", by_alias=True) | {"id": CREATED_ID, "project": PROJECT}
+
+    with requests_mock.Mocker() as m:
+        m.get("http://test-server/api/projects/", json=active_projects_page(1), status_code=200)
+        m.get(f"http://test-server{path}", json=empty_listing, status_code=200)
+        m.post(f"http://test-server{path}", json=created, status_code=201)
+        getattr(client, method)(resource)
+
+    assert [(request.method, request.path) for request in m.request_history] == [
+        ("GET", "/api/projects/"),
+        ("GET", path),
+        ("POST", path),
+    ]
+    assert m.request_history[0].qs == {"limit": ["1"]}
+    assert m.request_history[1].qs["project"] == [str(PROJECT_ID)]
+    assert "project" not in m.last_request.json()
+    assert resource.model_dump()["project"] == PROJECT
+
+
+def test_create_or_update_ruleset_without_a_project_uses_the_only_active_project(client: DataMasqueClient) -> None:
+    """The upsert leaves the choice of project to the server, after checking that exactly one project is active."""
+    ruleset = Ruleset(name="rs", yaml="version: '1.0'\ntasks: []", ruleset_type=RulesetType.database)
+
+    with requests_mock.Mocker() as m:
+        m.get("http://test-server/api/projects/", json=active_projects_page(1), status_code=200)
+        m.post(
+            "http://test-server/api/rulesets/?upsert=true",
+            json={"id": CREATED_ID, "name": "rs", "project": PROJECT},
+            status_code=201,
+        )
+        client.create_or_update_ruleset(ruleset)
+
+    assert [(request.method, request.path) for request in m.request_history] == [
+        ("GET", "/api/projects/"),
+        ("POST", "/api/rulesets/"),
+    ]
+    assert "project" not in m.last_request.json()
+    assert ruleset.project == PROJECT
+
+
+@pytest.mark.parametrize("active_projects", [0, 2])
+@pytest.mark.parametrize(
+    "make_resource, method, path, empty_listing", [*CREATE_OR_UPDATE_WITHOUT_A_PROJECT, RULESET_WITHOUT_A_PROJECT]
+)
+def test_create_or_update_without_a_project_needs_exactly_one_active_project(
+    client: DataMasqueClient,
+    make_resource: Callable[[], BaseModel],
+    method: str,
+    path: str,
+    empty_listing: object,
+    active_projects: int,
+) -> None:
+    """
+    With no project, the server only accepts a create when exactly one project is active.
+
+    So the client raises before looking up or writing anything,
+    rather than updating a same-named resource in a project the server would not have picked.
+    """
+    with requests_mock.Mocker() as m:
+        m.get("http://test-server/api/projects/", json=active_projects_page(active_projects), status_code=200)
+        with pytest.raises(DataMasqueException, match=f"has {active_projects} active projects"):
+            getattr(client, method)(make_resource())
+
+    assert [request.path for request in m.request_history] == ["/api/projects/"]

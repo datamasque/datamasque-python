@@ -15,6 +15,7 @@ from datamasque.client.models.ruleset_library import (
     ValidationStatus,
 )
 from datamasque.client.models.status import ValidationErrorDetails
+from tests.helpers import PROJECT, PROJECT_ID
 
 LIBRARY_ID_1 = "aaaaaaaa-1111-2222-3333-444444444444"
 LIBRARY_ID_2 = "bbbbbbbb-1111-2222-3333-444444444444"
@@ -31,7 +32,7 @@ def sample_library_list_response():
             {
                 "id": LIBRARY_ID_1,
                 "name": "my_library",
-                "namespace": "org",
+                "project": PROJECT,
                 "is_valid": "valid",
                 "created": "2025-01-01T12:00:00Z",
                 "modified": "2025-01-02T12:00:00Z",
@@ -39,7 +40,7 @@ def sample_library_list_response():
             {
                 "id": LIBRARY_ID_2,
                 "name": "another_library",
-                "namespace": "",
+                "project": PROJECT,
                 "is_valid": "invalid",
                 "created": "2025-02-01T12:00:00Z",
                 "modified": "2025-02-02T12:00:00Z",
@@ -54,7 +55,7 @@ def sample_library_detail_response():
     return {
         "id": LIBRARY_ID_1,
         "name": "my_library",
-        "namespace": "org",
+        "project": PROJECT,
         "config_yaml": "version: '1.0'\nfunctions:\n  - name: my_func",
         "is_valid": "valid",
         "created": "2025-01-01T12:00:00Z",
@@ -66,7 +67,7 @@ def sample_library_detail_response():
 def ruleset_library():
     return RulesetLibrary(
         name="test_library",
-        namespace="test_ns",
+        project=PROJECT,
         yaml="version: '1.0'\nfunctions: []",
     )
 
@@ -83,7 +84,7 @@ def test_list_ruleset_libraries(client: DataMasqueClient, sample_library_list_re
     assert len(libraries) == 2
     assert libraries[0].id == RulesetLibraryId(LIBRARY_ID_1)
     assert libraries[0].name == "my_library"
-    assert libraries[0].namespace == "org"
+    assert libraries[0].project == PROJECT
     assert libraries[0].yaml is None
     assert libraries[0].is_valid is ValidationStatus.valid
     assert libraries[1].id == RulesetLibraryId(LIBRARY_ID_2)
@@ -100,7 +101,7 @@ def test_list_ruleset_libraries_pagination(client: DataMasqueClient) -> None:
             {
                 "id": LIBRARY_ID_1,
                 "name": "lib1",
-                "namespace": "",
+                "project": PROJECT,
                 "is_valid": "valid",
                 "created": "2025-01-01T12:00:00Z",
                 "modified": "2025-01-01T12:00:00Z",
@@ -108,7 +109,7 @@ def test_list_ruleset_libraries_pagination(client: DataMasqueClient) -> None:
             {
                 "id": LIBRARY_ID_2,
                 "name": "lib2",
-                "namespace": "",
+                "project": PROJECT,
                 "is_valid": "valid",
                 "created": "2025-01-01T12:00:00Z",
                 "modified": "2025-01-01T12:00:00Z",
@@ -123,7 +124,7 @@ def test_list_ruleset_libraries_pagination(client: DataMasqueClient) -> None:
             {
                 "id": "cccccccc-1111-2222-3333-444444444444",
                 "name": "lib3",
-                "namespace": "",
+                "project": PROJECT,
                 "is_valid": "unknown",
                 "created": "2025-01-01T12:00:00Z",
                 "modified": "2025-01-01T12:00:00Z",
@@ -169,7 +170,7 @@ def test_get_ruleset_library(client: DataMasqueClient, sample_library_detail_res
 
     assert library.id == RulesetLibraryId(LIBRARY_ID_1)
     assert library.name == "my_library"
-    assert library.namespace == "org"
+    assert library.project == PROJECT
     assert library.yaml == "version: '1.0'\nfunctions:\n  - name: my_func"
     assert library.is_valid is ValidationStatus.valid
 
@@ -185,7 +186,7 @@ def test_get_ruleset_library_by_name_found(
             {
                 "id": LIBRARY_ID_1,
                 "name": "my_library",
-                "namespace": "org",
+                "project": PROJECT,
                 "is_valid": "valid",
                 "created": "2025-01-01T12:00:00Z",
                 "modified": "2025-01-02T12:00:00Z",
@@ -204,13 +205,12 @@ def test_get_ruleset_library_by_name_found(
             json=sample_library_detail_response,
             status_code=200,
         )
-        library = client.get_ruleset_library_by_name("my_library", "org")
+        library = client.get_ruleset_library_by_name("my_library", PROJECT_ID)
 
     assert library is not None
     assert library.name == "my_library"
     assert library.yaml == "version: '1.0'\nfunctions:\n  - name: my_func"
-    assert "name_exact=my_library" in m.request_history[0].url
-    assert "namespace_exact=org" in m.request_history[0].url
+    assert m.request_history[0].qs == {"name_exact": ["my_library"], "project": [str(PROJECT_ID)], "limit": ["1"]}
 
 
 def test_get_ruleset_library_by_name_raises_when_server_omits_id(client: DataMasqueClient) -> None:
@@ -222,7 +222,7 @@ def test_get_ruleset_library_by_name_raises_when_server_omits_id(client: DataMas
         "results": [
             {
                 "name": "my_library",
-                "namespace": "org",
+                "project": PROJECT,
                 "is_valid": "valid",
                 "created": "2025-01-01T12:00:00Z",
                 "modified": "2025-01-02T12:00:00Z",
@@ -237,7 +237,7 @@ def test_get_ruleset_library_by_name_raises_when_server_omits_id(client: DataMas
             status_code=200,
         )
         with pytest.raises(DataMasqueApiError, match="without an `id`"):
-            client.get_ruleset_library_by_name("my_library", "org")
+            client.get_ruleset_library_by_name("my_library", PROJECT_ID)
 
 
 def test_get_ruleset_library_by_name_not_found(client: DataMasqueClient) -> None:
@@ -249,7 +249,7 @@ def test_get_ruleset_library_by_name_not_found(client: DataMasqueClient) -> None
             json=empty_response,
             status_code=200,
         )
-        library = client.get_ruleset_library_by_name("nonexistent")
+        library = client.get_ruleset_library_by_name("nonexistent", PROJECT_ID)
 
     assert library is None
 
@@ -258,7 +258,7 @@ def test_create_ruleset_library(client: DataMasqueClient, ruleset_library: Rules
     create_response = {
         "id": LIBRARY_ID_1,
         "name": "test_library",
-        "namespace": "test_ns",
+        "project": PROJECT,
         "config_yaml": "version: '1.0'\nfunctions: []",
         "is_valid": "unknown",
         "created": "2025-06-01T10:00:00Z",
@@ -281,8 +281,26 @@ def test_create_ruleset_library(client: DataMasqueClient, ruleset_library: Rules
 
     request_body = m.last_request.json()
     assert request_body["name"] == "test_library"
-    assert request_body["namespace"] == "test_ns"
+    assert request_body["project"] == PROJECT
     assert request_body["config_yaml"] == "version: '1.0'\nfunctions: []"
+
+
+def test_update_ruleset_library_does_not_send_namespace_back(
+    client: DataMasqueClient, sample_library_detail_response: dict[str, Any]
+) -> None:
+    """A `namespace` the server returns is not sent back, because the server lets it override `project`."""
+    with requests_mock.Mocker() as m:
+        m.get(
+            f"http://test-server/api/ruleset-libraries/{LIBRARY_ID_1}/",
+            json={**sample_library_detail_response, "namespace": "org"},
+        )
+        m.put(f"http://test-server/api/ruleset-libraries/{LIBRARY_ID_1}/", json=sample_library_detail_response)
+        library = client.get_ruleset_library(RulesetLibraryId(LIBRARY_ID_1))
+        client.update_ruleset_library(library)
+
+    request_body = m.last_request.json()
+    assert "namespace" not in request_body
+    assert request_body["project"] == PROJECT
 
 
 def test_update_ruleset_library(client: DataMasqueClient, ruleset_library: RulesetLibrary) -> None:
@@ -291,7 +309,7 @@ def test_update_ruleset_library(client: DataMasqueClient, ruleset_library: Rules
     update_response = {
         "id": LIBRARY_ID_1,
         "name": "test_library",
-        "namespace": "test_ns",
+        "project": PROJECT,
         "config_yaml": "version: '1.0'\nfunctions: []",
         "is_valid": "unknown",
         "created": "2025-06-01T10:00:00Z",
@@ -329,7 +347,7 @@ def test_create_or_update_ruleset_library_create(
     create_response = {
         "id": LIBRARY_ID_1,
         "name": "test_library",
-        "namespace": "test_ns",
+        "project": PROJECT,
         "config_yaml": "version: '1.0'\nfunctions: []",
         "is_valid": "unknown",
         "created": "2025-06-01T10:00:00Z",
@@ -368,26 +386,17 @@ def test_create_or_update_ruleset_library_update(
             {
                 "id": LIBRARY_ID_1,
                 "name": "test_library",
-                "namespace": "test_ns",
+                "project": PROJECT,
                 "is_valid": "valid",
                 "created": "2025-06-01T10:00:00Z",
                 "modified": "2025-06-01T10:00:00Z",
             },
         ],
     }
-    detail_response = {
-        "id": LIBRARY_ID_1,
-        "name": "test_library",
-        "namespace": "test_ns",
-        "config_yaml": "version: '1.0'\nfunctions: []",
-        "is_valid": "valid",
-        "created": "2025-06-01T10:00:00Z",
-        "modified": "2025-06-01T10:00:00Z",
-    }
     update_response = {
         "id": LIBRARY_ID_1,
         "name": "test_library",
-        "namespace": "test_ns",
+        "project": PROJECT,
         "config_yaml": "version: '1.0'\nfunctions: []",
         "is_valid": "unknown",
         "created": "2025-06-01T10:00:00Z",
@@ -400,11 +409,6 @@ def test_create_or_update_ruleset_library_update(
             json=list_response,
             status_code=200,
         )
-        m.get(
-            f"http://test-server/api/ruleset-libraries/{LIBRARY_ID_1}/",
-            json=detail_response,
-            status_code=200,
-        )
         m.put(
             f"http://test-server/api/ruleset-libraries/{LIBRARY_ID_1}/",
             json=update_response,
@@ -413,10 +417,8 @@ def test_create_or_update_ruleset_library_update(
         result = client.create_or_update_ruleset_library(ruleset_library)
 
     assert result.id == RulesetLibraryId(LIBRARY_ID_1)
-    # Should have called GET (list), GET (detail), then PUT (update)
-    assert m.request_history[0].method == "GET"
-    assert m.request_history[1].method == "GET"
-    assert m.request_history[2].method == "PUT"
+    assert [request.method for request in m.request_history] == ["GET", "PUT"]
+    assert m.request_history[0].qs == {"name_exact": ["test_library"], "project": [PROJECT], "limit": ["1"]}
 
 
 def test_delete_ruleset_library_by_id(client: DataMasqueClient) -> None:
@@ -453,31 +455,35 @@ def test_delete_ruleset_library_by_id_force(client: DataMasqueClient) -> None:
 
 def test_delete_ruleset_library_by_name(client: DataMasqueClient, sample_library_list_response: dict[str, Any]) -> None:
     with requests_mock.Mocker() as m:
+        # The server filters by name, so only the matching library is listed.
+        only_match = {
+            **sample_library_list_response,
+            "count": 1,
+            "results": sample_library_list_response["results"][:1],
+        }
         m.get(
             "http://test-server/api/ruleset-libraries/",
-            json=sample_library_list_response,
+            json=only_match,
             status_code=200,
         )
         m.delete(
             f"http://test-server/api/ruleset-libraries/{LIBRARY_ID_1}/",
             status_code=204,
         )
-        client.delete_ruleset_library_by_name_if_exists("my_library", "org")
+        client.delete_ruleset_library_by_name_if_exists("my_library", PROJECT_ID)
 
-    assert m.request_history[0].method == "GET"
-    assert m.request_history[1].method == "DELETE"
+    assert m.request_history[0].qs["project"] == [str(PROJECT_ID)]
+    assert [request.method for request in m.request_history] == ["GET", "DELETE"]
 
 
-def test_delete_ruleset_library_by_name_not_found(
-    client: DataMasqueClient, sample_library_list_response: dict[str, Any]
-) -> None:
+def test_delete_ruleset_library_by_name_not_found(client: DataMasqueClient) -> None:
     with requests_mock.Mocker() as m:
         m.get(
             "http://test-server/api/ruleset-libraries/",
-            json=sample_library_list_response,
+            json={"count": 0, "next": None, "previous": None, "results": []},
             status_code=200,
         )
-        client.delete_ruleset_library_by_name_if_exists("nonexistent")
+        client.delete_ruleset_library_by_name_if_exists("nonexistent", PROJECT_ID)
 
     # Only the list call should have been made, no DELETE
     assert m.call_count == 1
@@ -488,7 +494,7 @@ def test_validate_ruleset_library(client: DataMasqueClient) -> None:
     validate_response = {
         "id": LIBRARY_ID_1,
         "name": "my_library",
-        "namespace": "org",
+        "project": PROJECT,
         "config_yaml": "version: '1.0'",
         "is_valid": "unknown",
         "created": "2025-01-01T12:00:00Z",
@@ -517,6 +523,7 @@ def test_list_rulesets_using_library(client: DataMasqueClient) -> None:
             {
                 "id": "eeeeeeee-1111-2222-3333-444444444444",
                 "name": "ruleset_a",
+                "project": PROJECT,
                 "mask_type": "database",
                 "is_valid": "valid",
                 "created": "2025-01-01T12:00:00Z",
@@ -525,6 +532,7 @@ def test_list_rulesets_using_library(client: DataMasqueClient) -> None:
             {
                 "id": "ffffffff-1111-2222-3333-444444444444",
                 "name": "ruleset_b",
+                "project": PROJECT,
                 "mask_type": "file",
                 "is_valid": "unknown",
                 "created": "2025-02-01T12:00:00Z",
@@ -575,6 +583,7 @@ def test_list_rulesets_using_library_pagination(client: DataMasqueClient) -> Non
             {
                 "id": "aaa",
                 "name": "r1",
+                "project": PROJECT,
                 "mask_type": "database",
                 "is_valid": "valid",
                 "created": "2025-01-01T12:00:00Z",
@@ -583,6 +592,7 @@ def test_list_rulesets_using_library_pagination(client: DataMasqueClient) -> Non
             {
                 "id": "bbb",
                 "name": "r2",
+                "project": PROJECT,
                 "mask_type": "database",
                 "is_valid": "valid",
                 "created": "2025-01-01T12:00:00Z",
@@ -598,6 +608,7 @@ def test_list_rulesets_using_library_pagination(client: DataMasqueClient) -> Non
             {
                 "id": "ccc",
                 "name": "r3",
+                "project": PROJECT,
                 "mask_type": "file",
                 "is_valid": "unknown",
                 "created": "2025-01-01T12:00:00Z",
@@ -626,7 +637,7 @@ def test_create_ruleset_library_populates_validation_errors(
     create_response = {
         "id": LIBRARY_ID_1,
         "name": "test_library",
-        "namespace": "test_ns",
+        "project": PROJECT,
         "config_yaml": "version: '1.0'\nfunctions: []",
         "is_valid": "invalid",
         "validation_errors": [{"message": "Invalid function definition"}],
@@ -654,7 +665,7 @@ def test_update_ruleset_library_populates_validation_errors(
     update_response = {
         "id": LIBRARY_ID_1,
         "name": "test_library",
-        "namespace": "test_ns",
+        "project": PROJECT,
         "config_yaml": "version: '1.0'\nfunctions: []",
         "is_valid": "invalid",
         "validation_errors": [{"message": "Invalid function definition"}],
@@ -684,7 +695,7 @@ def test_create_ruleset_library_does_not_send_read_only_fields(
     create_response = {
         "id": LIBRARY_ID_1,
         "name": "test_library",
-        "namespace": "test_ns",
+        "project": PROJECT,
         "config_yaml": "version: '1.0'\nfunctions: []",
         "is_valid": "invalid",
         "validation_errors": [{"message": "Invalid function definition"}],
@@ -715,7 +726,7 @@ def test_create_ruleset_library_collapses_git_snapshot(
     create_response = {
         "id": LIBRARY_ID_1,
         "name": "test_library",
-        "namespace": "test_ns",
+        "project": PROJECT,
         "config_yaml": "version: '1.0'\nfunctions: []",
         "is_valid": "valid",
         "git_branch": "main",
@@ -752,7 +763,7 @@ def test_create_and_update_ruleset_library_populate_unlicensed_feature_warnings(
     response = {
         "id": LIBRARY_ID_1,
         "name": "test_library",
-        "namespace": "test_ns",
+        "project": PROJECT,
         "config_yaml": "version: '1.0'\nfunctions: []",
         "is_valid": "valid",
         "unlicensed_feature_warnings": returned,

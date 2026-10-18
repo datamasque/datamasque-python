@@ -5,8 +5,26 @@ History
 1.7.0 (unreleased)
 ------------------
 
+* ``ConnectionConfig``, ``Ruleset``, ``RulesetLibrary``, ``DiscoveryConfig``, ``DiscoveryConfigLibrary``, ``RGConfig``
+  and ``TableReference`` send their ``project`` to the server when it is set.
+  It takes a project's ``<id>-<slug>`` reference, such as ``Project.reference``, or its ID as a string.
+  Left unset, a create goes into the server's default project.
+  Each create sets the model's ``project`` to the project the server stored it in.
+* **Breaking:** ``upload_file`` and ``upload_file_if_not_exists`` take a required ``project``.
+* **Breaking:** ``namespace`` is removed from ``RulesetLibrary`` and ``DiscoveryConfigLibrary``,
+  and the client drops it from server responses so that it is never sent back.
+  The library by-name helpers take ``project`` in its place.
+* **Breaking:** names are unique per project, so every by-name helper takes a required ``project``:
+  ``get_*_by_name``, ``delete_*_by_name_if_exists`` and ``get_file_of_type_by_name``.
+  ``create_or_update_*`` updates an existing resource only when it has the same name in the same project.
+  With the model's ``project`` unset, that is the server's only active project,
+  and ``DataMasqueException`` is raised when there is no active project or more than one.
+  The methods' ``project`` parameters take a ``Project`` or its ``ProjectId``.
 * **Breaking:** ``get_unfinished_runs`` returns its runs keyed by ``ConnectionId`` instead of connection name,
   because two connections in different projects can share a name.
+* ``list_connections``, ``list_table_references`` and ``list_files_of_type`` take an optional ``project`` filter.
+* ``DataMasqueFile`` gains a read-only ``project`` field, which is ``None`` for built-in seeds.
+* ``get_generated_rulesets`` sets each ruleset's ``project`` to the connection's project.
 * Added project models and management APIs.
 * Added ``list_resources``, which lists resources of every type across projects.
 
