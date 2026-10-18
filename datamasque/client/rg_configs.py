@@ -1,9 +1,10 @@
 import logging
-from typing import Iterator, Optional
+from typing import Iterator, Optional, Union
 
 from datamasque.client.base import BaseClient
 from datamasque.client.exceptions import DataMasqueApiError
 from datamasque.client.models.pagination import Page
+from datamasque.client.models.project import Project, ProjectId, unwrap_project_id
 from datamasque.client.models.rg_config import RGConfig, RGConfigId
 
 logger = logging.getLogger(__name__)
@@ -33,13 +34,13 @@ class RGConfigClient(BaseClient):
         response = self.make_request("GET", f"/api/ruleset-generation-configs/{config_id}/")
         return RGConfig.model_validate(response.json())
 
-    def _get_rg_config_id_by_name(self, name: str) -> Optional[RGConfigId]:
-        """Return the id of the config matching the name via a single list request, or `None`."""
+    def _get_rg_config_id_by_name(self, name: str, project: Union[ProjectId, str]) -> Optional[RGConfigId]:
+        """Return the id of the config matching the name and project via a single list request, or `None`."""
 
         response = self.make_request(
             "GET",
             "/api/ruleset-generation-configs/",
-            params={"name_exact": name, "limit": 1},
+            params={"name_exact": name, "project": project, "limit": 1},
         )
         page = Page[RGConfig].model_validate(response.json())
         if not page.results:
@@ -54,15 +55,16 @@ class RGConfigClient(BaseClient):
 
         return config_id
 
-    def get_rg_config_by_name(self, name: str) -> Optional[RGConfig]:
+    def get_rg_config_by_name(self, name: str, project: Union[ProjectId, Project]) -> Optional[RGConfig]:
         """
-        Looks for an RG config matching the given name (case-sensitive, exact match).
+        Looks for an RG config matching the given name (case-sensitive, exact match) in the given project.
 
-        RG configs are untyped and their names are unique, so the name alone identifies a single config.
+        RG configs are untyped and their names are unique per project.
+        `project` is a `Project` or its `ProjectId`.
         Returns it if found, otherwise `None`.
         """
 
-        config_id = self._get_rg_config_id_by_name(name)
+        config_id = self._get_rg_config_id_by_name(name, unwrap_project_id(project))
         if config_id is None:
             return None
 
@@ -80,6 +82,7 @@ class RGConfigClient(BaseClient):
         response = self.make_request("POST", "/api/ruleset-generation-configs/", data=data)
         created = RGConfig.model_validate(response.json())
         config.id = created.id
+        config.project = created.project
         config.is_valid = created.is_valid
         config.validation_errors = created.validation_errors
         config.created = created.created
@@ -116,12 +119,14 @@ class RGConfigClient(BaseClient):
 
     def create_or_update_rg_config(self, config: RGConfig) -> RGConfig:
         """
-        Creates the config if it doesn't exist, or updates it if one with the same name already exists.
+        Creates the config, or updates the existing one with the same name in the same project.
 
+        With no `project` set, the server's only active project is used,
+        and `DataMasqueException` is raised when it has no active project or more than one.
         Sets the config's `id` property.
         """
 
-        existing_id = self._get_rg_config_id_by_name(config.name)
+        existing_id = self._get_rg_config_id_by_name(config.name, self._resolve_project(config.project))
         if existing_id is not None:
             config.id = existing_id
             return self.update_rg_config(config)
@@ -137,14 +142,15 @@ class RGConfigClient(BaseClient):
 
         self._delete_if_exists(f"/api/ruleset-generation-configs/{config_id}/")
 
-    def delete_rg_config_by_name_if_exists(self, name: str) -> None:
+    def delete_rg_config_by_name_if_exists(self, name: str, project: Union[ProjectId, Project]) -> None:
         """
-        Deletes the RG config with the given name.
+        Deletes the RG config with the given name in the given project.
 
+        `project` is a `Project` or its `ProjectId`.
         No-op if no such config exists.
         """
 
-        config_id = self._get_rg_config_id_by_name(name)
+        config_id = self._get_rg_config_id_by_name(name, unwrap_project_id(project))
         if config_id is not None:
             self.delete_rg_config_by_id_if_exists(config_id)
 

@@ -40,13 +40,17 @@ class DiscoveryConfig(BaseModel):
     model_config = ConfigDict(extra="allow", populate_by_name=True)
 
     name: str
+    project: Optional[str] = None
+    """
+    The project it belongs to: the `<id>-<slug>` reference a GET returns, such as `Project.reference`,
+    or the project's ID as a string.
+    Left as `None`, a create goes into the server's default project.
+    """
     yaml: Optional[str] = Field(default=None, alias="config_yaml")
     config_type: DiscoveryConfigType
 
     # Server-populated read-only fields, excluded from request bodies.
     id: Optional[DiscoveryConfigId] = Field(default=None, exclude=True)
-    project: Optional[str] = Field(default=None, exclude=True)
-    """Its project's `<id>-<slug>` reference, e.g. `1-default`; `None` until it is created on the server."""
     is_valid: Optional[ValidationStatus] = Field(default=None, exclude=True)
     """Validation status; may be `in_progress` briefly after creating a large config."""
     validation_error: Optional[str] = Field(default=None, exclude=True)

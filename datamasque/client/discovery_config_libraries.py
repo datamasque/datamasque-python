@@ -1,9 +1,10 @@
 import logging
-from typing import Optional
+from typing import Optional, Union
 
 from datamasque.client.base import BaseClient
 from datamasque.client.exceptions import DataMasqueApiError
 from datamasque.client.models.discovery_config_library import DiscoveryConfigLibrary, DiscoveryConfigLibraryId
+from datamasque.client.models.project import Project, ProjectId, unwrap_project_id
 
 logger = logging.getLogger(__name__)
 
@@ -30,22 +31,18 @@ class DiscoveryConfigLibraryClient(BaseClient):
         response = self.make_request("GET", f"/api/discovery/config-libraries/{library_id}/")
         return DiscoveryConfigLibrary.model_validate(response.json())
 
-    def _get_discovery_config_library_id_by_name(self, name: str, namespace: str) -> Optional[DiscoveryConfigLibraryId]:
-        """
-        Returns the ID of the library with the given name and namespace, or `None` if there is none.
-
-        The listing is filtered by name to keep the response small;
-        the namespace is matched client-side,
-        since the API's namespace filter cannot select the default (empty) namespace.
-        """
+    def _get_discovery_config_library_id_by_name(
+        self, name: str, project: Union[ProjectId, str]
+    ) -> Optional[DiscoveryConfigLibraryId]:
+        """Returns the ID of the library with the given name in the given project, or `None` if there is none."""
 
         response = self.make_request(
             "GET",
             "/api/discovery/config-libraries/",
-            params={"name_exact": name},
+            params={"name_exact": name, "project": project},
         )
         entries = [DiscoveryConfigLibrary.model_validate(item) for item in response.json()]
-        matches = [entry for entry in entries if entry.name == name and entry.namespace == namespace]
+        matches = [entry for entry in entries if entry.name == name]
         if not matches:
             return None
 
@@ -57,15 +54,17 @@ class DiscoveryConfigLibraryClient(BaseClient):
 
         return matches[0].id
 
-    def get_discovery_config_library_by_name(self, name: str, namespace: str = "") -> Optional[DiscoveryConfigLibrary]:
+    def get_discovery_config_library_by_name(
+        self, name: str, project: Union[ProjectId, Project]
+    ) -> Optional[DiscoveryConfigLibrary]:
         """
-        Looks for a discovery config library matching the given name and namespace (case-sensitive, exact match).
+        Looks for a discovery config library matching the given name (case-sensitive, exact match) in the given project.
 
-        Library names are unique within a namespace.
+        `project` is a `Project` or its `ProjectId`.
         Returns it (with full YAML content) if found, otherwise `None`.
         """
 
-        library_id = self._get_discovery_config_library_id_by_name(name, namespace)
+        library_id = self._get_discovery_config_library_id_by_name(name, unwrap_project_id(project))
         if library_id is None:
             return None
 
@@ -86,6 +85,7 @@ class DiscoveryConfigLibraryClient(BaseClient):
         response = self.make_request("POST", "/api/discovery/config-libraries/", data=data)
         created = DiscoveryConfigLibrary.model_validate(response.json())
         library.id = created.id
+        library.project = created.project
         library.is_valid = created.is_valid
         library.validation_error = created.validation_error
         library.usage_count = created.usage_count
@@ -123,12 +123,14 @@ class DiscoveryConfigLibraryClient(BaseClient):
 
     def create_or_update_discovery_config_library(self, library: DiscoveryConfigLibrary) -> DiscoveryConfigLibrary:
         """
-        Creates the library, or updates the existing one with the same name and namespace.
+        Creates the library, or updates the existing one with the same name in the same project.
 
+        With no `project` set, the server's only active project is used,
+        and `DataMasqueException` is raised when it has no active project or more than one.
         Sets the library's `id` property.
         """
 
-        library_id = self._get_discovery_config_library_id_by_name(library.name, library.namespace)
+        library_id = self._get_discovery_config_library_id_by_name(library.name, self._resolve_project(library.project))
         if library_id is not None:
             library.id = library_id
             return self.update_discovery_config_library(library)
@@ -151,15 +153,15 @@ class DiscoveryConfigLibraryClient(BaseClient):
         self._delete_if_exists(f"/api/discovery/config-libraries/{library_id}/", params=params)
 
     def delete_discovery_config_library_by_name_if_exists(
-        self, name: str, namespace: str = "", *, force: bool = False
+        self, name: str, project: Union[ProjectId, Project], *, force: bool = False
     ) -> None:
         """
-        Deletes the discovery config library with the given name and namespace.
+        Deletes the discovery config library with the given name in the given project.
 
-        Library names are unique within a namespace.
+        `project` is a `Project` or its `ProjectId`.
         No-op if no such library exists.
         """
 
-        library_id = self._get_discovery_config_library_id_by_name(name, namespace)
+        library_id = self._get_discovery_config_library_id_by_name(name, unwrap_project_id(project))
         if library_id is not None:
             self.delete_discovery_config_library_by_id_if_exists(library_id, force=force)

@@ -10,8 +10,8 @@ import pytest
 import requests_mock
 
 from datamasque.client import DataMasqueClient
-from datamasque.client.models.files import OracleWalletFile, SeedFile, SnowflakeKeyFile, SslZipFile
-from tests.helpers import fake, parse_multipart_form
+from datamasque.client.models.files import DataMasqueFile, OracleWalletFile, SeedFile, SnowflakeKeyFile, SslZipFile
+from tests.helpers import OTHER_PROJECT, PROJECT, PROJECT_ID, fake, parse_multipart_form
 
 
 @pytest.mark.parametrize(
@@ -49,7 +49,7 @@ def test_upload_file(client, file_type, source_factory):
                     "modified_date": mock_return_modified_date.strftime("%Y-%m-%dT%H:%M:%S.%fZ"),
                 },
             )
-            file = client.upload_file(file_type, name_of_file, source)
+            file = client.upload_file(file_type, name_of_file, source, PROJECT_ID)
 
         if isinstance(source, (str, Path)):
             m_open.assert_called_once_with(source, "rb")
@@ -141,7 +141,7 @@ def test_get_files_by_type_and_name(client, file_type):
                 },
             ],
         )
-        result = client.get_file_of_type_by_name(file_type, "file2")
+        result = client.get_file_of_type_by_name(file_type, "file2", PROJECT_ID)
 
     assert isinstance(result, file_type)
     assert result.id == id_2
@@ -202,7 +202,7 @@ def test_upload_file_if_not_exists_skips_when_same_name_exists(client, file_type
                     },
                 ],
             )
-            result = client.upload_file_if_not_exists(file_type, "already_here.csv")
+            result = client.upload_file_if_not_exists(file_type, "already_here.csv", PROJECT_ID)
 
             assert result is None
             # Only the list-by-type GET should have fired — no POST.
@@ -231,7 +231,7 @@ def test_upload_file_if_not_exists_uploads_when_missing(client, file_type):
                     "modified_date": "2024-01-01T00:00:00.000000Z",
                 },
             )
-            result = client.upload_file_if_not_exists(file_type, Path("new_file.csv"))
+            result = client.upload_file_if_not_exists(file_type, Path("new_file.csv"), PROJECT_ID)
 
             assert isinstance(result, file_type)
             assert result.id == new_id
@@ -264,7 +264,7 @@ def test_upload_file_retries_on_401(config):
                     },
                 ],
             )
-            client.upload_file(SeedFile, "seed.csv", file_content)
+            client.upload_file(SeedFile, "seed.csv", file_content, PROJECT_ID)
 
             assert m_request.call_count == 2
             first_form = parse_multipart_form(m_request.request_history[0])
@@ -286,7 +286,7 @@ def test_upload_ssl_zip_file_sends_mysql_database_type(client):
                 "modified_date": "2024-01-01T00:00:00.000000Z",
             },
         )
-        client.upload_file(SslZipFile, "certs.zip", b"zip bytes")
+        client.upload_file(SslZipFile, "certs.zip", b"zip bytes", PROJECT_ID)
 
     form = parse_multipart_form(m_request.request_history[0])
     assert form["database_type"] == "mysql"
@@ -306,7 +306,77 @@ def test_upload_non_ssl_zip_file_omits_database_type(client, file_type):
                 "modified_date": "2024-01-01T00:00:00.000000Z",
             },
         )
-        client.upload_file(file_type, "file.bin", b"content")
+        client.upload_file(file_type, "file.bin", b"content", PROJECT_ID)
 
     form = parse_multipart_form(m_request.request_history[0])
     assert "database_type" not in form
+
+
+@pytest.mark.parametrize("file_type", [SeedFile, OracleWalletFile, SslZipFile, SnowflakeKeyFile])
+def test_upload_file_sends_project(client: DataMasqueClient, file_type: type[DataMasqueFile]) -> None:
+    with requests_mock.Mocker() as m_request:
+        m_request.post(
+            f"http://test-server/{file_type.get_url()}",
+            status_code=201,
+            json={
+                "id": str(uuid.uuid4()),
+                "name": "file.bin",
+                "project": PROJECT,
+                "created_date": "2024-01-01T00:00:00.000000Z",
+                "modified_date": "2024-01-01T00:00:00.000000Z",
+            },
+        )
+        file = client.upload_file(file_type, "file.bin", b"content", PROJECT_ID)
+
+    form = parse_multipart_form(m_request.request_history[0])
+    assert form["project"] == str(PROJECT_ID)
+    assert file.project == PROJECT
+
+
+@pytest.mark.parametrize("file_type", [SeedFile, OracleWalletFile, SslZipFile, SnowflakeKeyFile])
+def test_list_files_of_type_filters_by_project(client: DataMasqueClient, file_type: type[DataMasqueFile]) -> None:
+    with requests_mock.Mocker() as m_request:
+        m_request.get(f"http://test-server/{file_type.get_url()}?project={PROJECT_ID}", json=[], complete_qs=True)
+        assert client.list_files_of_type(file_type, PROJECT_ID) == []
+
+
+@pytest.mark.parametrize("file_type", [SeedFile, OracleWalletFile, SslZipFile, SnowflakeKeyFile])
+def test_get_file_of_type_by_name_is_scoped_to_the_project(
+    client: DataMasqueClient, file_type: type[DataMasqueFile]
+) -> None:
+    """A file with the same name in another project is not matched, because the listing is filtered by project."""
+    other_project_file = {
+        "id": str(uuid.uuid4()),
+        "name": "seed.csv",
+        "project": "2-other",
+        "created_date": "2024-01-01T00:00:00.000000Z",
+    }
+    with requests_mock.Mocker() as m_request:
+        m_request.get(f"http://test-server/{file_type.get_url()}", json=[other_project_file])
+        m_request.get(f"http://test-server/{file_type.get_url()}?project={PROJECT_ID}", json=[], complete_qs=True)
+        result = client.get_file_of_type_by_name(file_type, "seed.csv", PROJECT_ID)
+
+    assert result is None
+    assert m_request.last_request.qs == {"project": [str(PROJECT_ID)]}
+
+
+def test_upload_file_sends_the_id_of_a_project(client: DataMasqueClient) -> None:
+    with requests_mock.Mocker() as m_request:
+        m_request.post(
+            f"http://test-server/{SeedFile.get_url()}",
+            status_code=201,
+            json={
+                "id": str(uuid.uuid4()),
+                "name": "seed.csv",
+                "project": "2-banking",
+                "created_date": "2024-01-01T00:00:00.000000Z",
+            },
+        )
+        client.upload_file(
+            SeedFile,
+            "seed.csv",
+            b"content",
+            OTHER_PROJECT,
+        )
+
+    assert parse_multipart_form(m_request.request_history[0])["project"] == "2"

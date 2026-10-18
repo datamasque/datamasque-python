@@ -17,10 +17,13 @@ from urllib3.exceptions import InsecureRequestWarning
 
 from datamasque.client.exceptions import (
     DataMasqueApiError,
+    DataMasqueException,
     DataMasqueNotReadyError,
     DataMasqueTransportError,
 )
 from datamasque.client.models.dm_instance import DataMasqueInstanceConfig
+from datamasque.client.models.pagination import Page
+from datamasque.client.models.project import Project, ProjectId
 from datamasque.client.spcs import install_spcs_gateway_auth
 
 logger = logging.getLogger(__name__)
@@ -312,6 +315,27 @@ class BaseClient:
             return
 
         self._raise_for_status(response)
+
+    def _resolve_project(self, project: Optional[Union[ProjectId, str]]) -> Union[ProjectId, str]:
+        """
+        Returns `project`, or when it is `None`, the ID of the only active project.
+
+        That is the project the server puts a create into when it is sent no `project`.
+        With no active project, or more than one, the server rejects such a create,
+        so this raises `DataMasqueException` instead.
+        """
+
+        if project is not None:
+            return project
+
+        response = self.make_request("GET", "/api/projects/", params={"limit": 1})
+        page = Page[Project].model_validate(response.json())
+        if page.count != 1:
+            raise DataMasqueException(
+                f"No `project` is set and the server has {page.count} active projects. Set `project` to choose one."
+            )
+
+        return page.results[0].id
 
     def _iter_paginated(
         self,
