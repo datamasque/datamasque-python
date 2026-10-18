@@ -15,7 +15,7 @@ from datamasque.client import (
     TableReferenceOptions,
 )
 from datamasque.client.exceptions import DataMasqueException
-from tests.helpers import file_connection_config
+from tests.helpers import PROJECT, PROJECT_ID, file_connection_config
 
 TABLE_REFERENCE_ID_1 = "aaaaaaaa-1111-2222-3333-444444444444"
 TABLE_REFERENCE_ID_2 = "bbbbbbbb-1111-2222-3333-444444444444"
@@ -38,6 +38,7 @@ def sample_table_reference_list_response() -> list[dict[str, object]]:
         {
             "id": TABLE_REFERENCE_ID_1,
             "name": "customer_identities",
+            "project": PROJECT,
             "connection": CONNECTION_ID_1,
             "source": "identities/customers.csv",
             "options": DEFAULT_OPTIONS_JSON,
@@ -47,6 +48,7 @@ def sample_table_reference_list_response() -> list[dict[str, object]]:
         {
             "id": TABLE_REFERENCE_ID_2,
             "name": "account_identities",
+            "project": PROJECT,
             "connection": CONNECTION_ID_2,
             "source": "OPS.ACCOUNTS",
             "options": {
@@ -66,6 +68,7 @@ def sample_table_reference_list_response() -> list[dict[str, object]]:
 def table_reference() -> TableReference:
     return TableReference(
         name="customer_identities",
+        project=PROJECT,
         connection=ConnectionId(CONNECTION_ID_1),
         source="identities/customers.csv",
     )
@@ -73,7 +76,7 @@ def table_reference() -> TableReference:
 
 def test_name_connection_and_source_are_required_on_the_model() -> None:
     with pytest.raises(ValidationError, match="source"):
-        TableReference(name="customer_identities", connection=ConnectionId(CONNECTION_ID_1))
+        TableReference(name="customer_identities", project=PROJECT, connection=ConnectionId(CONNECTION_ID_1))
 
 
 def test_options_default_to_the_servers_defaults() -> None:
@@ -90,7 +93,9 @@ def test_connection_accepts_a_connection_config() -> None:
     connection = file_connection_config()
     connection.id = ConnectionId(CONNECTION_ID_1)
 
-    reference = TableReference(name="customer_identities", connection=connection, source="customers.csv")
+    reference = TableReference(
+        name="customer_identities", project=PROJECT, connection=connection, source="customers.csv"
+    )
 
     assert reference.connection == ConnectionId(CONNECTION_ID_1)
     assert reference.connection_id == ConnectionId(CONNECTION_ID_1)
@@ -98,7 +103,9 @@ def test_connection_accepts_a_connection_config() -> None:
 
 def test_connection_config_without_an_id_is_rejected() -> None:
     with pytest.raises(ValidationError, match="id is None"):
-        TableReference(name="customer_identities", connection=file_connection_config(), source="customers.csv")
+        TableReference(
+            name="customer_identities", project=PROJECT, connection=file_connection_config(), source="customers.csv"
+        )
 
 
 def test_list_table_references(
@@ -128,6 +135,21 @@ def test_list_table_references(
     assert references[1].options.encoding == "latin-1"
     assert references[1].options.quotechar == "'"
     assert references[1].options.null_string == "NULL"
+
+
+def test_list_table_references_in_a_project(
+    client: DataMasqueClient, sample_table_reference_list_response: list[dict[str, object]]
+) -> None:
+    with requests_mock.Mocker() as m:
+        m.get(
+            "http://test-server/api/table-references/",
+            json=sample_table_reference_list_response,
+            status_code=200,
+        )
+        references = client.list_table_references(PROJECT_ID)
+
+    assert m.last_request.qs == {"project": [str(PROJECT_ID)]}
+    assert [reference.project for reference in references] == [PROJECT, PROJECT]
 
 
 def test_list_table_references_empty(client: DataMasqueClient) -> None:
@@ -168,11 +190,12 @@ def test_get_table_reference_by_name_found(
             json=sample_table_reference_list_response,
             status_code=200,
         )
-        reference = client.get_table_reference_by_name("account_identities")
+        reference = client.get_table_reference_by_name("account_identities", PROJECT_ID)
 
     assert reference is not None
     assert reference.id == TableReferenceId(TABLE_REFERENCE_ID_2)
     assert m.call_count == 1
+    assert m.last_request.qs == {"project": [str(PROJECT_ID)]}
 
 
 def test_get_table_reference_by_name_not_found(
@@ -184,7 +207,7 @@ def test_get_table_reference_by_name_not_found(
             json=sample_table_reference_list_response,
             status_code=200,
         )
-        reference = client.get_table_reference_by_name("nonexistent")
+        reference = client.get_table_reference_by_name("nonexistent", PROJECT_ID)
 
     assert reference is None
 
@@ -193,6 +216,7 @@ def test_create_table_reference(client: DataMasqueClient, table_reference: Table
     create_response = {
         "id": TABLE_REFERENCE_ID_1,
         "name": "customer_identities",
+        "project": PROJECT,
         "connection": CONNECTION_ID_1,
         "source": "identities/customers.csv",
         "options": DEFAULT_OPTIONS_JSON,
@@ -218,6 +242,7 @@ def test_create_table_reference(client: DataMasqueClient, table_reference: Table
 
     request_body = m.last_request.json()
     assert request_body["name"] == "customer_identities"
+    assert request_body["project"] == PROJECT
     assert request_body["connection"] == CONNECTION_ID_1
     assert request_body["source"] == "identities/customers.csv"
     assert "options" not in request_body
@@ -225,9 +250,32 @@ def test_create_table_reference(client: DataMasqueClient, table_reference: Table
     assert not read_only_fields & request_body.keys()
 
 
+def test_create_table_reference_without_a_project(client: DataMasqueClient) -> None:
+    """No `project` is sent, so the server uses its default project, which is read back."""
+    reference = TableReference(
+        name="customer_identities", connection=ConnectionId(CONNECTION_ID_1), source="identities/customers.csv"
+    )
+    create_response = {
+        "id": TABLE_REFERENCE_ID_1,
+        "name": "customer_identities",
+        "project": PROJECT,
+        "connection": CONNECTION_ID_1,
+        "source": "identities/customers.csv",
+        "options": DEFAULT_OPTIONS_JSON,
+    }
+
+    with requests_mock.Mocker() as m:
+        m.post("http://test-server/api/table-references/", json=create_response, status_code=201)
+        client.create_table_reference(reference)
+
+    assert "project" not in m.last_request.json()
+    assert reference.project == PROJECT
+
+
 def test_create_table_reference_sends_options(client: DataMasqueClient) -> None:
     reference = TableReference(
         name="customer_identities",
+        project=PROJECT,
         connection=ConnectionId(CONNECTION_ID_1),
         source="identities/customers.csv",
         options=TableReferenceOptions(format=TableReferenceFormat.parquet, delimiter=";", null_string="NULL"),
@@ -235,6 +283,7 @@ def test_create_table_reference_sends_options(client: DataMasqueClient) -> None:
     create_response = {
         "id": TABLE_REFERENCE_ID_1,
         "name": "customer_identities",
+        "project": PROJECT,
         "connection": CONNECTION_ID_1,
         "source": "identities/customers.csv",
         "options": {
@@ -266,6 +315,7 @@ def test_create_table_reference_sends_null_string_default(client: DataMasqueClie
     """`null_string`'s default of `None` must be sent explicitly, not dropped from the payload."""
     reference = TableReference(
         name="customer_identities",
+        project=PROJECT,
         connection=ConnectionId(CONNECTION_ID_1),
         source="identities/customers.csv",
         options=TableReferenceOptions(),
@@ -273,6 +323,7 @@ def test_create_table_reference_sends_null_string_default(client: DataMasqueClie
     create_response = {
         "id": TABLE_REFERENCE_ID_1,
         "name": "customer_identities",
+        "project": PROJECT,
         "connection": CONNECTION_ID_1,
         "source": "identities/customers.csv",
         "options": DEFAULT_OPTIONS_JSON,
@@ -300,6 +351,7 @@ def test_update_table_reference(client: DataMasqueClient, table_reference: Table
     update_response = {
         "id": TABLE_REFERENCE_ID_1,
         "name": "customer_identities",
+        "project": PROJECT,
         "connection": CONNECTION_ID_1,
         "source": "identities/customers_v2.csv",
         "options": DEFAULT_OPTIONS_JSON,
@@ -333,6 +385,7 @@ def test_update_table_reference_without_options_sends_none(
     update_response = {
         "id": TABLE_REFERENCE_ID_1,
         "name": "customer_identities",
+        "project": PROJECT,
         "connection": CONNECTION_ID_1,
         "source": "identities/customers.csv",
         "options": {**DEFAULT_OPTIONS_JSON, "delimiter": ";"},
@@ -363,6 +416,7 @@ def test_create_or_update_table_reference_create(client: DataMasqueClient, table
     create_response = {
         "id": TABLE_REFERENCE_ID_1,
         "name": "customer_identities",
+        "project": PROJECT,
         "connection": CONNECTION_ID_1,
         "source": "identities/customers.csv",
         "options": DEFAULT_OPTIONS_JSON,
@@ -385,7 +439,9 @@ def test_create_or_update_table_reference_create(client: DataMasqueClient, table
 
     assert result.id == TableReferenceId(TABLE_REFERENCE_ID_1)
     assert m.request_history[0].method == "GET"
+    assert m.request_history[0].qs == {"project": [PROJECT]}
     assert m.request_history[1].method == "POST"
+    assert m.request_history[1].json()["project"] == PROJECT
 
 
 def test_create_or_update_table_reference_update(
@@ -396,6 +452,7 @@ def test_create_or_update_table_reference_update(
     update_response = {
         "id": TABLE_REFERENCE_ID_1,
         "name": "customer_identities",
+        "project": PROJECT,
         "connection": CONNECTION_ID_1,
         "source": "identities/customers.csv",
         "options": DEFAULT_OPTIONS_JSON,
@@ -428,6 +485,7 @@ def test_create_or_update_table_reference_raises_when_server_omits_id(
     list_response_without_id = [
         {
             "name": "customer_identities",
+            "project": PROJECT,
             "connection": CONNECTION_ID_1,
             "source": "identities/customers.csv",
             "options": DEFAULT_OPTIONS_JSON,
@@ -479,10 +537,11 @@ def test_delete_table_reference_by_name(
             f"http://test-server/api/table-references/{TABLE_REFERENCE_ID_2}/",
             status_code=204,
         )
-        client.delete_table_reference_by_name_if_exists("account_identities")
+        client.delete_table_reference_by_name_if_exists("account_identities", PROJECT_ID)
 
     assert m.call_count == 2
     assert m.request_history[0].method == "GET"
+    assert m.request_history[0].qs == {"project": [str(PROJECT_ID)]}
     assert m.request_history[1].method == "DELETE"
     assert TABLE_REFERENCE_ID_2 in m.request_history[1].url
 
@@ -496,7 +555,7 @@ def test_delete_table_reference_by_name_not_found(
             json=sample_table_reference_list_response,
             status_code=200,
         )
-        client.delete_table_reference_by_name_if_exists("nonexistent")
+        client.delete_table_reference_by_name_if_exists("nonexistent", PROJECT_ID)
 
     assert m.call_count == 1
     assert m.request_history[0].method == "GET"

@@ -38,13 +38,17 @@ class Ruleset(GitTrackedEntity):
     """Represents a ruleset."""
 
     name: str
+    project: Optional[str] = None
+    """
+    The project it belongs to: the `<id>-<slug>` reference a GET returns, such as `Project.reference`,
+    or the project's ID as a string.
+    Left as `None`, a create goes into the server's default project.
+    """
     yaml: str = Field(default="", alias="config_yaml")
     ruleset_type: RulesetType = Field(default=RulesetType.database, alias="mask_type")
 
     # Server-populated read-only fields, excluded from request bodies.
     id: Optional[RulesetId] = Field(default=None, exclude=True)
-    project: Optional[str] = Field(default=None, exclude=True)
-    """Its project's `<id>-<slug>` reference, e.g. `1-default`; `None` until it is created on the server."""
     is_valid: Optional[ValidationStatus] = Field(default=None, exclude=True)
     validation_errors: list[ValidationErrorDetails] = Field(default_factory=list, exclude=True)
     """Validation errors surfaced by the server; empty when valid."""

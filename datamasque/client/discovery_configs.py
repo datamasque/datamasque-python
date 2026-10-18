@@ -1,10 +1,11 @@
 import logging
-from typing import Iterator, Optional
+from typing import Iterator, Optional, Union
 
 from datamasque.client.base import BaseClient
-from datamasque.client.exceptions import DataMasqueApiError, DataMasqueException
+from datamasque.client.exceptions import DataMasqueApiError
 from datamasque.client.models.discovery_config import DiscoveryConfig, DiscoveryConfigId, DiscoveryConfigType
 from datamasque.client.models.pagination import Page
+from datamasque.client.models.project import Project, ProjectId, unwrap_project_id
 
 logger = logging.getLogger(__name__)
 
@@ -34,14 +35,14 @@ class DiscoveryConfigClient(BaseClient):
         return DiscoveryConfig.model_validate(response.json())
 
     def _get_discovery_config_id_by_name(
-        self, name: str, config_type: DiscoveryConfigType
+        self, name: str, config_type: DiscoveryConfigType, project: Union[ProjectId, str]
     ) -> Optional[DiscoveryConfigId]:
-        """Return the id of the config matching name and type via a single list request, or `None`."""
+        """Return the id of the config matching name, type and project via a single list request, or `None`."""
 
         response = self.make_request(
             "GET",
             "/api/discovery/configs/",
-            params={"name_exact": name, "config_type": config_type.value, "limit": 1},
+            params={"name_exact": name, "config_type": config_type.value, "project": project, "limit": 1},
         )
         page = Page[DiscoveryConfig].model_validate(response.json())
         if not page.results:
@@ -56,15 +57,18 @@ class DiscoveryConfigClient(BaseClient):
 
         return config_id
 
-    def get_discovery_config_by_name(self, name: str, config_type: DiscoveryConfigType) -> Optional[DiscoveryConfig]:
+    def get_discovery_config_by_name(
+        self, name: str, config_type: DiscoveryConfigType, project: Union[ProjectId, Project]
+    ) -> Optional[DiscoveryConfig]:
         """
-        Looks for a discovery config matching the given name and type (case-sensitive, exact match).
+        Looks for a discovery config matching the given name (case-sensitive, exact match), type and project.
 
-        Config names are unique per type, so a type is required to identify a single config.
+        Config names are unique per type and project, so both are required to identify a single config.
+        `project` is a `Project` or its `ProjectId`.
         Returns it if found, otherwise `None`.
         """
 
-        config_id = self._get_discovery_config_id_by_name(name, config_type)
+        config_id = self._get_discovery_config_id_by_name(name, config_type, unwrap_project_id(project))
         if config_id is None:
             return None
 
@@ -86,6 +90,7 @@ class DiscoveryConfigClient(BaseClient):
         response = self.make_request("POST", "/api/discovery/configs/", data=data)
         created = DiscoveryConfig.model_validate(response.json())
         config.id = created.id
+        config.project = created.project
         config.is_valid = created.is_valid
         config.validation_error = created.validation_error
         config.validation_error_details = created.validation_error_details
@@ -123,12 +128,16 @@ class DiscoveryConfigClient(BaseClient):
 
     def create_or_update_discovery_config(self, config: DiscoveryConfig) -> DiscoveryConfig:
         """
-        Creates the config if it doesn't exist, or updates it if one with the same name already exists.
+        Creates the config, or updates the existing one with the same name and type in the same project.
 
+        With no `project` set, the server's only active project is used,
+        and `DataMasqueException` is raised when it has no active project or more than one.
         Sets the config's `id` property.
         """
 
-        existing_id = self._get_discovery_config_id_by_name(config.name, config.config_type)
+        existing_id = self._get_discovery_config_id_by_name(
+            config.name, config.config_type, self._resolve_project(config.project)
+        )
         if existing_id is not None:
             config.id = existing_id
             return self.update_discovery_config(config)
@@ -144,24 +153,20 @@ class DiscoveryConfigClient(BaseClient):
 
         self._delete_if_exists(f"/api/discovery/configs/{config_id}/")
 
-    def delete_discovery_config_by_name_if_exists(self, name: str, config_type: DiscoveryConfigType) -> None:
+    def delete_discovery_config_by_name_if_exists(
+        self, name: str, config_type: DiscoveryConfigType, project: Union[ProjectId, Project]
+    ) -> None:
         """
-        Deletes the discovery config with the given name and type.
+        Deletes the discovery config with the given name and type in the given project.
 
-        Config names are unique per type, so a type is required to identify a single config.
+        Config names are unique per type and project, so both are required to identify a single config.
+        `project` is a `Project` or its `ProjectId`.
         No-op if no such config exists.
         """
 
-        matching = [
-            config
-            for config in self.list_discovery_configs()
-            if config.name == name and config.config_type is config_type
-        ]
-        for config in matching:
-            if config.id is None:
-                raise DataMasqueException(f'Server returned a discovery config named "{config.name}" without an `id`.')
-
-            self.delete_discovery_config_by_id_if_exists(config.id)
+        config_id = self._get_discovery_config_id_by_name(name, config_type, unwrap_project_id(project))
+        if config_id is not None:
+            self.delete_discovery_config_by_id_if_exists(config_id)
 
     def get_default_discovery_config_yaml(self) -> str:
         """Returns the server's built-in default discovery configuration as a YAML string."""

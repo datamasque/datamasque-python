@@ -9,6 +9,20 @@ from pydantic import BaseModel, ConfigDict
 ProjectId = NewType("ProjectId", int)
 
 
+def drop_namespace(cls: type, data: object) -> object:
+    """
+    Drops the deprecated `namespace` field that the server still returns on libraries.
+
+    The models allow extra fields, so a kept `namespace` would be sent back on update,
+    and the server lets `namespace` override `project`.
+    """
+
+    if isinstance(data, dict) and "namespace" in data:
+        data = {key: value for key, value in data.items() if key != "namespace"}
+
+    return data
+
+
 class Project(BaseModel):
     """A project: the top-level grouping that connections, rulesets and other resources belong to."""
 

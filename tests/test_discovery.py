@@ -46,10 +46,12 @@ from datamasque.client.exceptions import (
 from datamasque.client.models.connection import ConnectionId, DatabaseConnectionConfig, DatabaseType
 from datamasque.client.models.data_selection import SelectedColumns, SelectedFileData, UserSelection
 from datamasque.client.models.status import AsyncRulesetGenerationTaskStatus
-from tests.helpers import parse_multipart_form
+from tests.helpers import PROJECT, parse_multipart_form, sample_mounted_share_connection_json
 
 DISCOVERY_CONFIG_ID = "aaaaaaaa-1111-2222-3333-444444444444"
 RG_CONFIG_ID = "bbbbbbbb-1111-2222-3333-444444444444"
+CONNECTION_PROJECT = "2-banking"
+"""The project of the connection the generated rulesets come from."""
 
 
 def test_generate_ruleset(client):
@@ -159,6 +161,14 @@ def test_poll_async_ruleset_generation(client):
         assert status is AsyncRulesetGenerationTaskStatus.failed
 
 
+def mock_source_connection(m: requests_mock.Mocker, connection_id: ConnectionId) -> None:
+    """Mocks the connection lookup that `get_generated_rulesets` makes to find the rulesets' project."""
+    m.get(
+        f"http://test-server/api/connections/{connection_id}/",
+        json=sample_mounted_share_connection_json(id=connection_id, name="source") | {"project": CONNECTION_PROJECT},
+    )
+
+
 def test_get_generated_rulesets_success(client):
     connection_id = ConnectionId("1")
     yaml_content_1 = b"""
@@ -185,6 +195,7 @@ def test_get_generated_rulesets_success(client):
     """
 
     with requests_mock.Mocker() as m:
+        mock_source_connection(m, connection_id)
         m.get(
             f"http://test-server/api/async-generate-ruleset/{connection_id}/",
             json={"status": "finished"},
@@ -211,6 +222,7 @@ def test_get_generated_rulesets_success(client):
         assert rulesets[0].yaml == yaml_content_1.decode("utf-8")
         assert rulesets[1].name == "ruleset2"
         assert rulesets[1].yaml == yaml_content_2.decode("utf-8")
+        assert [ruleset.project for ruleset in rulesets] == [CONNECTION_PROJECT, CONNECTION_PROJECT]
 
 
 def test_get_generated_rulesets_finished_with_warnings_success(client):
@@ -229,6 +241,7 @@ def test_get_generated_rulesets_finished_with_warnings_success(client):
     """
 
     with requests_mock.Mocker() as m:
+        mock_source_connection(m, connection_id)
         m.get(
             f"http://test-server/api/async-generate-ruleset/{connection_id}/",
             json={"status": "finished_with_warnings"},
@@ -259,6 +272,7 @@ def test_get_generated_rulesets_empty_archive_raises(client):
     connection_id = ConnectionId("1")
 
     with requests_mock.Mocker() as m:
+        mock_source_connection(m, connection_id)
         m.get(
             f"http://test-server/api/async-generate-ruleset/{connection_id}/",
             json={"status": "finished"},
@@ -287,6 +301,7 @@ def test_get_generated_rulesets_from_selection_success(client):
     generated_yaml = 'version: "1.0"\ntasks:\n- type: mask_table\n  table: users\n  key: id\n  rules: []\n'
 
     with requests_mock.Mocker() as m:
+        mock_source_connection(m, connection_id)
         # Status check and the redirect target are the same URL; both resolve to the same JSON.
         m.get(
             f"http://test-server/api/async-generate-ruleset/{connection_id}/",
@@ -305,12 +320,14 @@ def test_get_generated_rulesets_from_selection_success(client):
     assert rulesets[0].yaml == generated_yaml
     # The server doesn't return a name — callers set one before create_or_update_ruleset.
     assert rulesets[0].name == "generated_ruleset"
+    assert rulesets[0].project == CONNECTION_PROJECT
 
 
 def test_get_generated_rulesets_from_selection_empty_ruleset_raises(client):
     """A finished task with no `generated_ruleset` in the JSON body raises a clear error."""
     connection_id = ConnectionId("1")
     with requests_mock.Mocker() as m:
+        mock_source_connection(m, connection_id)
         m.get(
             f"http://test-server/api/async-generate-ruleset/{connection_id}/",
             json={"status": "finished", "generated_ruleset": None},
@@ -376,6 +393,7 @@ def test_get_generated_rulesets_download_fail(client):
     connection_id = ConnectionId("1")
 
     with requests_mock.Mocker() as m:
+        mock_source_connection(m, connection_id)
         m.get(
             f"http://test-server/api/async-generate-ruleset/{connection_id}/",
             json={"status": "finished"},
@@ -660,6 +678,7 @@ def test_schema_discovery_request_model_dump_includes_set_fields():
 def test_discovery_requests_accept_connection_config_objects():
     """All three discovery request models accept a full `ConnectionConfig` and extract its `id`."""
     connection = DatabaseConnectionConfig(
+        project=PROJECT,
         id=ConnectionId("conn-uuid"),
         name="prod_db",
         db_type=DatabaseType.postgres,
@@ -1242,14 +1261,16 @@ def test_schema_discovery_from_config_request_accepts_discovery_config_id():
 
 def test_schema_discovery_from_config_request_unwraps_discovery_config_model():
     """Passing a full `DiscoveryConfig` object substitutes its `id` for the wire payload."""
-    config = DiscoveryConfig(name="my_cfg", config_type="database", id=DiscoveryConfigId(DISCOVERY_CONFIG_ID))
+    config = DiscoveryConfig(
+        project=PROJECT, name="my_cfg", config_type="database", id=DiscoveryConfigId(DISCOVERY_CONFIG_ID)
+    )
     req = SchemaDiscoveryFromConfigRequest(connection="conn-1", discovery_config=config)
     assert req.model_dump(exclude_none=True, mode="json")["discovery_config"] == DISCOVERY_CONFIG_ID
 
 
 def test_schema_discovery_from_config_request_rejects_unsaved_discovery_config():
     """A `DiscoveryConfig` without an `id` cannot be used yet — raises immediately."""
-    config = DiscoveryConfig(name="my_cfg", config_type="database")
+    config = DiscoveryConfig(project=PROJECT, name="my_cfg", config_type="database")
     with pytest.raises(ValueError, match="id is None"):
         SchemaDiscoveryFromConfigRequest(connection="conn-1", discovery_config=config)
 
@@ -1352,7 +1373,9 @@ def test_start_schema_discovery_run_from_config_sends_schemas(client):
 
 def test_start_file_data_discovery_run_from_config_sends_discovery_config(client):
     """`start_file_data_discovery_run_from_config` posts only the connection and discovery_config id."""
-    config = DiscoveryConfig(name="my_cfg", config_type="file", id=DiscoveryConfigId(DISCOVERY_CONFIG_ID))
+    config = DiscoveryConfig(
+        project=PROJECT, name="my_cfg", config_type="file", id=DiscoveryConfigId(DISCOVERY_CONFIG_ID)
+    )
     req = FileDataDiscoveryFromConfigRequest(connection="conn-1", discovery_config=config)
     with requests_mock.Mocker() as m:
         m.post("http://test-server/api/run-file-data-discovery/v2/", json={"id": 99}, status_code=201)
@@ -1618,7 +1641,7 @@ def test_generate_ruleset_with_rg_config_none_sends_null(client):
 
 def test_ruleset_generation_with_rg_config_request_unwraps_rg_config_model():
     """Passing a full `RGConfig` object substitutes its `id` for the wire payload."""
-    config = RGConfig(name="my_rgc", id=RGConfigId(RG_CONFIG_ID))
+    config = RGConfig(project=PROJECT, name="my_rgc", id=RGConfigId(RG_CONFIG_ID))
     req = RulesetGenerationWithRGConfigRequest(
         connection="conn-1",
         selected_columns={"public": {"users": ["email"]}},
@@ -1629,7 +1652,7 @@ def test_ruleset_generation_with_rg_config_request_unwraps_rg_config_model():
 
 def test_ruleset_generation_with_rg_config_request_rejects_unsaved_rg_config():
     """An `RGConfig` without an `id` cannot be used yet — raises immediately."""
-    config = RGConfig(name="my_rgc")
+    config = RGConfig(project=PROJECT, name="my_rgc")
     with pytest.raises(ValueError, match="id is None"):
         RulesetGenerationWithRGConfigRequest(
             connection="conn-1",
@@ -1759,7 +1782,7 @@ def test_start_async_ruleset_generation_with_rg_config_unwraps_rg_config_model(c
     """A full `RGConfig` object is unwrapped to its id in the request body."""
     connection_id = ConnectionId("1")
     selected_columns = SelectedColumns(columns={"public": {"users": ["col1"]}})
-    config = RGConfig(name="my_rgc", id=RGConfigId(RG_CONFIG_ID))
+    config = RGConfig(project=PROJECT, name="my_rgc", id=RGConfigId(RG_CONFIG_ID))
 
     with requests_mock.Mocker() as m:
         m.post(f"http://test-server/api/async-generate-ruleset/v2/{connection_id}/", status_code=201)
