@@ -13,6 +13,7 @@ from datamasque.client.models.ruleset import Ruleset
 from datamasque.client.models.ruleset_library import RulesetLibrary
 from datamasque.client.models.runs import RunInfo, UnfinishedRun
 from datamasque.client.models.table_reference import TableReference
+from tests.helpers import PROJECT
 
 ResourceModel = Union[
     ConnectionConfig, Ruleset, RulesetLibrary, DiscoveryConfig, DiscoveryConfigLibrary, RGConfig, TableReference
@@ -52,17 +53,29 @@ _RESOURCE_CASES = [
 
 
 @pytest.mark.parametrize(("parse", "payload"), _RESOURCE_CASES)
-def test_resource_parses_project_and_excludes_it_when_serializing(parse: ParseResource, payload: Payload) -> None:
-    model = parse({**payload, "project": "1-default"})
+def test_resource_parses_project_and_sends_it_when_serializing(parse: ParseResource, payload: Payload) -> None:
+    model = parse({**payload, "project": PROJECT})
 
-    assert model.project == "1-default"
+    assert model.project == PROJECT
     assert "project" not in (model.model_extra or {})
-    assert "project" not in model.model_dump(by_alias=True, mode="json")
+    assert model.model_dump(by_alias=True, mode="json")["project"] == PROJECT
 
 
 @pytest.mark.parametrize(("parse", "payload"), _RESOURCE_CASES)
-def test_resource_project_defaults_to_none_when_absent(parse: ParseResource, payload: Payload) -> None:
-    assert parse(payload).project is None
+def test_resource_project_is_optional_and_not_sent_when_unset(parse: ParseResource, payload: Payload) -> None:
+    model = parse(payload)
+
+    assert model.project is None
+    assert "project" not in model.model_dump(by_alias=True, exclude_none=True, mode="json")
+
+
+@pytest.mark.parametrize("library_class", [RulesetLibrary, DiscoveryConfigLibrary])
+def test_library_drops_namespace(library_class: type[Union[RulesetLibrary, DiscoveryConfigLibrary]]) -> None:
+    """The server still returns the deprecated `namespace`, which would override `project` if it were sent back."""
+    library = library_class.model_validate({"id": "l-1", "name": "l", "project": PROJECT, "namespace": "org"})
+
+    assert "namespace" not in (library.model_extra or {})
+    assert "namespace" not in library.model_dump(by_alias=True, mode="json")
 
 
 _RUN_PAYLOAD: Payload = {
@@ -77,7 +90,7 @@ _RUN_PAYLOAD: Payload = {
 
 @pytest.mark.parametrize("run_class", [RunInfo, UnfinishedRun])
 def test_run_parses_project(run_class: type[Union[RunInfo, UnfinishedRun]]) -> None:
-    run = run_class.model_validate({**_RUN_PAYLOAD, "project": "1-default"})
+    run = run_class.model_validate({**_RUN_PAYLOAD, "project": PROJECT})
 
-    assert run.project == "1-default"
+    assert run.project == PROJECT
     assert "project" not in (run.model_extra or {})

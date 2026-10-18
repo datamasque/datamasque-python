@@ -14,6 +14,7 @@ from datamasque.client.models.rg_config import (
     unwrap_rg_config_id,
 )
 from datamasque.client.models.status import ValidationErrorType, ValidationStatus
+from tests.helpers import PROJECT, PROJECT_ID
 
 CONFIG_ID_1 = "aaaaaaaa-1111-2222-3333-444444444444"
 CONFIG_ID_2 = "bbbbbbbb-1111-2222-3333-444444444444"
@@ -31,6 +32,7 @@ def sample_config_list_response() -> dict[str, Any]:
             {
                 "id": CONFIG_ID_1,
                 "name": "my_config",
+                "project": PROJECT,
                 "archived": False,
                 "created": "2025-01-01T12:00:00Z",
                 "modified": "2025-01-02T12:00:00Z",
@@ -38,6 +40,7 @@ def sample_config_list_response() -> dict[str, Any]:
             {
                 "id": CONFIG_ID_2,
                 "name": "another_config",
+                "project": PROJECT,
                 "archived": False,
                 "created": "2025-02-01T12:00:00Z",
                 "modified": "2025-02-02T12:00:00Z",
@@ -51,6 +54,7 @@ def sample_config_detail_response() -> dict[str, Any]:
     return {
         "id": CONFIG_ID_1,
         "name": "my_config",
+        "project": PROJECT,
         "config_yaml": CONFIG_YAML,
         "archived": False,
         "created": "2025-01-01T12:00:00Z",
@@ -60,7 +64,7 @@ def sample_config_detail_response() -> dict[str, Any]:
 
 @pytest.fixture
 def rg_config() -> RGConfig:
-    return RGConfig(name="test_config", yaml=CONFIG_YAML)
+    return RGConfig(name="test_config", project=PROJECT, yaml=CONFIG_YAML)
 
 
 def test_list_rg_configs(client: DataMasqueClient, sample_config_list_response: dict[str, Any]) -> None:
@@ -88,6 +92,7 @@ def test_list_rg_configs_pagination(client: DataMasqueClient) -> None:
             {
                 "id": CONFIG_ID_1,
                 "name": "c1",
+                "project": PROJECT,
                 "archived": False,
                 "created": "2025-01-01T12:00:00Z",
                 "modified": "2025-01-01T12:00:00Z",
@@ -95,6 +100,7 @@ def test_list_rg_configs_pagination(client: DataMasqueClient) -> None:
             {
                 "id": CONFIG_ID_2,
                 "name": "c2",
+                "project": PROJECT,
                 "archived": False,
                 "created": "2025-01-01T12:00:00Z",
                 "modified": "2025-01-01T12:00:00Z",
@@ -109,6 +115,7 @@ def test_list_rg_configs_pagination(client: DataMasqueClient) -> None:
             {
                 "id": "cccccccc-1111-2222-3333-444444444444",
                 "name": "c3",
+                "project": PROJECT,
                 "archived": False,
                 "created": "2025-01-01T12:00:00Z",
                 "modified": "2025-01-01T12:00:00Z",
@@ -159,6 +166,7 @@ def test_get_rg_config_by_name_found(client: DataMasqueClient, sample_config_det
             {
                 "id": CONFIG_ID_1,
                 "name": "my_config",
+                "project": PROJECT,
                 "archived": False,
                 "created": "2025-01-01T12:00:00Z",
                 "modified": "2025-01-02T12:00:00Z",
@@ -177,11 +185,11 @@ def test_get_rg_config_by_name_found(client: DataMasqueClient, sample_config_det
             json=sample_config_detail_response,
             status_code=200,
         )
-        config = client.get_rg_config_by_name("my_config")
+        config = client.get_rg_config_by_name("my_config", PROJECT_ID)
 
     assert config is not None
     assert config.name == "my_config"
-    assert "name_exact=my_config" in m.request_history[0].url
+    assert m.request_history[0].qs == {"name_exact": ["my_config"], "project": [str(PROJECT_ID)], "limit": ["1"]}
 
 
 def test_get_rg_config_by_name_not_found(client: DataMasqueClient) -> None:
@@ -193,7 +201,7 @@ def test_get_rg_config_by_name_not_found(client: DataMasqueClient) -> None:
             json=empty_response,
             status_code=200,
         )
-        config = client.get_rg_config_by_name("nonexistent")
+        config = client.get_rg_config_by_name("nonexistent", PROJECT_ID)
 
     assert config is None
 
@@ -206,6 +214,7 @@ def test_get_rg_config_by_name_raises_when_server_omits_id(client: DataMasqueCli
         "results": [
             {
                 "name": "my_config",
+                "project": PROJECT,
                 "archived": False,
                 "created": "2025-01-01T12:00:00Z",
                 "modified": "2025-01-02T12:00:00Z",
@@ -220,13 +229,14 @@ def test_get_rg_config_by_name_raises_when_server_omits_id(client: DataMasqueCli
             status_code=200,
         )
         with pytest.raises(DataMasqueApiError, match="without an `id`"):
-            client.get_rg_config_by_name("my_config")
+            client.get_rg_config_by_name("my_config", PROJECT_ID)
 
 
 def test_create_rg_config(client: DataMasqueClient, rg_config: RGConfig) -> None:
     create_response = {
         "id": CONFIG_ID_1,
         "name": "test_config",
+        "project": PROJECT,
         "config_yaml": CONFIG_YAML,
         "is_valid": "valid",
         "archived": False,
@@ -250,6 +260,7 @@ def test_create_rg_config(client: DataMasqueClient, rg_config: RGConfig) -> None
 
     request_body = m.last_request.json()
     assert request_body["name"] == "test_config"
+    assert request_body["project"] == PROJECT
     assert request_body["config_yaml"] == CONFIG_YAML
     # Server-managed read-only fields must not be echoed back in the request body.
     assert "id" not in request_body
@@ -264,6 +275,7 @@ def test_create_and_update_rg_config_populate_validation_errors(client: DataMasq
     invalid_response = {
         "id": CONFIG_ID_1,
         "name": "test_config",
+        "project": PROJECT,
         "config_yaml": CONFIG_YAML,
         "is_valid": "invalid",
         "validation_errors": [
@@ -312,6 +324,7 @@ def test_update_rg_config(client: DataMasqueClient, rg_config: RGConfig) -> None
     update_response = {
         "id": CONFIG_ID_1,
         "name": "test_config",
+        "project": PROJECT,
         "config_yaml": CONFIG_YAML,
         "archived": False,
         "created": "2025-06-01T10:00:00Z",
@@ -344,7 +357,7 @@ def test_update_rg_config_no_id_raises(client: DataMasqueClient, rg_config: RGCo
 def test_update_rg_config_no_yaml_raises(client: DataMasqueClient) -> None:
     """A config from a list response carries no YAML, so a PUT would silently blank the server's copy."""
 
-    listed = RGConfig(name="test_config")
+    listed = RGConfig(name="test_config", project=PROJECT)
     listed.id = RGConfigId(CONFIG_ID_1)
 
     with pytest.raises(ValueError, match="yaml is None"):
@@ -356,6 +369,7 @@ def test_create_or_update_rg_config_create(client: DataMasqueClient, rg_config: 
     create_response = {
         "id": CONFIG_ID_1,
         "name": "test_config",
+        "project": PROJECT,
         "config_yaml": CONFIG_YAML,
         "archived": False,
         "created": "2025-06-01T10:00:00Z",
@@ -369,7 +383,9 @@ def test_create_or_update_rg_config_create(client: DataMasqueClient, rg_config: 
 
     assert result.id == RGConfigId(CONFIG_ID_1)
     assert m.request_history[0].method == "GET"
+    assert m.request_history[0].qs["project"] == [PROJECT]
     assert m.request_history[1].method == "POST"
+    assert m.request_history[1].json()["project"] == PROJECT
 
 
 def test_create_or_update_rg_config_update(client: DataMasqueClient, rg_config: RGConfig) -> None:
@@ -381,6 +397,7 @@ def test_create_or_update_rg_config_update(client: DataMasqueClient, rg_config: 
             {
                 "id": CONFIG_ID_1,
                 "name": "test_config",
+                "project": PROJECT,
                 "archived": False,
                 "created": "2025-06-01T10:00:00Z",
                 "modified": "2025-06-01T10:00:00Z",
@@ -390,6 +407,7 @@ def test_create_or_update_rg_config_update(client: DataMasqueClient, rg_config: 
     update_response = {
         "id": CONFIG_ID_1,
         "name": "test_config",
+        "project": PROJECT,
         "config_yaml": CONFIG_YAML,
         "archived": False,
         "created": "2025-06-01T10:00:00Z",
@@ -433,6 +451,7 @@ def test_delete_rg_config_by_name(client: DataMasqueClient) -> None:
             {
                 "id": CONFIG_ID_1,
                 "name": "my_config",
+                "project": PROJECT,
                 "archived": False,
                 "created": "2025-01-01T12:00:00Z",
                 "modified": "2025-01-02T12:00:00Z",
@@ -443,10 +462,10 @@ def test_delete_rg_config_by_name(client: DataMasqueClient) -> None:
     with requests_mock.Mocker() as m:
         m.get("http://test-server/api/ruleset-generation-configs/", json=list_response, status_code=200)
         m.delete(f"http://test-server/api/ruleset-generation-configs/{CONFIG_ID_1}/", status_code=204)
-        client.delete_rg_config_by_name_if_exists("my_config")
+        client.delete_rg_config_by_name_if_exists("my_config", PROJECT_ID)
 
     assert [r.method for r in m.request_history] == ["GET", "DELETE"]
-    assert "name_exact=my_config" in m.request_history[0].url
+    assert m.request_history[0].qs == {"name_exact": ["my_config"], "project": [str(PROJECT_ID)], "limit": ["1"]}
 
 
 def test_delete_rg_config_by_name_not_found(client: DataMasqueClient) -> None:
@@ -454,7 +473,7 @@ def test_delete_rg_config_by_name_not_found(client: DataMasqueClient) -> None:
 
     with requests_mock.Mocker() as m:
         m.get("http://test-server/api/ruleset-generation-configs/", json=empty_response, status_code=200)
-        client.delete_rg_config_by_name_if_exists("nonexistent")
+        client.delete_rg_config_by_name_if_exists("nonexistent", PROJECT_ID)
 
     assert m.call_count == 1
     assert m.request_history[0].method == "GET"
@@ -479,6 +498,7 @@ def test_rg_config_parses_validation_fields() -> None:
         {
             "id": CONFIG_ID_1,
             "name": "my_config",
+            "project": PROJECT,
             "config_yaml": "labels: []",
             "is_valid": "invalid",
             "validation_errors": [{"message": "bad shape on line 3", "line_number": 3, "column_number": 1}],
@@ -497,6 +517,7 @@ def test_rg_config_validation_fields_optional() -> None:
         {
             "id": CONFIG_ID_1,
             "name": "my_config",
+            "project": PROJECT,
             "created": "2025-01-01T12:00:00Z",
             "modified": "2025-01-02T12:00:00Z",
         }
@@ -512,11 +533,11 @@ def test_unwrap_rg_config_id_passes_through_strings() -> None:
 
 
 def test_unwrap_rg_config_id_extracts_id_from_model() -> None:
-    config = RGConfig(name="x", id=RGConfigId(CONFIG_ID_1))
+    config = RGConfig(name="x", project=PROJECT, id=RGConfigId(CONFIG_ID_1))
     assert unwrap_rg_config_id(config) == CONFIG_ID_1
 
 
 def test_unwrap_rg_config_id_raises_without_id() -> None:
-    config = RGConfig(name="x")
+    config = RGConfig(name="x", project=PROJECT)
     with pytest.raises(ValueError, match="id is None"):
         unwrap_rg_config_id(config)
