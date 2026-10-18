@@ -1,6 +1,7 @@
 """Tests for project support in the DataMasque client."""
 
 from datetime import datetime
+from typing import Union
 
 import pytest
 import requests_mock
@@ -17,12 +18,21 @@ from datamasque.client import (
     ProjectId,
 )
 
-CREATE_RESPONSE = {
+BANKING_PROJECT = {
     "id": 7,
     "reference": "7-banking",
     "name": "Banking",
     "description": "Customer banking data",
     "created": "2026-10-01T10:00:00Z",
+    "updated": "2026-10-01T10:00:00Z",
+}
+
+LEGACY_PROJECT = {
+    "id": 8,
+    "reference": "8-legacy",
+    "name": "Legacy",
+    "description": "",
+    "created": "2026-09-01T10:00:00Z",
     "updated": "2026-10-01T10:00:00Z",
 }
 
@@ -59,7 +69,7 @@ def test_create_project(client: DataMasqueClient) -> None:
     request = ProjectCreateRequest(name="Banking", description="Customer banking data")
 
     with requests_mock.Mocker() as m:
-        m.post("http://test-server/api/projects/", json=CREATE_RESPONSE, status_code=201)
+        m.post("http://test-server/api/projects/", json=BANKING_PROJECT, status_code=201)
         project = client.create_project(request)
 
     assert m.last_request.json() == {"name": "Banking", "description": "Customer banking data"}
@@ -76,7 +86,7 @@ def test_create_project_returns_the_name_and_description_as_stored(client: DataM
     request = ProjectCreateRequest(name="  Banking ", description=" Customer banking data  ")
 
     with requests_mock.Mocker() as m:
-        m.post("http://test-server/api/projects/", json=CREATE_RESPONSE, status_code=201)
+        m.post("http://test-server/api/projects/", json=BANKING_PROJECT, status_code=201)
         project = client.create_project(request)
 
     assert m.last_request.json() == {"name": "  Banking ", "description": " Customer banking data  "}
@@ -142,8 +152,8 @@ def test_get_project_delete_conflicts_returns_empty_list_when_project_can_be_del
 
 
 def test_project_delete_calls_accept_projects_as_well_as_ids(client: DataMasqueClient) -> None:
-    project = Project.model_validate(CREATE_RESPONSE)
-    destination = Project.model_validate(CREATE_RESPONSE | {"id": 8, "reference": "8-retail", "name": "Retail"})
+    project = Project.model_validate(BANKING_PROJECT)
+    destination = Project.model_validate(BANKING_PROJECT | {"id": 8, "reference": "8-retail", "name": "Retail"})
 
     with requests_mock.Mocker() as m:
         m.get("http://test-server/api/projects/7/delete-check/", json={"conflicts": []})
@@ -194,3 +204,65 @@ def test_delete_project_raises_a_plain_api_error_for_a_status_other_than_409(
 
     assert not isinstance(exc_info.value, ProjectDeleteConflictError)
     assert exc_info.value.response.status_code == status_code
+
+
+def test_list_projects_follows_pages(client: DataMasqueClient) -> None:
+    """With more active projects than fit on a page of 100, the client follows `next` to the last page."""
+    projects = [
+        {
+            **BANKING_PROJECT,
+            "id": project_id,
+            "reference": f"{project_id}-project-{project_id}",
+            "name": f"Project {project_id}",
+        }
+        for project_id in range(1, 102)
+    ]
+    with requests_mock.Mocker() as m:
+        m.get(
+            "http://test-server/api/projects/?limit=100&offset=0",
+            json={
+                "count": 101,
+                "next": "http://test-server/api/projects/?limit=100&offset=100",
+                "results": projects[:100],
+            },
+            complete_qs=True,
+        )
+        m.get(
+            "http://test-server/api/projects/?limit=100&offset=100",
+            json={"count": 101, "next": None, "results": projects[100:]},
+            complete_qs=True,
+        )
+        result = client.list_projects()
+
+    assert [project.id for project in result] == list(range(1, 102))
+
+
+def test_list_projects_include_archived(client: DataMasqueClient) -> None:
+    with requests_mock.Mocker() as m:
+        m.get(
+            "http://test-server/api/projects/?include_archived=true&limit=100&offset=0",
+            json={"count": 2, "next": None, "results": [BANKING_PROJECT, LEGACY_PROJECT]},
+            complete_qs=True,
+        )
+        projects = client.list_projects(include_archived=True)
+
+    assert [project.id for project in projects] == [ProjectId(7), ProjectId(8)]
+
+
+@pytest.mark.parametrize("project", [ProjectId(7), Project.model_validate(BANKING_PROJECT)])
+def test_get_project(client: DataMasqueClient, project: Union[ProjectId, Project]) -> None:
+    with requests_mock.Mocker() as m:
+        m.get("http://test-server/api/projects/7/", json=BANKING_PROJECT, complete_qs=True)
+        result = client.get_project(project)
+
+    assert result.id == ProjectId(7)
+    assert result.name == "Banking"
+
+
+def test_get_missing_project_raises(client: DataMasqueClient) -> None:
+    with requests_mock.Mocker() as m:
+        m.get("http://test-server/api/projects/99/", json={"detail": "Not found."}, status_code=404)
+        with pytest.raises(DataMasqueApiError) as exc_info:
+            client.get_project(ProjectId(99))
+
+    assert exc_info.value.response.status_code == 404
