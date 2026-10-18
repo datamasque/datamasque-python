@@ -5,6 +5,8 @@ History
 1.7.0 (unreleased)
 ------------------
 
+* **Breaking:** ``get_unfinished_runs`` returns its runs keyed by ``ConnectionId`` instead of connection name,
+  because two connections in different projects can share a name.
 * Added project models and management APIs.
 * Added ``list_resources``, which lists resources of every type across projects.
 

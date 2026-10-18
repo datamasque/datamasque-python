@@ -3,8 +3,10 @@
 import pytest
 import requests_mock
 
+from datamasque.client import DataMasqueClient
 from datamasque.client.exceptions import (
     DataMasqueApiError,
+    DataMasqueException,
     FailedToStartError,
     InvalidLibraryError,
     InvalidRulesetError,
@@ -92,78 +94,101 @@ def test_unfinished_run_str_without_destination():
     assert str(run) == '"source_db": Run ID 42 in status `queued`, ruleset "my_ruleset"'
 
 
-def test_get_unfinished_runs(client):
+QUEUED_SOURCE_ID = ConnectionId("0b6f6c1e-2d3a-4c55-9a1e-5f0b8d7e1a01")
+QUEUED_DESTINATION_ID = ConnectionId("0b6f6c1e-2d3a-4c55-9a1e-5f0b8d7e1a02")
+RUNNING_SOURCE_ID = ConnectionId("0b6f6c1e-2d3a-4c55-9a1e-5f0b8d7e1a03")
+RUNNING_DESTINATION_ID = ConnectionId("0b6f6c1e-2d3a-4c55-9a1e-5f0b8d7e1a04")
+VALIDATING_SOURCE_ID = ConnectionId("0b6f6c1e-2d3a-4c55-9a1e-5f0b8d7e1a05")
+VALIDATING_DESTINATION_ID = ConnectionId("0b6f6c1e-2d3a-4c55-9a1e-5f0b8d7e1a06")
+CANCELLING_SOURCE_ID = ConnectionId("0b6f6c1e-2d3a-4c55-9a1e-5f0b8d7e1a07")
+
+UNFINISHED_RUNS_URL = (
+    "http://test-server/api/runs/?connection_ruleset_name=&ruleset_name=&run_status={}&limit=1&offset=0"
+)
+
+
+def unfinished_run_json(
+    run_id: int, status: str, source: tuple[str, str], destination: tuple[str, str]
+) -> dict[str, object]:
+    """
+    Builds an unfinished-run list entry from `(id, name)` pairs.
+
+    An empty ID is sent as `None`, and an empty destination name means none.
+    """
+    return {
+        "id": run_id,
+        "source_connection": source[0] or None,
+        "source_connection_name": source[1],
+        "destination_connection": destination[0] or None,
+        "destination_connection_name": destination[1],
+        "ruleset_name": f"ruleset_{run_id}",
+        "project": "1-default",
+        "status": status,
+    }
+
+
+def test_get_unfinished_runs(client: DataMasqueClient) -> None:
+    runs = {
+        "queued": unfinished_run_json(
+            1, "queued", (QUEUED_SOURCE_ID, "queued_src"), (QUEUED_DESTINATION_ID, "queued_dst")
+        ),
+        "running": unfinished_run_json(
+            2, "running", (RUNNING_SOURCE_ID, "running_src"), (RUNNING_DESTINATION_ID, "running_dst")
+        ),
+        "validating": unfinished_run_json(
+            3, "validating", (VALIDATING_SOURCE_ID, "validating_src"), (VALIDATING_DESTINATION_ID, "validating_dst")
+        ),
+        "cancelling": unfinished_run_json(4, "cancelling", (CANCELLING_SOURCE_ID, "cancelling_src"), ("", "")),
+    }
     with requests_mock.Mocker() as m:
-        m.get(
-            "http://test-server/api/runs/?connection_ruleset_name=&ruleset_name=&run_status=queued&limit=1&offset=0",
-            json={
-                "results": [
-                    {
-                        "source_connection_name": "queued_src",
-                        "destination_connection_name": "queued_dst",
-                        "id": 1,
-                        "ruleset_name": "ruleset_1",
-                        "project": "1-default",
-                        "status": "queued",
-                    }
-                ]
-            },
-            status_code=200,
-        )
-        m.get(
-            "http://test-server/api/runs/?connection_ruleset_name=&ruleset_name=&run_status=running&limit=1&offset=0",
-            json={
-                "results": [
-                    {
-                        "source_connection_name": "running_src",
-                        "destination_connection_name": "running_dst",
-                        "id": 2,
-                        "ruleset_name": "ruleset_2",
-                        "project": "1-default",
-                        "status": "running",
-                    }
-                ]
-            },
-            status_code=200,
-        )
-        m.get(
-            "http://test-server/api/runs/?connection_ruleset_name=&ruleset_name=&run_status=validating&limit=1&offset=0",
-            json={
-                "results": [
-                    {
-                        "source_connection_name": "validating_src",
-                        "destination_connection_name": "validating_dst",
-                        "id": 3,
-                        "ruleset_name": "ruleset_3",
-                        "project": "1-default",
-                        "status": "validating",
-                    }
-                ]
-            },
-            status_code=200,
-        )
-        m.get(
-            "http://test-server/api/runs/?connection_ruleset_name=&ruleset_name=&run_status=cancelling&limit=1&offset=0",
-            json={
-                "results": [
-                    {
-                        "source_connection_name": "cancelling_src",
-                        "destination_connection_name": "",
-                        "id": 4,
-                        "ruleset_name": "ruleset_4",
-                        "project": "1-default",
-                        "status": "cancelling",
-                    }
-                ]
-            },
-            status_code=200,
-        )
+        for status, run in runs.items():
+            m.get(UNFINISHED_RUNS_URL.format(status), json={"results": [run]}, status_code=200)
 
         ur = client.get_unfinished_runs()
-        # 3 statuses have both source and destination keys, cancelling has only source (empty destination)
-        assert len(ur) == 7
-        for run in ur.values():
-            assert isinstance(run, UnfinishedRun)
+
+    # 3 statuses have both source and destination keys, cancelling has only source (empty destination)
+    assert {connection_id: run.id for connection_id, run in ur.items()} == {
+        QUEUED_SOURCE_ID: 1,
+        QUEUED_DESTINATION_ID: 1,
+        RUNNING_SOURCE_ID: 2,
+        RUNNING_DESTINATION_ID: 2,
+        VALIDATING_SOURCE_ID: 3,
+        VALIDATING_DESTINATION_ID: 3,
+        CANCELLING_SOURCE_ID: 4,
+    }
+
+
+def test_get_unfinished_runs_keeps_same_named_connections_apart(client: DataMasqueClient) -> None:
+    """Two connections with the same name in different projects each keep their own run."""
+    runs = {
+        "queued": unfinished_run_json(1, "queued", (QUEUED_SOURCE_ID, "orders_db"), ("", "")),
+        "running": unfinished_run_json(2, "running", (RUNNING_SOURCE_ID, "orders_db"), ("", "")),
+    }
+    with requests_mock.Mocker() as m:
+        for status in ("queued", "running", "validating", "cancelling"):
+            results = [runs[status]] if status in runs else []
+            m.get(UNFINISHED_RUNS_URL.format(status), json={"results": results}, status_code=200)
+
+        ur = client.get_unfinished_runs()
+
+    assert {connection_id: run.id for connection_id, run in ur.items()} == {QUEUED_SOURCE_ID: 1, RUNNING_SOURCE_ID: 2}
+
+
+@pytest.mark.parametrize(
+    "source, destination, missing",
+    [
+        (("", "orders_db"), ("", ""), "source"),
+        ((QUEUED_SOURCE_ID, "orders_db"), ("", "orders_copy"), "destination"),
+    ],
+)
+def test_get_unfinished_runs_without_connection_id_raises(
+    client: DataMasqueClient, source: tuple[str, str], destination: tuple[str, str], missing: str
+) -> None:
+    run = unfinished_run_json(1, "queued", source, destination)
+    with requests_mock.Mocker() as m:
+        m.get(UNFINISHED_RUNS_URL.format("queued"), json={"results": [run]}, status_code=200)
+        with pytest.raises(DataMasqueException, match=f"without a {missing} connection ID"):
+            client.get_unfinished_runs()
 
 
 def test_start_masking_run(client):
