@@ -7,13 +7,12 @@ from dataclasses import dataclass
 from importlib.metadata import PackageNotFoundError, version
 from io import BufferedIOBase, BytesIO, TextIOBase
 from pathlib import Path
-from typing import Any, Callable, Iterator, Mapping, Optional, Type, TypeVar, Union
+from typing import Any, Callable, Iterator, Optional, Type, TypeVar, Union
 from urllib.parse import urljoin
 
 import requests
 from pydantic import BaseModel
-from requests import PreparedRequest, Response
-from requests.adapters import HTTPAdapter
+from requests import Response
 from urllib3.exceptions import InsecureRequestWarning
 
 from datamasque.client.exceptions import (
@@ -51,53 +50,19 @@ def _build_user_agent() -> str:
 USER_AGENT = _build_user_agent()
 
 
-class _DefaultTimeoutAdapter(HTTPAdapter):
-    """
-    An adapter that gives every request it sends a timeout, unless the call passed its own.
-
-    `requests.Session` has no session-wide timeout, and a request without one can wait forever.
-    """
-
-    def __init__(self, timeout: tuple[float, float]) -> None:
-        super().__init__()
-        self._timeout = timeout
-
-    def send(
-        self,
-        request: PreparedRequest,
-        stream: bool = False,
-        timeout: Union[None, float, tuple[float, float], tuple[float, None]] = None,
-        verify: Union[bool, str] = True,
-        cert: Union[None, bytes, str, tuple[Union[bytes, str], Union[bytes, str]]] = None,
-        proxies: Optional[Mapping[str, str]] = None,
-    ) -> Response:
-        return super().send(
-            request,
-            stream=stream,
-            timeout=self._timeout if timeout is None else timeout,
-            verify=verify,
-            cert=cert,
-            proxies=proxies,
-        )
-
-
-def _build_session(verify_ssl: bool, timeout: tuple[float, float]) -> requests.Session:
+def _build_session(verify_ssl: bool) -> requests.Session:
     """
     Build a configured `requests.Session` for one client's lifetime.
 
-    Centralises the `User-Agent`, `verify` and timeout defaults so every call site
-    inherits them automatically, keeping the per-call code free of
-    boilerplate and removing the risk of forgetting any of them on a new
+    Centralises the `User-Agent` and `verify` defaults so every call site
+    inherits them automatically — keeping the per-call code free of
+    boilerplate and removing the risk of forgetting either flag on a new
     endpoint.
-    `timeout` is the `(connect, read)` pair in seconds.
     """
 
     session = requests.Session()
     session.headers["User-Agent"] = USER_AGENT
     session.verify = verify_ssl
-    adapter = _DefaultTimeoutAdapter(timeout)
-    session.mount("http://", adapter)
-    session.mount("https://", adapter)
     return session
 
 
@@ -172,9 +137,8 @@ class BaseClient:
         self.password = connection_config.password
         self.verify_ssl = connection_config.verify_ssl
         self.token_source = connection_config.token_source
-        self._session = _build_session(
-            self.verify_ssl, (connection_config.connect_timeout_seconds, connection_config.read_timeout_seconds)
-        )
+        self._session = _build_session(self.verify_ssl)
+        self._timeout = (connection_config.connect_timeout_seconds, connection_config.read_timeout_seconds)
         if connection_config.spcs_pat:
             install_spcs_gateway_auth(self._session, connection_config.spcs_pat)
 
@@ -289,8 +253,11 @@ class BaseClient:
                             params=params,
                             headers=headers,
                             files=files_payload,
+                            timeout=self._timeout,
                         )
-                    return self._session.request(method, url, json=data, params=params, headers=headers)
+                    return self._session.request(
+                        method, url, json=data, params=params, headers=headers, timeout=self._timeout
+                    )
             except requests.RequestException as e:
                 raise DataMasqueTransportError(f"Failed to reach DataMasque server at {url}: {e}") from e
 
