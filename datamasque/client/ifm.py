@@ -84,7 +84,9 @@ class DataMasqueIfmClient:
         self.token_source = connection_config.token_source
         # One session for both admin-server (JWT login/refresh) and IFM (data plane)
         # traffic -- different hosts, but a single session handles per-host pooling.
-        self._session = _build_session(self.verify_ssl)
+        self._session = _build_session(
+            self.verify_ssl, (connection_config.connect_timeout_seconds, connection_config.read_timeout_seconds)
+        )
 
     def authenticate(self) -> None:
         """Obtain an access (and refresh) token from the admin server, or via `token_source`."""
