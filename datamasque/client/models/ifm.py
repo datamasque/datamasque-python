@@ -171,8 +171,7 @@ class DataMasqueIfmInstanceConfig(BaseModel):
     connect_timeout_seconds: float = DEFAULT_CONNECT_TIMEOUT_SECONDS
     """How long a request may take to connect, including the TLS handshake."""
     read_timeout_seconds: float = DEFAULT_READ_TIMEOUT_SECONDS
-    """How long a request may wait for the server between bytes of its response.
-    Raise it for an endpoint that takes longer than this to start answering."""
+    """How long a request may wait for the server between bytes of its response."""
 
     @model_validator(mode="after")
     def _validate_auth_source(self) -> "DataMasqueIfmInstanceConfig":
