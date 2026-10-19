@@ -1,3 +1,4 @@
+from datamasque.client.audit_logs import AuditLogClient
 from datamasque.client.base import FileOrContent, UploadFile
 from datamasque.client.connections import ConnectionClient
 from datamasque.client.discovery import DiscoveryClient
@@ -30,6 +31,7 @@ class DataMasqueClient(
     RGConfigClient,
     UserClient,
     SettingsClient,
+    AuditLogClient,
 ):
     """
     Client for a DataMasque server instance.

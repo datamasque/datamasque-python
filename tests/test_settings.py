@@ -1,10 +1,11 @@
-"""Tests for `SettingsClient` (admin install bootstrap, application logs, locality)."""
+"""Tests for `SettingsClient` (admin install bootstrap, application logs, locality, AI detection cache)."""
 
 import pytest
 import requests_mock
 
 from datamasque.client import DataMasqueClient
 from datamasque.client.exceptions import DataMasqueApiError, DataMasqueUserError
+from datamasque.client.models.ai_detection_cache import AiDetectionCacheClearResult
 from datamasque.client.models.dm_instance import DataMasqueInstanceConfig
 from tests.helpers import fake
 
@@ -105,3 +106,65 @@ def test_set_locality_sends_patch(client):
         client.set_locality("en_GB")
 
     assert m.last_request.json() == {"locality": "en_GB"}
+
+
+def test_get_ai_detection_cache_size_bytes(client):
+    with requests_mock.Mocker() as m:
+        m.get("http://test-server/api/ai-detection-cache/", json={"size_bytes": 4096}, status_code=200)
+        size_bytes = client.get_ai_detection_cache_size_bytes()
+
+    assert size_bytes == 4096
+    assert m.last_request.method == "GET"
+
+
+def test_get_ai_detection_cache_size_bytes_raises_when_server_cannot_read_cache(client):
+    with requests_mock.Mocker() as m:
+        m.get(
+            "http://test-server/api/ai-detection-cache/",
+            json={"message": "Could not measure the AI detection cache: permission denied"},
+            status_code=500,
+        )
+        with pytest.raises(DataMasqueApiError) as exc_info:
+            client.get_ai_detection_cache_size_bytes()
+
+    assert exc_info.value.response.status_code == 500
+
+
+def test_clear_ai_detection_cache_sends_null_unused_for_days_by_default(client):
+    with requests_mock.Mocker() as m:
+        m.post(
+            "http://test-server/api/ai-detection-cache/clear/",
+            json={"freed_bytes": 2048, "size_bytes": 0},
+            status_code=200,
+        )
+        result = client.clear_ai_detection_cache()
+
+    assert m.last_request.json() == {"unused_for_days": None}
+    assert result == AiDetectionCacheClearResult(freed_bytes=2048, size_bytes=0)
+
+
+def test_clear_ai_detection_cache_sends_unused_for_days(client):
+    with requests_mock.Mocker() as m:
+        m.post(
+            "http://test-server/api/ai-detection-cache/clear/",
+            json={"freed_bytes": 1024, "size_bytes": 3072},
+            status_code=200,
+        )
+        result = client.clear_ai_detection_cache(unused_for_days=30)
+
+    assert m.last_request.json() == {"unused_for_days": 30}
+    assert result.freed_bytes == 1024
+    assert result.size_bytes == 3072
+
+
+def test_clear_ai_detection_cache_raises_when_server_refuses_unused_for_days(client):
+    with requests_mock.Mocker() as m:
+        m.post(
+            "http://test-server/api/ai-detection-cache/clear/",
+            json={"unused_for_days": ["Ensure this value is greater than or equal to 1."]},
+            status_code=400,
+        )
+        with pytest.raises(DataMasqueApiError) as exc_info:
+            client.clear_ai_detection_cache(unused_for_days=0)
+
+    assert exc_info.value.response.status_code == 400

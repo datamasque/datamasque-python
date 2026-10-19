@@ -4,6 +4,22 @@ datamasque.client.models package
 Submodules
 ----------
 
+datamasque.client.models.ai_detection_cache module
+--------------------------------------------------
+
+.. automodule:: datamasque.client.models.ai_detection_cache
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+datamasque.client.models.audit_log module
+-----------------------------------------
+
+.. automodule:: datamasque.client.models.audit_log
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 datamasque.client.models.connection module
 ------------------------------------------
 

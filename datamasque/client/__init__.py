@@ -27,6 +27,8 @@ from datamasque.client.exceptions import (
     RunNotCancellableError,
 )
 from datamasque.client.ifm import DataMasqueIfmClient
+from datamasque.client.models.ai_detection_cache import AiDetectionCacheClearResult
+from datamasque.client.models.audit_log import AuditLog, AuditLogAction
 from datamasque.client.models.connection import (
     AzureConnectionConfig,
     CassandraConnectionConfig,
@@ -177,8 +179,11 @@ from datamasque.client.models.user import User, UserId, UserRole
 __version__ = version("datamasque-python")
 
 __all__ = [
+    "AiDetectionCacheClearResult",
     "AsyncRulesetGenerationInProgressError",
     "AsyncRulesetGenerationTaskStatus",
+    "AuditLog",
+    "AuditLogAction",
     "AzureConnectionConfig",
     "BooleanPreview",
     "BooleanStatistics",

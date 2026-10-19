@@ -2,6 +2,19 @@
 History
 =======
 
+1.6.0 (2026-10-19)
+------------------
+
+* Added ``get_ai_detection_cache_size_bytes`` and ``clear_ai_detection_cache``
+  to read the size of the AI detection cache and delete its entries:
+  all of them, or with ``unused_for_days`` only those no masking run has used in that many days.
+  ``clear_ai_detection_cache`` returns an ``AiDetectionCacheClearResult``
+  with the bytes freed and the size of the cache after the clear.
+* Added ``list_audit_logs`` and ``iter_audit_logs``, which return audit log entries newest first
+  as ``AuditLog`` models, with ``action`` typed by the new ``AuditLogAction`` enum.
+  ``list_audit_logs`` takes an optional ``limit`` to return only the newest entries.
+  ``project`` and ``project_name`` are ``None`` on servers older than 3.26.20.
+
 1.5.0 (2026-10-07)
 ------------------
 

@@ -4,6 +4,7 @@ from urllib.parse import urlparse
 
 from datamasque.client.base import BaseClient
 from datamasque.client.exceptions import DataMasqueUserError
+from datamasque.client.models.ai_detection_cache import AiDetectionCacheClearResult
 
 
 class SettingsClient(BaseClient):
@@ -22,6 +23,48 @@ class SettingsClient(BaseClient):
         """Sets the server-wide locality used for ruleset generation and Jinja2 interpolation of ruleset YAML."""
 
         self.make_request("PATCH", path="api/settings/", data={"locality": locality})
+
+    def get_ai_detection_cache_size_bytes(self) -> int:
+        """
+        Returns the size on disk of the AI detection cache, in bytes.
+
+        The cache holds the `ai_detect` results that tasks with `cache_ai_detect_spans` set to `true`
+        reuse on later runs.
+        Requires an admin user.
+
+        Raises:
+            DataMasqueApiError: the caller is not an admin user,
+              or the server could not read the cache directory.
+        """
+
+        response = self.make_request("GET", "/api/ai-detection-cache/")
+        return response.json()["size_bytes"]
+
+    def clear_ai_detection_cache(self, unused_for_days: Optional[int] = None) -> AiDetectionCacheClearResult:
+        """
+        Deletes entries from the AI detection cache.
+
+        `unused_for_days`, from 1 to 36500,
+        deletes only the entries that no masking run has used in that many days.
+        `None` (the default) deletes every entry.
+        On the next run, DataMasque sends the texts of the deleted entries to the AI Engine again.
+        Requires an admin user.
+
+        Returns the bytes freed and the size of the cache after the clear.
+
+        Raises:
+            DataMasqueApiError: `unused_for_days` is out of range,
+              the caller is not an admin user,
+              or the server could not clear the cache.
+              A failed clear may have deleted some entries before it failed.
+        """
+
+        response = self.make_request(
+            "POST",
+            "/api/ai-detection-cache/clear/",
+            data={"unused_for_days": unused_for_days},
+        )
+        return AiDetectionCacheClearResult.model_validate(response.json())
 
     def admin_install(
         self,

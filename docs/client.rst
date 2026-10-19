@@ -12,6 +12,14 @@ Subpackages
 Submodules
 ----------
 
+datamasque.client.audit_logs module
+-----------------------------------
+
+.. automodule:: datamasque.client.audit_logs
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 datamasque.client.base module
 -----------------------------
 
