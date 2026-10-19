@@ -1,7 +1,8 @@
 """Project models for the DataMasque API."""
 
 from datetime import datetime
-from typing import NewType
+from enum import Enum
+from typing import NewType, Optional, Union
 
 from pydantic import BaseModel, ConfigDict
 
@@ -22,18 +23,52 @@ class Project(BaseModel):
     updated: datetime
 
 
+def unwrap_project_id(project: Union[ProjectId, Project]) -> ProjectId:
+    """Return the id of `project`, which a caller may give as a `Project` or as its `ProjectId`."""
+    return project.id if isinstance(project, Project) else project
+
+
 class ProjectCreateRequest(BaseModel):
     """
     Request body for `POST /api/projects/`.
 
-    Names are unique across active and archived projects, ignoring case.
-    The server trims leading and trailing whitespace from `name` and `description`,
-    and rejects a name that contains "/", ".." or a control character.
-    It may reject other names too,
-    and its 400 response gives the reason.
+    A name must not contain "/", ".." or a control character,
+    and must differ, ignoring case, from the name of every other project, including deleted ones.
+    The server trims leading and trailing whitespace from `name` and `description`.
     """
 
     model_config = ConfigDict(extra="forbid")
 
     name: str
     description: str = ""
+
+
+class ProjectDeleteConflictReason(str, Enum):
+    """Why a project's resources cannot move to the destination project when the project is deleted."""
+
+    name_in_use = "name_in_use"
+    """The destination project already contains a resource of the same type and name."""
+    file_exists = "file_exists"
+    """The destination project already has a file or directory where the resource's files would move to."""
+    unexpected_file = "unexpected_file"
+    """The project's directory contains a file or directory that belongs to none of its resources."""
+
+
+class ProjectDeleteConflict(BaseModel):
+    """A conflict that prevents a project's resources moving to the destination project when the project is deleted."""
+
+    model_config = ConfigDict(extra="allow")
+
+    reason: ProjectDeleteConflictReason
+    detail: str
+    """A message that describes the conflict."""
+    type: Optional[str] = None
+    """
+    For `name_in_use` and `file_exists`: the type of the resource that would move, such as `connections` or `rulesets`.
+    """
+    id: Optional[str] = None
+    """For `name_in_use` and `file_exists`: the ID of the resource that would move."""
+    name: Optional[str] = None
+    """For `name_in_use` and `file_exists`: the name of the resource that would move."""
+    path: Optional[str] = None
+    """For `file_exists` and `unexpected_file`: the path of the file or directory."""
