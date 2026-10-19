@@ -4,6 +4,11 @@ from pydantic import BaseModel, ConfigDict, model_validator
 
 from datamasque.client.exceptions import DataMasqueUserError
 
+# How long a request may take to connect, and then wait between bytes of the response, before it fails.
+# Without them a server that accepts the connection and never answers holds the caller forever.
+DEFAULT_CONNECT_TIMEOUT_SECONDS = 10.0
+DEFAULT_READ_TIMEOUT_SECONDS = 300.0
+
 
 class DataMasqueInstanceConfig(BaseModel):
     """
@@ -42,6 +47,11 @@ class DataMasqueInstanceConfig(BaseModel):
     Create the token in Snowsight (User profile → Programmatic access tokens)
     for an account that can reach the SPCS app.
     Leave unset for instances that are not hosted on SPCS."""
+    connect_timeout_seconds: float = DEFAULT_CONNECT_TIMEOUT_SECONDS
+    """How long a request may take to connect, including the TLS handshake."""
+    read_timeout_seconds: float = DEFAULT_READ_TIMEOUT_SECONDS
+    """How long a request may wait for the server between bytes of its response.
+    Raise it for an endpoint that takes longer than this to start answering."""
 
     @model_validator(mode="after")
     def _validate_auth_source(self) -> "DataMasqueInstanceConfig":

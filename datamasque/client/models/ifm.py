@@ -6,6 +6,7 @@ from typing import Any, Callable, Optional
 from pydantic import BaseModel, ConfigDict, model_validator
 
 from datamasque.client.exceptions import DataMasqueUserError
+from datamasque.client.models.dm_instance import DEFAULT_CONNECT_TIMEOUT_SECONDS, DEFAULT_READ_TIMEOUT_SECONDS
 
 
 class RulesetPlanOptions(BaseModel):
@@ -167,6 +168,11 @@ class DataMasqueIfmInstanceConfig(BaseModel):
     password: Optional[str] = None
     verify_ssl: bool = True
     token_source: Optional[Callable[[], str]] = None
+    connect_timeout_seconds: float = DEFAULT_CONNECT_TIMEOUT_SECONDS
+    """How long a request may take to connect, including the TLS handshake."""
+    read_timeout_seconds: float = DEFAULT_READ_TIMEOUT_SECONDS
+    """How long a request may wait for the server between bytes of its response.
+    Raise it for an endpoint that takes longer than this to start answering."""
 
     @model_validator(mode="after")
     def _validate_auth_source(self) -> "DataMasqueIfmInstanceConfig":
