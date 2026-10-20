@@ -13,6 +13,7 @@ History
   so creating a resource places it in the server's default project.
 * ``RunInfo`` and ``UnfinishedRun`` gain a required ``project`` field:
   the run's project, taken from its ruleset's project when the run starts.
+* Added ``connect_timeout_seconds`` and ``read_timeout_seconds`` to the instance config models.
 
 Requires server version 3.26.20
 
