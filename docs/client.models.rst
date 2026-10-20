@@ -76,6 +76,14 @@ datamasque.client.models.resource module
    :undoc-members:
    :show-inheritance:
 
+datamasque.client.models.resource_type module
+---------------------------------------------
+
+.. automodule:: datamasque.client.models.resource_type
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 datamasque.client.models.rg_config module
 -----------------------------------------
 

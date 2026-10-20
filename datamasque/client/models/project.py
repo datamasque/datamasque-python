@@ -6,6 +6,8 @@ from typing import NewType, Optional, Union
 
 from pydantic import BaseModel, ConfigDict
 
+from datamasque.client.models.resource_type import ResourceTypeName
+
 ProjectId = NewType("ProjectId", int)
 
 
@@ -76,10 +78,8 @@ class ProjectDeleteConflict(BaseModel):
     reason: ProjectDeleteConflictReason
     detail: str
     """A message that describes the conflict."""
-    type: Optional[str] = None
-    """
-    For `name_in_use` and `file_exists`: the type of the resource that would move, such as `connections` or `rulesets`.
-    """
+    type: Optional[ResourceTypeName] = None
+    """For `name_in_use` and `file_exists`: the type of the resource that would move."""
     id: Optional[str] = None
     """For `name_in_use` and `file_exists`: the ID of the resource that would move."""
     name: Optional[str] = None
