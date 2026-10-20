@@ -1,4 +1,4 @@
-"""Tests for listing resources with the DataMasque client."""
+"""Tests for listing and moving resources with the DataMasque client."""
 
 from datetime import datetime
 from typing import Optional
@@ -14,6 +14,7 @@ from datamasque.client import (
     Project,
     ProjectId,
     Resource,
+    ResourceMoveConflictReason,
     ResourceTypeName,
     RulesetResource,
 )
@@ -150,3 +151,73 @@ def test_list_resources_raises_for_a_caller_who_cannot_list_them(client: DataMas
             client.list_resources()
 
     assert raised.value.response.status_code == 403
+
+
+# The move methods accept a listed `Resource` or a plain ID.
+MOVING = {
+    ResourceTypeName.rulesets: [RulesetResource.model_validate(RULESET)],
+    ResourceTypeName.connections: [CONNECTION["id"]],
+}
+MOVE_REQUEST = {
+    "destination": "8",
+    "resources": [{"type": "rulesets", "id": RULESET["id"]}, {"type": "connections", "id": CONNECTION["id"]}],
+}
+NAME_CLASH = {
+    "reason": "name_in_use",
+    "detail": 'The destination project already contains a connection named "customers_db".',
+    "type": "connections",
+    "id": CONNECTION["id"],
+    "name": "customers_db",
+}
+
+
+def test_get_resource_move_conflicts_sends_the_resources_and_destination(client: DataMasqueClient) -> None:
+    with requests_mock.Mocker() as m:
+        m.post("http://test-server/api/resources/move-check/", json={"conflicts": [NAME_CLASH]})
+        conflicts = client.get_resource_move_conflicts(MOVING, ProjectId(8))
+
+    assert m.last_request.json() == MOVE_REQUEST
+    assert len(conflicts) == 1
+    assert conflicts[0].reason is ResourceMoveConflictReason.name_in_use
+    assert conflicts[0].type is ResourceTypeName.connections
+    assert conflicts[0].name == "customers_db"
+
+
+def test_move_resources_returns_the_count_moved_and_the_conflicts(client: DataMasqueClient) -> None:
+    with requests_mock.Mocker() as m:
+        m.post("http://test-server/api/resources/move/", json={"moved": 1, "conflicts": [NAME_CLASH]})
+        result = client.move_resources(MOVING, ProjectId(8))
+
+    assert m.last_request.json() == MOVE_REQUEST
+    assert result.moved == 1
+    assert [conflict.id for conflict in result.conflicts] == [CONNECTION["id"]]
+
+
+def test_move_resources_moves_what_list_resources_returned_to_a_project(client: DataMasqueClient) -> None:
+    retail = Project.model_validate(
+        {
+            "id": 8,
+            "reference": "8-retail",
+            "name": "Retail",
+            "created": "2026-10-01T10:00:00Z",
+            "updated": "2026-10-01T10:00:00Z",
+        }
+    )
+    with requests_mock.Mocker() as m:
+        m.get("http://test-server/api/resources/", json=page({"rulesets": [RULESET], "connections": [CONNECTION]}))
+        m.post("http://test-server/api/resources/move/", json={"moved": 2, "conflicts": []})
+        client.move_resources(client.list_resources(), retail)
+
+    assert m.last_request.json() == MOVE_REQUEST
+
+
+@pytest.mark.parametrize("resources", [{}, {ResourceTypeName.rulesets: []}])
+def test_moving_no_resources_raises_without_a_request(client: DataMasqueClient, resources: dict) -> None:
+    with requests_mock.Mocker() as m:
+        with pytest.raises(ValueError, match="at least one resource"):
+            client.move_resources(resources, ProjectId(8))
+
+        with pytest.raises(ValueError, match="at least one resource"):
+            client.get_resource_move_conflicts(resources, ProjectId(8))
+
+    assert m.call_count == 0
