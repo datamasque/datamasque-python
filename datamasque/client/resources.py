@@ -1,10 +1,10 @@
 import logging
 from collections import defaultdict
 from collections.abc import Sequence
-from typing import Optional, Union
+from typing import Optional
 
 from datamasque.client.base import BaseClient
-from datamasque.client.models.project import Project, ProjectId, unwrap_project_id
+from datamasque.client.models.project import ProjectIdentifier, unwrap_project_id
 from datamasque.client.models.resource import (
     RESOURCE_MODEL_BY_TYPE_NAME,
     Resource,
@@ -17,7 +17,7 @@ from datamasque.client.models.resource_type import ResourceTypeName
 logger = logging.getLogger(__name__)
 
 
-def _move_request(resources: ResourcesByType, destination: Union[ProjectId, Project]) -> dict[str, object]:
+def _move_request(resources: ResourcesByType, destination: ProjectIdentifier) -> dict[str, object]:
     keys = [
         {"type": type_name.value, "id": resource.id if isinstance(resource, Resource) else resource}
         for type_name, group in resources.items()
@@ -36,7 +36,7 @@ class ResourceClient(BaseClient):
     def list_resources(
         self,
         *,
-        projects: Optional[Sequence[Union[ProjectId, Project]]] = None,
+        projects: Optional[Sequence[ProjectIdentifier]] = None,
         types: Optional[Sequence[ResourceTypeName]] = None,
         search: Optional[str] = None,
         page_size: int = 500,
@@ -44,7 +44,7 @@ class ResourceClient(BaseClient):
         """
         Returns the resources the caller can manage, grouped by type, fetched in pages of `page_size`.
 
-        `projects` limits them to those projects, each given as a `Project` or its `ProjectId`;
+        `projects` limits them to those projects, each given as a `Project`, its `ProjectId` or its `<id>-<slug>` form;
         `types` to those types; and `search` to resources whose name contains every word of it, ignoring case.
         The groups are the requested types, or every type the server has when `types` is not given.
         An empty `projects` or `types` matches no resources, without a request to the server.
@@ -81,7 +81,7 @@ class ResourceClient(BaseClient):
     def get_resource_move_conflicts(
         self,
         resources: ResourcesByType,
-        destination: Union[ProjectId, Project],
+        destination: ProjectIdentifier,
     ) -> list[ResourceMoveConflict]:
         """
         Checks whether `resources` can move to the destination project, without moving them.
@@ -103,7 +103,7 @@ class ResourceClient(BaseClient):
     def move_resources(
         self,
         resources: ResourcesByType,
-        destination: Union[ProjectId, Project],
+        destination: ProjectIdentifier,
     ) -> ResourceMoveResult:
         """
         Moves `resources` to the destination project, with their files and runs.

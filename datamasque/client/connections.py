@@ -4,7 +4,7 @@ from typing import Optional, Union
 from datamasque.client.base import BaseClient
 from datamasque.client.exceptions import DataMasqueException
 from datamasque.client.models.connection import ConnectionConfig, ConnectionId, validate_connection
-from datamasque.client.models.project import Project, ProjectId, unwrap_project_id
+from datamasque.client.models.project import ProjectId, ProjectIdentifier, unwrap_project_id
 
 logger = logging.getLogger(__name__)
 
@@ -12,11 +12,11 @@ logger = logging.getLogger(__name__)
 class ConnectionClient(BaseClient):
     """Connection-related API methods. Mixed into `DataMasqueClient`."""
 
-    def list_connections(self, project: Optional[Union[ProjectId, Project]] = None) -> list[ConnectionConfig]:
+    def list_connections(self, project: Optional[ProjectIdentifier] = None) -> list[ConnectionConfig]:
         """
         Lists all configured connections, or only those in `project` when it is given.
 
-        `project` is a `Project` or its `ProjectId`.
+        `project` is a `Project`, its `ProjectId` or its `<id>-<slug>` form.
         Note that database passwords and connection strings are returned encrypted over the API
         and so are `None` on the returned `ConnectionConfig` objects.
         """
@@ -69,11 +69,11 @@ class ConnectionClient(BaseClient):
 
         self._delete_if_exists(f"/api/connections/{connection_id}/")
 
-    def delete_connection_by_name_if_exists(self, connection_name: str, project: Union[ProjectId, Project]) -> None:
+    def delete_connection_by_name_if_exists(self, connection_name: str, project: ProjectIdentifier) -> None:
         """
         Deletes the connection with the given name in the given project.
 
-        `project` is a `Project` or its `ProjectId`.
+        `project` is a `Project`, its `ProjectId` or its `<id>-<slug>` form.
         No-op if the connection does not exist.
         """
 
