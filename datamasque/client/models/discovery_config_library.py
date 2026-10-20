@@ -23,6 +23,8 @@ class DiscoveryConfigLibrary(BaseModel):
     yaml: Optional[str] = Field(default=None, alias="config_yaml")
     # Server-populated read-only fields, excluded from request bodies.
     id: Optional[DiscoveryConfigLibraryId] = Field(default=None, exclude=True)
+    project: Optional[str] = Field(default=None, exclude=True)
+    """Its project's `<id>-<slug>` reference, e.g. `1-default`; `None` until it is created on the server."""
     is_valid: Optional[ValidationStatus] = Field(default=None, exclude=True)
     """Validation status; libraries are validated synchronously on create/update."""
     validation_error: Optional[str] = Field(default=None, exclude=True)

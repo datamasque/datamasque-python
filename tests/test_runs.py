@@ -72,6 +72,7 @@ def test_unfinished_run_str_with_destination():
         source_connection=RunConnectionRef(name="source_db"),
         destination_connection=RunConnectionRef(name="destination_db"),
         ruleset_name="my_ruleset",
+        project="1-default",
         status=MaskingRunStatus.running,
     )
 
@@ -84,6 +85,7 @@ def test_unfinished_run_str_without_destination():
         id=42,
         source_connection=RunConnectionRef(name="source_db"),
         ruleset_name="my_ruleset",
+        project="1-default",
         status=MaskingRunStatus.queued,
     )
 
@@ -101,6 +103,7 @@ def test_get_unfinished_runs(client):
                         "destination_connection_name": "queued_dst",
                         "id": 1,
                         "ruleset_name": "ruleset_1",
+                        "project": "1-default",
                         "status": "queued",
                     }
                 ]
@@ -116,6 +119,7 @@ def test_get_unfinished_runs(client):
                         "destination_connection_name": "running_dst",
                         "id": 2,
                         "ruleset_name": "ruleset_2",
+                        "project": "1-default",
                         "status": "running",
                     }
                 ]
@@ -131,6 +135,7 @@ def test_get_unfinished_runs(client):
                         "destination_connection_name": "validating_dst",
                         "id": 3,
                         "ruleset_name": "ruleset_3",
+                        "project": "1-default",
                         "status": "validating",
                     }
                 ]
@@ -146,6 +151,7 @@ def test_get_unfinished_runs(client):
                         "destination_connection_name": "",
                         "id": 4,
                         "ruleset_name": "ruleset_4",
+                        "project": "1-default",
                         "status": "cancelling",
                     }
                 ]
@@ -324,6 +330,7 @@ def test_get_run_info(client):
                 "mask_type": "database",
                 "source_connection_name": "conn1",
                 "ruleset_name": "rs1",
+                "project": "1-default",
             },
             status_code=200,
         )
@@ -418,6 +425,7 @@ def test_run_info_collapses_flat_connection_fields():
             "destination_connection": "dst-uuid",
             "destination_connection_name": "staging",
             "ruleset_name": "rs",
+            "project": "1-default",
         }
     )
     assert isinstance(run.source_connection, RunConnectionRef)
@@ -438,6 +446,7 @@ def test_run_info_treats_empty_destination_name_as_absent():
             "source_connection_name": "prod",
             "destination_connection_name": "",
             "ruleset_name": "rs",
+            "project": "1-default",
         }
     )
     assert run.destination_connection is None
@@ -491,6 +500,7 @@ def test_cancel_run_returns_updated_run_info(client):
                 "mask_type": "database",
                 "source_connection_name": "conn1",
                 "ruleset_name": "rs1",
+                "project": "1-default",
             },
             status_code=200,
         )

@@ -45,6 +45,8 @@ class DiscoveryConfig(BaseModel):
 
     # Server-populated read-only fields, excluded from request bodies.
     id: Optional[DiscoveryConfigId] = Field(default=None, exclude=True)
+    project: Optional[str] = Field(default=None, exclude=True)
+    """Its project's `<id>-<slug>` reference, e.g. `1-default`; `None` until it is created on the server."""
     is_valid: Optional[ValidationStatus] = Field(default=None, exclude=True)
     """Validation status; may be `in_progress` briefly after creating a large config."""
     validation_error: Optional[str] = Field(default=None, exclude=True)

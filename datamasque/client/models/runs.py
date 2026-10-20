@@ -142,6 +142,12 @@ class RunInfo(BaseModel):
     start_time: Optional[datetime] = None
     end_time: Optional[datetime] = None
     options: Optional[dict[str, Any]] = None
+    project: str
+    """
+    Its project's `<id>-<slug>` reference, e.g. `1-default`.
+
+    Taken from the ruleset's project when the run starts, and never changes after that.
+    """
 
     @model_validator(mode="before")
     @classmethod
@@ -159,6 +165,8 @@ class UnfinishedRun(BaseModel):
     ruleset_name: str
     status: MaskingRunStatus
     destination_connection: Optional[RunConnectionRef] = None
+    project: str
+    """Its project's `<id>-<slug>` reference, e.g. `1-default`."""
 
     @model_validator(mode="before")
     @classmethod
