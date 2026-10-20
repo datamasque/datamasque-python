@@ -15,6 +15,8 @@ History
   ``list_audit_logs`` takes an optional ``limit`` to return only the newest entries.
   ``project`` and ``project_name`` are ``None`` on servers older than 3.26.20.
 
+Requires server version 3.26.20
+
 1.5.0 (2026-10-07)
 ------------------
 
