@@ -4,7 +4,7 @@ from typing import Iterator, Optional, Union
 from datamasque.client.base import BaseClient
 from datamasque.client.exceptions import DataMasqueApiError
 from datamasque.client.models.pagination import Page
-from datamasque.client.models.project import Project, ProjectId, unwrap_project_id
+from datamasque.client.models.project import ProjectId, ProjectIdentifier, unwrap_project_id
 from datamasque.client.models.rg_config import RGConfig, RGConfigId
 
 logger = logging.getLogger(__name__)
@@ -55,12 +55,12 @@ class RGConfigClient(BaseClient):
 
         return config_id
 
-    def get_rg_config_by_name(self, name: str, project: Union[ProjectId, Project]) -> Optional[RGConfig]:
+    def get_rg_config_by_name(self, name: str, project: ProjectIdentifier) -> Optional[RGConfig]:
         """
         Looks for an RG config matching the given name (case-sensitive, exact match) in the given project.
 
         RG configs are untyped and their names are unique per project.
-        `project` is a `Project` or its `ProjectId`.
+        `project` is a `Project`, its `ProjectId` or its `<id>-<slug>` form.
         Returns it if found, otherwise `None`.
         """
 
@@ -144,11 +144,11 @@ class RGConfigClient(BaseClient):
 
         self._delete_if_exists(f"/api/ruleset-generation-configs/{config_id}/")
 
-    def delete_rg_config_by_name_if_exists(self, name: str, project: Union[ProjectId, Project]) -> None:
+    def delete_rg_config_by_name_if_exists(self, name: str, project: ProjectIdentifier) -> None:
         """
         Deletes the RG config with the given name in the given project.
 
-        `project` is a `Project` or its `ProjectId`.
+        `project` is a `Project`, its `ProjectId` or its `<id>-<slug>` form.
         No-op if no such config exists.
         """
 

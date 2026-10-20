@@ -4,7 +4,7 @@ from typing import Iterator, Optional, Union
 from datamasque.client.base import BaseClient
 from datamasque.client.exceptions import DataMasqueApiError
 from datamasque.client.models.pagination import Page
-from datamasque.client.models.project import Project, ProjectId, unwrap_project_id
+from datamasque.client.models.project import ProjectId, ProjectIdentifier, unwrap_project_id
 from datamasque.client.models.ruleset import Ruleset
 from datamasque.client.models.ruleset_library import RulesetLibrary, RulesetLibraryId
 
@@ -56,11 +56,11 @@ class RulesetLibraryClient(BaseClient):
 
         return library_id
 
-    def get_ruleset_library_by_name(self, name: str, project: Union[ProjectId, Project]) -> Optional[RulesetLibrary]:
+    def get_ruleset_library_by_name(self, name: str, project: ProjectIdentifier) -> Optional[RulesetLibrary]:
         """
         Looks for a ruleset library matching the given name (case-sensitive, exact match) in the given project.
 
-        `project` is a `Project` or its `ProjectId`.
+        `project` is a `Project`, its `ProjectId` or its `<id>-<slug>` form.
         Returns it (with full YAML content) if found, otherwise None.
         """
 
@@ -147,12 +147,12 @@ class RulesetLibraryClient(BaseClient):
         self._delete_if_exists(f"/api/ruleset-libraries/{library_id}/", params=params)
 
     def delete_ruleset_library_by_name_if_exists(
-        self, library_name: str, project: Union[ProjectId, Project], *, force: bool = False
+        self, library_name: str, project: ProjectIdentifier, *, force: bool = False
     ) -> None:
         """
         Deletes the ruleset library with the given name in the given project.
 
-        `project` is a `Project` or its `ProjectId`.
+        `project` is a `Project`, its `ProjectId` or its `<id>-<slug>` form.
         No-op if the library does not exist.
         """
 

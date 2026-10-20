@@ -4,7 +4,7 @@ from typing import Optional, Union
 from datamasque.client.base import BaseClient
 from datamasque.client.exceptions import DataMasqueApiError
 from datamasque.client.models.discovery_config_library import DiscoveryConfigLibrary, DiscoveryConfigLibraryId
-from datamasque.client.models.project import Project, ProjectId, unwrap_project_id
+from datamasque.client.models.project import ProjectId, ProjectIdentifier, unwrap_project_id
 
 logger = logging.getLogger(__name__)
 
@@ -55,12 +55,12 @@ class DiscoveryConfigLibraryClient(BaseClient):
         return matches[0].id
 
     def get_discovery_config_library_by_name(
-        self, name: str, project: Union[ProjectId, Project]
+        self, name: str, project: ProjectIdentifier
     ) -> Optional[DiscoveryConfigLibrary]:
         """
         Looks for a discovery config library matching the given name (case-sensitive, exact match) in the given project.
 
-        `project` is a `Project` or its `ProjectId`.
+        `project` is a `Project`, its `ProjectId` or its `<id>-<slug>` form.
         Returns it (with full YAML content) if found, otherwise `None`.
         """
 
@@ -155,12 +155,12 @@ class DiscoveryConfigLibraryClient(BaseClient):
         self._delete_if_exists(f"/api/discovery/config-libraries/{library_id}/", params=params)
 
     def delete_discovery_config_library_by_name_if_exists(
-        self, name: str, project: Union[ProjectId, Project], *, force: bool = False
+        self, name: str, project: ProjectIdentifier, *, force: bool = False
     ) -> None:
         """
         Deletes the discovery config library with the given name in the given project.
 
-        `project` is a `Project` or its `ProjectId`.
+        `project` is a `Project`, its `ProjectId` or its `<id>-<slug>` form.
         No-op if no such library exists.
         """
 

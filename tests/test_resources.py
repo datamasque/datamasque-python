@@ -211,6 +211,15 @@ def test_move_resources_moves_what_list_resources_returned_to_a_project(client: 
     assert m.last_request.json() == MOVE_REQUEST
 
 
+def test_move_resources_takes_a_listed_resources_project_as_the_destination(client: DataMasqueClient) -> None:
+    listed = RulesetResource.model_validate(RULESET)
+    with requests_mock.Mocker() as m:
+        m.post("http://test-server/api/resources/move/", json={"moved": 2, "conflicts": []})
+        client.move_resources(MOVING, listed.project)
+
+    assert m.last_request.json()["destination"] == "7"
+
+
 @pytest.mark.parametrize("resources", [{}, {ResourceTypeName.rulesets: []}])
 def test_moving_no_resources_raises_without_a_request(client: DataMasqueClient, resources: dict) -> None:
     with requests_mock.Mocker() as m:

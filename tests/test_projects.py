@@ -1,7 +1,7 @@
 """Tests for project support in the DataMasque client."""
 
 from datetime import datetime
-from typing import Callable, Union
+from typing import Callable
 
 import pytest
 import requests_mock
@@ -16,11 +16,13 @@ from datamasque.client import (
     ProjectDeleteConflictError,
     ProjectDeleteConflictReason,
     ProjectId,
+    ProjectIdentifier,
 )
 from datamasque.client.exceptions import DataMasqueException
 from datamasque.client.models.connection import ConnectionId, S3ConnectionConfig
 from datamasque.client.models.discovery_config import DiscoveryConfig
 from datamasque.client.models.discovery_config_library import DiscoveryConfigLibrary
+from datamasque.client.models.project import unwrap_project_id
 from datamasque.client.models.rg_config import RGConfig
 from datamasque.client.models.ruleset import Ruleset, RulesetType
 from datamasque.client.models.ruleset_library import RulesetLibrary
@@ -260,8 +262,8 @@ def test_list_projects_include_archived(client: DataMasqueClient) -> None:
     assert [project.id for project in projects] == [ProjectId(7), ProjectId(8)]
 
 
-@pytest.mark.parametrize("project", [ProjectId(7), Project.model_validate(BANKING_PROJECT)])
-def test_get_project(client: DataMasqueClient, project: Union[ProjectId, Project]) -> None:
+@pytest.mark.parametrize("project", [ProjectId(7), Project.model_validate(BANKING_PROJECT), "7-banking"])
+def test_get_project(client: DataMasqueClient, project: ProjectIdentifier) -> None:
     with requests_mock.Mocker() as m:
         m.get("http://test-server/api/projects/7/", json=BANKING_PROJECT, complete_qs=True)
         result = client.get_project(project)
@@ -415,3 +417,18 @@ def test_create_or_update_without_a_project_needs_exactly_one_active_project(
             getattr(client, method)(make_resource())
 
     assert [request.path for request in m.request_history] == ["/api/projects/"]
+
+
+@pytest.mark.parametrize(
+    "project",
+    [ProjectId(7), Project.model_validate(BANKING_PROJECT), "7-banking", "7"],
+    ids=["id", "project", "reference", "id as a string"],
+)
+def test_unwrap_project_id_reads_the_id_from_each_form(project: ProjectIdentifier) -> None:
+    assert unwrap_project_id(project) == ProjectId(7)
+
+
+@pytest.mark.parametrize("project", ["myproject", "", "-7"])
+def test_unwrap_project_id_rejects_a_string_that_does_not_start_with_an_id(project: str) -> None:
+    with pytest.raises(ValueError, match=f'"{project}" is not a project ID or reference'):
+        unwrap_project_id(project)
