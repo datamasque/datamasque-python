@@ -138,6 +138,7 @@ class BaseClient:
         self.verify_ssl = connection_config.verify_ssl
         self.token_source = connection_config.token_source
         self._session = _build_session(self.verify_ssl)
+        self._timeout = (connection_config.connect_timeout_seconds, connection_config.read_timeout_seconds)
         if connection_config.spcs_pat:
             install_spcs_gateway_auth(self._session, connection_config.spcs_pat)
 
@@ -252,8 +253,11 @@ class BaseClient:
                             params=params,
                             headers=headers,
                             files=files_payload,
+                            timeout=self._timeout,
                         )
-                    return self._session.request(method, url, json=data, params=params, headers=headers)
+                    return self._session.request(
+                        method, url, json=data, params=params, headers=headers, timeout=self._timeout
+                    )
             except requests.RequestException as e:
                 raise DataMasqueTransportError(f"Failed to reach DataMasque server at {url}: {e}") from e
 
