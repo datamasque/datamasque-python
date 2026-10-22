@@ -22,7 +22,7 @@ class RulesetClient(BaseClient):
         """
         Creates the ruleset, or updates the existing one with the same name and type in the same project.
 
-        With no `project` set, the server's only active project is used,
+        With no `project` set, the client's `default_project` is used, else the server's only active project,
         and `DataMasqueException` is raised when it has no active project or more than one.
         Populates the given ruleset's `id`, `is_valid`, `validation_errors`, `unlicensed_feature_warnings`,
         and `git` fields from the server response, and returns the same ruleset instance for convenience.
@@ -30,7 +30,9 @@ class RulesetClient(BaseClient):
 
         # The server finds the existing ruleset itself, so this only checks that an unset project resolves.
         self._resolve_project(ruleset.project)
-        data = ruleset.model_dump(exclude_none=True, by_alias=True, mode="json")
+        data = ruleset.model_dump(exclude_none=True, by_alias=True, mode="json") | self._default_project_field(
+            ruleset.project
+        )
         response = self.make_request("POST", "/api/rulesets/", data=data, params={"upsert": "true"})
         created = Ruleset.model_validate(response.json())
         ruleset.id = created.id

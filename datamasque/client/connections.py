@@ -35,7 +35,7 @@ class ConnectionClient(BaseClient):
         Creates or updates the connection in DM, and sets the `id` field on the given `connection_config`.
 
         An existing connection with the same name in the same project is updated.
-        With no `project` set, the server's only active project is used,
+        With no `project` set, the client's `default_project` is used, else the server's only active project,
         and `DataMasqueException` is raised when it has no active project or more than one.
         """
 
@@ -53,6 +53,7 @@ class ConnectionClient(BaseClient):
             "version": "1.0",
         } | connection_config.model_dump(exclude_none=True, by_alias=True, mode="json")
         if connection_id is None:
+            data |= self._default_project_field(connection_config.project)
             response = self.make_request("POST", "/api/connections/", data=data)
         else:
             response = self.make_request("PUT", f"/api/connections/{connection_id}/", data=data)

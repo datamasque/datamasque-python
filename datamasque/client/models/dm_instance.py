@@ -49,6 +49,12 @@ class DataMasqueInstanceConfig(BaseModel):
     """How long a request may take to connect, including the TLS handshake."""
     read_timeout_seconds: float = DEFAULT_READ_TIMEOUT_SECONDS
     """How long a request may wait for the server between bytes of its response."""
+    default_project: Optional[str] = None
+    """The project a create goes into when the resource names none, as a `<id>-<slug>` reference (e.g. `1-default`)
+    or a bare project id.
+
+    Applies to connections, rulesets, discovery configs, RG configs, table references and libraries.
+    Leave unset to use the server's only active project."""
 
     @model_validator(mode="after")
     def _validate_auth_source(self) -> "DataMasqueInstanceConfig":
