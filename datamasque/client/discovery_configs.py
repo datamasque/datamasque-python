@@ -86,7 +86,9 @@ class DiscoveryConfigClient(BaseClient):
         if not config.yaml:
             raise ValueError("Cannot create a discovery config without YAML content (yaml is empty)")
 
-        data = config.model_dump(exclude_none=True, by_alias=True, mode="json")
+        data = config.model_dump(exclude_none=True, by_alias=True, mode="json") | self._default_project_field(
+            config.project
+        )
         response = self.make_request("POST", "/api/discovery/configs/", data=data)
         created = DiscoveryConfig.model_validate(response.json())
         config.id = created.id
@@ -130,7 +132,7 @@ class DiscoveryConfigClient(BaseClient):
         """
         Creates the config, or updates the existing one with the same name and type in the same project.
 
-        With no `project` set, the server's only active project is used,
+        With no `project` set, the client's `default_project` is used, else the server's only active project,
         and `DataMasqueException` is raised when it has no active project or more than one.
         Sets the config's `id` property.
         """
