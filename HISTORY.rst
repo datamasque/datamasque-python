@@ -2,7 +2,7 @@
 History
 =======
 
-1.6.0 (unreleased)
+1.6.0 (2026-10-23)
 ------------------
 
 * Added a read-only ``project`` field to ``ConnectionConfig``, ``Ruleset``, ``RulesetLibrary``, ``DiscoveryConfig``,
