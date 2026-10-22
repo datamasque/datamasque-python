@@ -122,14 +122,19 @@ from datamasque.client.models.project import (
     ProjectDeleteConflict,
     ProjectDeleteConflictReason,
     ProjectId,
+    ProjectIdentifier,
 )
 from datamasque.client.models.resource import (
     ConnectionResource,
     DiscoveryConfigResource,
     Resource,
-    ResourceTypeName,
+    ResourceMoveConflict,
+    ResourceMoveConflictReason,
+    ResourceMoveResult,
+    ResourcesByType,
     RulesetResource,
 )
+from datamasque.client.models.resource_type import ResourceTypeName
 from datamasque.client.models.rg_config import RGConfig, RGConfigId
 from datamasque.client.models.ruleset import Ruleset, RulesetId, RulesetType
 from datamasque.client.models.ruleset_library import RulesetLibrary, RulesetLibraryId
@@ -292,12 +297,17 @@ __all__ = [
     "ProjectDeleteConflictError",
     "ProjectDeleteConflictReason",
     "ProjectId",
+    "ProjectIdentifier",
     "RGConfig",
     "RGConfigId",
     "RGConfigNotFoundError",
     "ReferencingForeignKey",
     "Resource",
+    "ResourceMoveConflict",
+    "ResourceMoveConflictReason",
+    "ResourceMoveResult",
     "ResourceTypeName",
+    "ResourcesByType",
     "Ruleset",
     "RulesetGenerationRequest",
     "RulesetGenerationWithRGConfigRequest",

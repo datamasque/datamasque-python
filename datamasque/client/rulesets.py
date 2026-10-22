@@ -1,9 +1,8 @@
 import logging
-from typing import Union
 
 from datamasque.client.base import BaseClient
 from datamasque.client.exceptions import DataMasqueException
-from datamasque.client.models.project import Project, ProjectId, unwrap_project_id
+from datamasque.client.models.project import ProjectIdentifier, unwrap_project_id
 from datamasque.client.models.ruleset import Ruleset, RulesetId, RulesetType
 
 logger = logging.getLogger(__name__)
@@ -55,13 +54,13 @@ class RulesetClient(BaseClient):
         self._delete_if_exists(f"/api/rulesets/{ruleset_id}/")
 
     def delete_ruleset_by_name_if_exists(
-        self, ruleset_name: str, ruleset_type: RulesetType, project: Union[ProjectId, Project]
+        self, ruleset_name: str, ruleset_type: RulesetType, project: ProjectIdentifier
     ) -> None:
         """
         Deletes the ruleset with the given name and type in the given project.
 
         Ruleset names are unique per type and project, so both are required to identify a single ruleset.
-        `project` is a `Project` or its `ProjectId`.
+        `project` is a `Project`, its `ProjectId` or its `<id>-<slug>` form.
         No-op if no such ruleset exists.
         """
 

@@ -6,6 +6,8 @@ from typing import NewType, Optional, Union
 
 from pydantic import BaseModel, ConfigDict
 
+from datamasque.client.models.resource_type import ResourceTypeName
+
 ProjectId = NewType("ProjectId", int)
 
 
@@ -37,9 +39,30 @@ class Project(BaseModel):
     updated: datetime
 
 
-def unwrap_project_id(project: Union[ProjectId, Project]) -> ProjectId:
-    """Return the id of `project`, which a caller may give as a `Project` or as its `ProjectId`."""
-    return project.id if isinstance(project, Project) else project
+# A project, given as a `Project`, its `ProjectId`, or its `<id>-<slug>` form such as a listed resource's `project`.
+ProjectIdentifier = Union[ProjectId, Project, str]
+
+
+def unwrap_project_id(project: ProjectIdentifier) -> ProjectId:
+    """
+    Return the ID of `project`.
+
+    Raises:
+        ValueError: `project` is a string that is not a project reference in the form `<id>-<slug>`.
+    """
+    if isinstance(project, Project):
+        return project.id
+
+    if isinstance(project, str):
+        try:
+            return ProjectId(int(project.split("-")[0]))
+        except ValueError:
+            raise ValueError(
+                f'"{project}" is not a project ID or reference. '
+                "Specify the ID as an integer, or a reference in the form `3-myproject`."
+            ) from None
+
+    return project
 
 
 class ProjectCreateRequest(BaseModel):
@@ -76,10 +99,8 @@ class ProjectDeleteConflict(BaseModel):
     reason: ProjectDeleteConflictReason
     detail: str
     """A message that describes the conflict."""
-    type: Optional[str] = None
-    """
-    For `name_in_use` and `file_exists`: the type of the resource that would move, such as `connections` or `rulesets`.
-    """
+    type: Optional[ResourceTypeName] = None
+    """For `name_in_use` and `file_exists`: the type of the resource that would move."""
     id: Optional[str] = None
     """For `name_in_use` and `file_exists`: the ID of the resource that would move."""
     name: Optional[str] = None

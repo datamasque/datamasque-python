@@ -1,5 +1,5 @@
 import logging
-from typing import Iterator, Union
+from typing import Iterator
 
 from requests import Response
 
@@ -9,7 +9,7 @@ from datamasque.client.models.project import (
     Project,
     ProjectCreateRequest,
     ProjectDeleteConflict,
-    ProjectId,
+    ProjectIdentifier,
     unwrap_project_id,
 )
 
@@ -42,9 +42,9 @@ class ProjectClient(BaseClient):
 
         return list(self.iter_projects(include_archived=include_archived))
 
-    def get_project(self, project: Union[ProjectId, Project]) -> Project:
+    def get_project(self, project: ProjectIdentifier) -> Project:
         """
-        Retrieves a single project, given as a `Project` or its `ProjectId`.
+        Retrieves a single project, given as a `Project`, its `ProjectId` or its `<id>-<slug>` form.
 
         Archived projects can be retrieved too.
         """
@@ -68,8 +68,8 @@ class ProjectClient(BaseClient):
 
     def get_project_delete_conflicts(
         self,
-        project: Union[ProjectId, Project],
-        destination: Union[ProjectId, Project],
+        project: ProjectIdentifier,
+        destination: ProjectIdentifier,
     ) -> list[ProjectDeleteConflict]:
         """
         Returns the conflicts that would prevent `delete_project` moving the project's resources to the destination.
@@ -89,7 +89,11 @@ class ProjectClient(BaseClient):
         )
         return _get_conflicts(response)
 
-    def delete_project(self, project: Union[ProjectId, Project], destination: Union[ProjectId, Project]) -> None:
+    def delete_project(
+        self,
+        project: ProjectIdentifier,
+        destination: ProjectIdentifier,
+    ) -> None:
         """
         Deletes a project, after moving every resource in it to the destination project.
 
