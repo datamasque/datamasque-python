@@ -81,7 +81,9 @@ class DiscoveryConfigLibraryClient(BaseClient):
         if not library.yaml:
             raise ValueError("Cannot create a discovery config library without YAML content (yaml is empty)")
 
-        data = library.model_dump(exclude_none=True, by_alias=True, mode="json")
+        data = library.model_dump(exclude_none=True, by_alias=True, mode="json") | self._default_project_field(
+            library.project
+        )
         response = self.make_request("POST", "/api/discovery/config-libraries/", data=data)
         created = DiscoveryConfigLibrary.model_validate(response.json())
         library.id = created.id
@@ -125,7 +127,7 @@ class DiscoveryConfigLibraryClient(BaseClient):
         """
         Creates the library, or updates the existing one with the same name in the same project.
 
-        With no `project` set, the server's only active project is used,
+        With no `project` set, the client's `default_project` is used, else the server's only active project,
         and `DataMasqueException` is raised when it has no active project or more than one.
         Sets the library's `id` property.
         """

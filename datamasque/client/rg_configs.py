@@ -78,7 +78,9 @@ class RGConfigClient(BaseClient):
         (`id`, `is_valid`, `validation_errors`, `created`, `modified`) and returns the config.
         """
 
-        data = config.model_dump(exclude_none=True, by_alias=True, mode="json")
+        data = config.model_dump(exclude_none=True, by_alias=True, mode="json") | self._default_project_field(
+            config.project
+        )
         response = self.make_request("POST", "/api/ruleset-generation-configs/", data=data)
         created = RGConfig.model_validate(response.json())
         config.id = created.id
@@ -121,7 +123,7 @@ class RGConfigClient(BaseClient):
         """
         Creates the config, or updates the existing one with the same name in the same project.
 
-        With no `project` set, the server's only active project is used,
+        With no `project` set, the client's `default_project` is used, else the server's only active project,
         and `DataMasqueException` is raised when it has no active project or more than one.
         Sets the config's `id` property.
         """
