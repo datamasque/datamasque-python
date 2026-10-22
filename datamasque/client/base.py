@@ -133,6 +133,7 @@ class BaseClient:
     password: Optional[str]
     verify_ssl: bool
     token_source: Optional[Callable[[], str]]
+    default_project: Optional[str]
 
     def __init__(self, connection_config: DataMasqueInstanceConfig) -> None:
         self.base_url = connection_config.base_url
@@ -140,6 +141,7 @@ class BaseClient:
         self.password = connection_config.password
         self.verify_ssl = connection_config.verify_ssl
         self.token_source = connection_config.token_source
+        self.default_project = connection_config.default_project
         self._session = _build_session(self.verify_ssl)
         self._timeout = (connection_config.connect_timeout_seconds, connection_config.read_timeout_seconds)
         if connection_config.spcs_pat:
@@ -318,15 +320,17 @@ class BaseClient:
 
     def _resolve_project(self, project: Optional[Union[ProjectId, str]]) -> Union[ProjectId, str]:
         """
-        Returns `project`, or when it is `None`, the ID of the only active project.
+        Returns `project`, else the client's `default_project`, else the ID of the only active project.
 
-        That is the project the server puts a create into when it is sent no `project`.
+        The last is the project the server puts a create into when it is sent no `project`.
         With no active project, or more than one, the server rejects such a create,
         so this raises `DataMasqueException` instead.
         """
 
         if project is not None:
             return project
+        if self.default_project is not None:
+            return self.default_project
 
         response = self.make_request("GET", "/api/projects/", params={"limit": 1})
         page = Page[Project].model_validate(response.json())
@@ -336,6 +340,17 @@ class BaseClient:
             )
 
         return page.results[0].id
+
+    def _default_project_field(self, project: Optional[Union[ProjectId, str]]) -> dict[str, str]:
+        """
+        Returns the `project` field a create sends when the resource names no `project`: the client's `default_project`.
+
+        Empty when the resource names one, which its own fields carry, or when there is no `default_project`.
+        """
+
+        if project is None and self.default_project is not None:
+            return {"project": self.default_project}
+        return {}
 
     def _iter_paginated(
         self,
