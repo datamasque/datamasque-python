@@ -125,7 +125,7 @@ class ConnectionConfig(BaseModel):
     """
     The project it belongs to: the `<id>-<slug>` reference a GET returns, such as `Project.reference`,
     or the project's ID as a string.
-    Left as `None`, a create goes into the server's default project.
+    Left as `None`, a create goes into the client's `default_project`, else the server's default project.
     """
     id: Optional[ConnectionId] = None
     # Server-populated and read-only, so it is excluded when serializing a config back to the API.

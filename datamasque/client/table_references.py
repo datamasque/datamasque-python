@@ -81,6 +81,7 @@ class TableReferenceClient(BaseClient):
             data.pop("options", None)
         if data.get("project") is None:
             data.pop("project", None)
+        data |= self._default_project_field(table_reference.project)
         response = self.make_request("POST", "/api/table-references/", data=data)
         created = TableReference.model_validate(response.json())
         table_reference.id = created.id
@@ -122,7 +123,7 @@ class TableReferenceClient(BaseClient):
         """
         Creates the table reference, or updates the existing one with the same name in the same project.
 
-        With no `project` set, the server's only active project is used,
+        With no `project` set, the client's `default_project` is used, else the server's only active project,
         and `DataMasqueException` is raised when it has no active project or more than one.
         Sets the table reference's `id` property.
         """

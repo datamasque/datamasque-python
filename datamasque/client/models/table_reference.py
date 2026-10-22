@@ -77,7 +77,7 @@ class TableReference(BaseModel):
     """
     The project it belongs to: the `<id>-<slug>` reference a GET returns, such as `Project.reference`,
     or the project's ID as a string.
-    Left as `None`, a create goes into the server's default project.
+    Left as `None`, a create goes into the client's `default_project`, else the server's default project.
     """
     connection: Union[ConnectionId, ConnectionConfig]
     """The connection the data lives in. Accepts a `ConnectionId` or a `ConnectionConfig` (its `id` is extracted)."""

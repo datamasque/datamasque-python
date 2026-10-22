@@ -23,6 +23,11 @@ History
 * **Breaking:** ``get_unfinished_runs`` returns its runs keyed by ``ConnectionId`` instead of connection name,
   because two connections in different projects can share a name.
 * ``list_connections``, ``list_table_references`` and ``list_files_of_type`` take an optional ``project`` filter.
+* Added ``default_project`` to ``DataMasqueInstanceConfig``.
+  A create whose model has no ``project`` goes into ``default_project``,
+  and ``create_or_update_*`` looks for an existing resource there,
+  before falling back to the server's only active project.
+  Updating a connection leaves it in its project.
 * ``DataMasqueFile`` gains a read-only ``project`` field, which is ``None`` for built-in seeds.
 * ``get_generated_rulesets`` sets each ruleset's ``project`` to the connection's project.
 * Added project models and management APIs.
