@@ -1225,12 +1225,24 @@ def test_mongo_connection_sends_retry_writes_when_disabled():
     assert api_dict["retry_writes"] is False
 
 
-def test_documentdb_connection_sends_retry_writes_when_disabled():
-    """A DocumentDB connection inherits retry_writes and sends it when disabled."""
-    conn = DocumentDbConnectionConfig(name="docdb", host="docdb.example", database="people", retry_writes=False)
+def test_documentdb_connection_defaults_retry_writes_off_and_sends_it():
+    """
+    DocumentDB engine versions before 8.0.2 reject retryable writes, so the config defaults them off.
+
+    The value is sent even though it equals the default, because some server versions store `true`
+    for a DocumentDB connection that leaves the field out.
+    """
+    conn = DocumentDbConnectionConfig(name="docdb", host="docdb.example", database="people")
     api_dict = conn.model_dump(exclude_none=True, by_alias=True, mode="json")
     assert api_dict["db_type"] == "documentdb"
+    assert conn.retry_writes is False
     assert api_dict["retry_writes"] is False
+
+
+def test_documentdb_connection_sends_retry_writes_when_enabled():
+    conn = DocumentDbConnectionConfig(name="docdb", host="docdb.example", database="people", retry_writes=True)
+    api_dict = conn.model_dump(exclude_none=True, by_alias=True, mode="json")
+    assert api_dict["retry_writes"] is True
 
 
 def test_mongo_connection_model_validate_blanks_encrypted_password():
