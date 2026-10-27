@@ -31,7 +31,7 @@ History
 * ``DataMasqueFile`` gains a read-only ``project`` field, which is ``None`` for built-in seeds.
 * ``get_generated_rulesets`` sets each ruleset's ``project`` to the connection's project.
 * Added project models and management APIs.
-* Added ``list_resources``, which lists resources of every type across projects.
+* Added resource management APIs.
 
 1.6.0 (unreleased)
 ------------------
