@@ -123,6 +123,7 @@ from datamasque.client.models.project import (
     ProjectDeleteConflictReason,
     ProjectId,
     ProjectIdentifier,
+    ProjectUpdateRequest,
 )
 from datamasque.client.models.resource import (
     ConnectionResource,
@@ -298,6 +299,7 @@ __all__ = [
     "ProjectDeleteConflictReason",
     "ProjectId",
     "ProjectIdentifier",
+    "ProjectUpdateRequest",
     "RGConfig",
     "RGConfigId",
     "RGConfigNotFoundError",

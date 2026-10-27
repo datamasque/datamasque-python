@@ -37,6 +37,14 @@ class Project(BaseModel):
     description: str = ""
     created: datetime
     updated: datetime
+    has_git_synced_resources: Optional[bool] = None
+    """
+    Whether any library, discovery config library, ruleset or discovery config in the project
+    that is not deleted is synced with git.
+
+    Only `get_project` sets it; other calls leave it `None`.
+    A rename leaves a git-synced library or discovery config library at its old repository path.
+    """
 
 
 # A project, given as a `Project`, its `ProjectId`, or its `<id>-<slug>` form such as a listed resource's `project`.
@@ -78,6 +86,20 @@ class ProjectCreateRequest(BaseModel):
 
     name: str
     description: str = ""
+
+
+class ProjectUpdateRequest(BaseModel):
+    """
+    Request body for `PATCH /api/projects/{id}/`.
+
+    A field left as `None` is not sent, so the server keeps its current value.
+    A new `name` follows the rules of `ProjectCreateRequest`.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    name: Optional[str] = None
+    description: Optional[str] = None
 
 
 class ProjectDeleteConflictReason(str, Enum):
