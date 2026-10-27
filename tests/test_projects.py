@@ -1,7 +1,7 @@
 """Tests for project support in the DataMasque client."""
 
 from datetime import datetime
-from typing import Callable
+from typing import Callable, Optional
 
 import pytest
 import requests_mock
@@ -17,6 +17,7 @@ from datamasque.client import (
     ProjectDeleteConflictReason,
     ProjectId,
     ProjectIdentifier,
+    ProjectUpdateRequest,
 )
 from datamasque.client.exceptions import DataMasqueException
 from datamasque.client.models.connection import ConnectionId, S3ConnectionConfig
@@ -48,6 +49,28 @@ LEGACY_PROJECT = {
     "created": "2026-09-01T10:00:00Z",
     "updated": "2026-10-01T10:00:00Z",
 }
+
+FILES_EXIST_MESSAGE = 'Cannot rename the project, because files already exist at "seeds/retail".'
+
+RENAMED_PROJECT = {**BANKING_PROJECT, "reference": "7-retail", "name": "Retail"}
+
+UPDATE_PROJECT_CASES = [
+    pytest.param(ProjectId(7), ProjectUpdateRequest(name="Retail"), {"name": "Retail"}, id="rename-by-id"),
+    pytest.param("7-banking", ProjectUpdateRequest(name="Retail"), {"name": "Retail"}, id="rename-by-reference"),
+    pytest.param(
+        Project.model_validate(BANKING_PROJECT),
+        ProjectUpdateRequest(description=""),
+        {"description": ""},
+        id="project-object-clears-description",
+    ),
+    pytest.param(
+        ProjectId(7),
+        ProjectUpdateRequest(name="Banking", description="Customer banking data"),
+        {"name": "Banking", "description": "Customer banking data"},
+        id="name-and-description",
+    ),
+]
+
 
 CONFLICTS = [
     {
@@ -432,3 +455,84 @@ def test_unwrap_project_id_reads_the_id_from_each_form(project: ProjectIdentifie
 def test_unwrap_project_id_rejects_a_string_that_does_not_start_with_an_id(project: str) -> None:
     with pytest.raises(ValueError, match=f'"{project}" is not a project ID or reference'):
         unwrap_project_id(project)
+
+
+def test_update_request_rejects_unknown_fields() -> None:
+    with pytest.raises(ValidationError) as exc_info:
+        # mypy rejects the unknown field, which the test passes on purpose.
+        ProjectUpdateRequest(name="Banking", archived=True)  # type: ignore[call-arg]
+
+    assert [(error["loc"], error["msg"]) for error in exc_info.value.errors()] == [
+        (("archived",), "Extra inputs are not permitted")
+    ]
+
+
+@pytest.mark.parametrize(("project", "request_body", "expected_body"), UPDATE_PROJECT_CASES)
+def test_update_project_sends_only_the_fields_set(
+    client: DataMasqueClient,
+    project: ProjectIdentifier,
+    request_body: ProjectUpdateRequest,
+    expected_body: dict[str, object],
+) -> None:
+    with requests_mock.Mocker() as m:
+        m.patch("http://test-server/api/projects/7/", json=BANKING_PROJECT)
+        client.update_project(project, request_body)
+
+    assert m.last_request.json() == expected_body
+
+
+def test_update_project_returns_the_renamed_project(client: DataMasqueClient) -> None:
+    with requests_mock.Mocker() as m:
+        m.patch("http://test-server/api/projects/7/", json=RENAMED_PROJECT)
+        project = client.update_project(ProjectId(7), ProjectUpdateRequest(name="Retail"))
+
+    assert project.name == "Retail"
+    assert project.reference == "7-retail"
+
+
+def test_update_project_rejected_name_raises(client: DataMasqueClient) -> None:
+    with requests_mock.Mocker() as m:
+        m.patch(
+            "http://test-server/api/projects/7/",
+            json={"name": [FILES_EXIST_MESSAGE]},
+            status_code=400,
+        )
+        with pytest.raises(DataMasqueApiError) as exc_info:
+            client.update_project(ProjectId(7), ProjectUpdateRequest(name="Retail"))
+
+    assert exc_info.value.response.status_code == 400
+    assert exc_info.value.response.json() == {"name": [FILES_EXIST_MESSAGE]}
+
+
+@pytest.mark.parametrize(
+    ("status_code", "detail"),
+    [
+        (403, "You do not have permission to perform this action."),
+        (404, "Not found."),
+    ],
+)
+def test_update_project_refused_raises(client: DataMasqueClient, status_code: int, detail: str) -> None:
+    with requests_mock.Mocker() as m:
+        m.patch("http://test-server/api/projects/7/", json={"detail": detail}, status_code=status_code)
+        with pytest.raises(DataMasqueApiError) as exc_info:
+            client.update_project(ProjectId(7), ProjectUpdateRequest(name="Retail"))
+
+    assert exc_info.value.response.status_code == status_code
+
+
+@pytest.mark.parametrize(
+    ("body", "expected"),
+    [
+        pytest.param({**BANKING_PROJECT, "has_git_synced_resources": True}, True, id="synced"),
+        pytest.param({**BANKING_PROJECT, "has_git_synced_resources": False}, False, id="not-synced"),
+        pytest.param(BANKING_PROJECT, None, id="flag-absent"),
+    ],
+)
+def test_get_project_reports_git_synced_resources(
+    client: DataMasqueClient, body: dict[str, object], expected: Optional[bool]
+) -> None:
+    with requests_mock.Mocker() as m:
+        m.get("http://test-server/api/projects/7/", json=body)
+        project = client.get_project(ProjectId(7))
+
+    assert project.has_git_synced_resources is expected
