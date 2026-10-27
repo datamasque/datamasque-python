@@ -5,7 +5,7 @@ from datamasque.client.base import BaseClient
 from datamasque.client.exceptions import DataMasqueApiError
 from datamasque.client.models.discovery_config import DiscoveryConfig, DiscoveryConfigId, DiscoveryConfigType
 from datamasque.client.models.pagination import Page
-from datamasque.client.models.project import Project, ProjectId, unwrap_project_id
+from datamasque.client.models.project import ProjectId, ProjectIdentifier, unwrap_project_id
 
 logger = logging.getLogger(__name__)
 
@@ -58,13 +58,13 @@ class DiscoveryConfigClient(BaseClient):
         return config_id
 
     def get_discovery_config_by_name(
-        self, name: str, config_type: DiscoveryConfigType, project: Union[ProjectId, Project]
+        self, name: str, config_type: DiscoveryConfigType, project: ProjectIdentifier
     ) -> Optional[DiscoveryConfig]:
         """
         Looks for a discovery config matching the given name (case-sensitive, exact match), type and project.
 
         Config names are unique per type and project, so both are required to identify a single config.
-        `project` is a `Project` or its `ProjectId`.
+        `project` is a `Project`, its `ProjectId` or its `<id>-<slug>` form.
         Returns it if found, otherwise `None`.
         """
 
@@ -156,13 +156,13 @@ class DiscoveryConfigClient(BaseClient):
         self._delete_if_exists(f"/api/discovery/configs/{config_id}/")
 
     def delete_discovery_config_by_name_if_exists(
-        self, name: str, config_type: DiscoveryConfigType, project: Union[ProjectId, Project]
+        self, name: str, config_type: DiscoveryConfigType, project: ProjectIdentifier
     ) -> None:
         """
         Deletes the discovery config with the given name and type in the given project.
 
         Config names are unique per type and project, so both are required to identify a single config.
-        `project` is a `Project` or its `ProjectId`.
+        `project` is a `Project`, its `ProjectId` or its `<id>-<slug>` form.
         No-op if no such config exists.
         """
 
