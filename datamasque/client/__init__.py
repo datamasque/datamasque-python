@@ -28,6 +28,15 @@ from datamasque.client.exceptions import (
     RunNotCancellableError,
 )
 from datamasque.client.ifm import DataMasqueIfmClient
+from datamasque.client.models.bundle import (
+    BundleImportCounts,
+    BundleImportItemResults,
+    BundleImportResult,
+    BundleImportStatus,
+    LibraryImportResult,
+    RulesetImportResult,
+    SeedFileImportResult,
+)
 from datamasque.client.models.connection import (
     AzureConnectionConfig,
     CassandraConnectionConfig,
@@ -202,6 +211,10 @@ __all__ = [
     "AzureConnectionConfig",
     "BooleanPreview",
     "BooleanStatistics",
+    "BundleImportCounts",
+    "BundleImportItemResults",
+    "BundleImportResult",
+    "BundleImportStatus",
     "CassandraConnectionConfig",
     "ColumnKind",
     "ColumnPreview",
@@ -270,6 +283,7 @@ __all__ = [
     "LengthEntry",
     "LengthUnit",
     "LengthsStatistics",
+    "LibraryImportResult",
     "LicenseInfo",
     "LicenseLock",
     "Locator",
@@ -312,6 +326,7 @@ __all__ = [
     "RulesetGenerationRequest",
     "RulesetGenerationWithRGConfigRequest",
     "RulesetId",
+    "RulesetImportResult",
     "RulesetLibrary",
     "RulesetLibraryId",
     "RulesetPlan",
@@ -336,6 +351,7 @@ __all__ = [
     "SchemaDiscoveryRequest",
     "SchemaDiscoveryResult",
     "SeedFile",
+    "SeedFileImportResult",
     "SelectedColumns",
     "SelectedData",
     "SelectedFileData",
