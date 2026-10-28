@@ -36,7 +36,7 @@ History
   and returns the updated ``Project``.
   Only admin users can update projects, and API tokens cannot.
 * ``get_project`` sets ``Project.has_git_synced_resources``, which says whether the project holds a git-synced resource.
-  A rename leaves a git-synced library or discovery config library at its old repository path.
+  After a rename, a git-synced resource's next push writes a new copy under the new name, and the old copy stays.
 
 1.6.0 (unreleased)
 ------------------
