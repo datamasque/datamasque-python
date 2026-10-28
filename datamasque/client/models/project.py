@@ -42,8 +42,10 @@ class Project(BaseModel):
     Whether any library, discovery config library, ruleset or discovery config in the project
     that is not deleted is synced with git.
 
+    A resource edited since its last push is not counted.
     Only `get_project` sets it; other calls leave it `None`.
-    A rename leaves a git-synced library or discovery config library at its old repository path.
+    After a rename, a git-synced resource's next push writes a new copy under the new name and the old copy stays.
+    DataMasque does not move files in the repository.
     """
 
 
