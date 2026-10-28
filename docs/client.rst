@@ -20,6 +20,14 @@ datamasque.client.base module
    :undoc-members:
    :show-inheritance:
 
+datamasque.client.bundles module
+--------------------------------
+
+.. automodule:: datamasque.client.bundles
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 datamasque.client.connections module
 ------------------------------------
 
