@@ -42,6 +42,12 @@ History
 * ``list_resources`` takes ``ordering`` and ``descending``, and each type's resources come back in that order.
   Each listed ``Resource`` has a ``position``, its place in that order across every type.
   Both require server version 3.26.21.
+* Added ``export_bundle`` and ``import_bundle``, which export and import Version 2 bundles
+  that keep each ruleset, library and seed file in its project.
+  ``import_bundle`` also imports deprecated Version 1 bundles,
+  putting their items that name no project into ``fallback_project``,
+  else the server's earliest-created active project; ``default_project`` does not apply.
+  Both require server version 3.26.21.
 
 1.6.0 (unreleased)
 ------------------
