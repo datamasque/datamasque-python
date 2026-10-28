@@ -10,6 +10,9 @@ from datamasque.client import (
     ConnectionResource,
     DataMasqueApiError,
     DataMasqueClient,
+    ListedConnectionResource,
+    ListedResource,
+    ListedRulesetResource,
     MaskType,
     Project,
     ProjectId,
@@ -42,6 +45,15 @@ BUILT_IN_SEED = {
     "created": "2026-01-01T00:00:00Z",
     "modified": "2026-01-01T00:00:00Z",
 }
+LIBRARY = {
+    "id": "4f2a6c18-9d3b-4e75-a0c2-7b1e5d9f3a60",
+    "name": "customer_masks",
+    "project": "7-banking",
+    "created": "2026-10-01T10:00:00Z",
+    "modified": "2026-10-01T10:00:00Z",
+}
+# A resource in the listing carries its links; one in a link does not.
+NO_LINKS = {"uses": {}, "used_by": {}}
 
 
 def page(results: dict[str, list[dict]], next_url: Optional[str] = None) -> dict:
@@ -57,12 +69,19 @@ def test_list_resources_groups_them_by_type_name(client: DataMasqueClient) -> No
     with requests_mock.Mocker() as m:
         m.get(
             "http://test-server/api/resources/",
-            json=page({"rulesets": [RULESET], "connections": [CONNECTION], "seeds": [BUILT_IN_SEED]}),
+            json=page(
+                {
+                    "rulesets": [RULESET | NO_LINKS],
+                    "connections": [CONNECTION | NO_LINKS],
+                    "seeds": [BUILT_IN_SEED | NO_LINKS],
+                }
+            ),
         )
         resources = client.list_resources()
 
     assert sorted(resources) == ["connections", "rulesets", "seeds"]
     (ruleset,) = resources["rulesets"]
+    assert isinstance(ruleset, ListedRulesetResource)
     assert isinstance(ruleset, RulesetResource)
     assert ruleset.id == RULESET["id"]
     assert ruleset.name == "mask_customers"
@@ -70,11 +89,45 @@ def test_list_resources_groups_them_by_type_name(client: DataMasqueClient) -> No
     assert ruleset.created == datetime.fromisoformat("2026-10-01T10:00:00+00:00")
     assert ruleset.mask_type is MaskType.database
     (connection,) = resources["connections"]
-    assert isinstance(connection, ConnectionResource)
+    assert isinstance(connection, ListedConnectionResource)
     assert connection.created is None
     (seed,) = resources["seeds"]
-    assert type(seed) is Resource
+    assert type(seed) is ListedResource
     assert seed.project is None
+
+
+def test_list_resources_lists_each_link_as_its_types_summary(client: DataMasqueClient) -> None:
+    listed_ruleset = RULESET | {
+        "uses": {"connections": [CONNECTION], "ruleset_libraries": [LIBRARY]},
+        "used_by": {},
+    }
+    with requests_mock.Mocker() as m:
+        m.get("http://test-server/api/resources/", json=page({"rulesets": [listed_ruleset]}))
+        resources = client.list_resources()
+
+    (ruleset,) = resources[ResourceTypeName.rulesets]
+    assert sorted(ruleset.uses) == [ResourceTypeName.connections, ResourceTypeName.ruleset_libraries]
+    (connection,) = ruleset.uses[ResourceTypeName.connections]
+    assert type(connection) is ConnectionResource
+    assert connection.mask_type is MaskType.database
+    (library,) = ruleset.uses[ResourceTypeName.ruleset_libraries]
+    assert type(library) is Resource
+    assert library.name == "customer_masks"
+    assert ruleset.used_by == {}
+
+
+def test_move_resources_moves_a_listed_resources_links(client: DataMasqueClient) -> None:
+    listed_ruleset = RULESET | {"uses": {"connections": [CONNECTION]}, "used_by": {}}
+    with requests_mock.Mocker() as m:
+        m.get("http://test-server/api/resources/", json=page({"rulesets": [listed_ruleset]}))
+        m.post("http://test-server/api/resources/move/", json={"moved": 1, "conflicts": []})
+        (ruleset,) = client.list_resources()[ResourceTypeName.rulesets]
+        client.move_resources(ruleset.uses, ProjectId(8))
+
+    assert m.last_request.json() == {
+        "destination": "8",
+        "resources": [{"type": "connections", "id": CONNECTION["id"]}],
+    }
 
 
 def test_list_resources_sends_its_filters(client: DataMasqueClient) -> None:
@@ -131,8 +184,13 @@ def test_list_resources_follows_every_page_and_merges_the_groups(client: DataMas
         m.get(
             "http://test-server/api/resources/",
             [
-                {"json": page({"rulesets": [RULESET], "connections": [CONNECTION]}, next_url=next_url)},
-                {"json": page({"rulesets": [RULESET | {"id": "c3d1e5f7-0000-4000-8000-000000000001"}]})},
+                {
+                    "json": page(
+                        {"rulesets": [RULESET | NO_LINKS], "connections": [CONNECTION | NO_LINKS]},
+                        next_url=next_url,
+                    )
+                },
+                {"json": page({"rulesets": [RULESET | NO_LINKS | {"id": "c3d1e5f7-0000-4000-8000-000000000001"}]})},
             ],
         )
         resources = client.list_resources(page_size=2)
@@ -204,7 +262,10 @@ def test_move_resources_moves_what_list_resources_returned_to_a_project(client: 
         }
     )
     with requests_mock.Mocker() as m:
-        m.get("http://test-server/api/resources/", json=page({"rulesets": [RULESET], "connections": [CONNECTION]}))
+        m.get(
+            "http://test-server/api/resources/",
+            json=page({"rulesets": [RULESET | NO_LINKS], "connections": [CONNECTION | NO_LINKS]}),
+        )
         m.post("http://test-server/api/resources/move/", json={"moved": 2, "conflicts": []})
         client.move_resources(client.list_resources(), retail)
 

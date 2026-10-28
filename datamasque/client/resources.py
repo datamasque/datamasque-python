@@ -6,11 +6,14 @@ from typing import Optional
 from datamasque.client.base import BaseClient
 from datamasque.client.models.project import ProjectIdentifier, unwrap_project_id
 from datamasque.client.models.resource import (
-    RESOURCE_MODEL_BY_TYPE_NAME,
+    LISTED_RESOURCE_MODEL_BY_TYPE_NAME,
+    ListedResource,
+    ListedResources,
     Resource,
     ResourceMoveConflict,
     ResourceMoveResult,
     ResourcesByType,
+    parse_resource_groups,
 )
 from datamasque.client.models.resource_type import ResourceTypeName
 
@@ -40,7 +43,7 @@ class ResourceClient(BaseClient):
         types: Optional[Sequence[ResourceTypeName]] = None,
         search: Optional[str] = None,
         page_size: int = 500,
-    ) -> dict[ResourceTypeName, list[Resource]]:
+    ) -> ListedResources:
         """
         Returns the resources the caller can manage, grouped by type, fetched in pages of `page_size`.
 
@@ -48,8 +51,9 @@ class ResourceClient(BaseClient):
         `types` to those types; and `search` to resources whose name contains every word of it, ignoring case.
         The groups are the requested types, or every type the server has when `types` is not given.
         An empty `projects` or `types` matches no resources, without a request to the server.
-        Connections, rulesets and discovery configs are listed as `ConnectionResource`, `RulesetResource`
-        and `DiscoveryConfigResource`.
+        Connections, rulesets and discovery configs are listed as `ListedConnectionResource`, `ListedRulesetResource`
+        and `ListedDiscoveryConfigResource`, and every other type as `ListedResource`.
+        Each one's `uses` and `used_by` list the resources it links to and that link to it.
 
         Raises:
             DataMasqueApiError: the server rejects the request, for example because a project does not exist.
@@ -70,11 +74,12 @@ class ResourceClient(BaseClient):
         if search is not None:
             params["search"] = search
 
-        resources: defaultdict[ResourceTypeName, list[Resource]] = defaultdict(list)
+        resources: defaultdict[ResourceTypeName, list[ListedResource]] = defaultdict(list)
         for results in self._iter_pages("/api/resources/", params=params, page_size=page_size):
-            for type_name, rows in results.items():
-                model = RESOURCE_MODEL_BY_TYPE_NAME.get(type_name, Resource)
-                resources[ResourceTypeName(type_name)].extend(model.model_validate(row) for row in rows)
+            for type_name, page_resources in parse_resource_groups(
+                results, LISTED_RESOURCE_MODEL_BY_TYPE_NAME, ListedResource
+            ).items():
+                resources[type_name].extend(page_resources)
 
         return dict(resources)
 

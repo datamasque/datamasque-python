@@ -32,6 +32,9 @@ History
 * ``get_generated_rulesets`` sets each ruleset's ``project`` to the connection's project.
 * Added project models and management APIs.
 * Added resource management APIs.
+* ``list_resources`` returns each resource as a ``ListedResource``,
+  whose ``uses`` and ``used_by`` list the resources it links to and the resources that link to it, grouped by type.
+  A resource's ``uses`` can be passed to ``move_resources`` to move what it links to.
 
 1.6.0 (unreleased)
 ------------------
