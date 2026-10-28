@@ -4,6 +4,14 @@ datamasque.client.models package
 Submodules
 ----------
 
+datamasque.client.models.bundle module
+--------------------------------------
+
+.. automodule:: datamasque.client.models.bundle
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 datamasque.client.models.connection module
 ------------------------------------------
 

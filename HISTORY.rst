@@ -32,6 +32,11 @@ History
 * ``get_generated_rulesets`` sets each ruleset's ``project`` to the connection's project.
 * Added project models and management APIs.
 * Added resource management APIs.
+* Added ``export_bundle`` and ``import_bundle``, which export and import Version 2 bundles
+  that keep each ruleset, library and seed file in its project.
+  ``import_bundle`` also imports deprecated Version 1 bundles,
+  putting their items that name no project into ``fallback_project``,
+  else the server's earliest-created active project; ``default_project`` does not apply.
 
 1.6.0 (unreleased)
 ------------------
