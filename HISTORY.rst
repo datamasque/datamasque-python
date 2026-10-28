@@ -32,6 +32,11 @@ History
 * ``get_generated_rulesets`` sets each ruleset's ``project`` to the connection's project.
 * Added project models and management APIs.
 * Added resource management APIs.
+* Added ``update_project``, which takes a ``ProjectUpdateRequest`` to rename a project or change its description,
+  and returns the updated ``Project``.
+  Only admin users can update projects, and API tokens cannot.
+* ``get_project`` sets ``Project.has_git_synced_resources``, which says whether the project holds a git-synced resource.
+  After a rename, a git-synced resource's next push writes a new copy under the new name, and the old copy stays.
 
 1.6.0 (unreleased)
 ------------------
