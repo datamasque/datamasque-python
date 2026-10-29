@@ -30,6 +30,13 @@ History
   Updating a connection leaves it in its project.
 * ``DataMasqueFile`` gains a read-only ``project`` field, which is ``None`` for built-in seeds.
 * ``get_generated_rulesets`` sets each ruleset's ``project`` to the connection's project.
+* Added Git push, pull and file listing for rulesets, ruleset libraries, discovery configs
+  and discovery config libraries: ``list_*_git_files``, ``pull_*_from_git``, ``push_*_to_git``
+  and ``get_*_git_push_path``, with the ``GitFile``, ``GitFileCommit`` and ``GitExtension`` types.
+  A push writes the resource's file in its project's folder, with the ``extension`` it is given (``.yml`` or ``.yaml``).
+  A resource pushed before the server's upgrade to projects keeps its existing file
+  until it is renamed or moved to another project.
+  ``get_*_git_push_path`` returns the path a push writes, relative to the repository and without its extension.
 * Added project models and management APIs.
 * Added resource management APIs.
 
