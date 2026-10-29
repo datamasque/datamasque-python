@@ -4,6 +4,7 @@ from datamasque.client.discovery import DiscoveryClient
 from datamasque.client.discovery_config_libraries import DiscoveryConfigLibraryClient
 from datamasque.client.discovery_configs import DiscoveryConfigClient
 from datamasque.client.files import FileClient
+from datamasque.client.git import GitClient
 from datamasque.client.license import LicenseClient
 from datamasque.client.projects import ProjectClient
 from datamasque.client.resources import ResourceClient
@@ -32,6 +33,7 @@ class DataMasqueClient(
     UnstructuredDiscoveryClient,
     DiscoveryConfigClient,
     DiscoveryConfigLibraryClient,
+    GitClient,
     TableReferenceClient,
     RGConfigClient,
     UserClient,
