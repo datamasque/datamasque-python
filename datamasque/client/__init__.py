@@ -27,6 +27,7 @@ from datamasque.client.exceptions import (
     RGConfigNotFoundError,
     RunNotCancellableError,
 )
+from datamasque.client.git import GitExtension
 from datamasque.client.ifm import DataMasqueIfmClient
 from datamasque.client.models.connection import (
     AzureConnectionConfig,
@@ -101,7 +102,7 @@ from datamasque.client.models.files import (
     SnowflakeKeyFile,
     SslZipFile,
 )
-from datamasque.client.models.git import GitSnapshot
+from datamasque.client.models.git import GitFile, GitFileCommit, GitSnapshot
 from datamasque.client.models.ifm import (
     DataMasqueIfmInstanceConfig,
     IfmLog,
@@ -253,6 +254,9 @@ __all__ = [
     "FirstCharsStatistics",
     "ForeignKeyRef",
     "GcsConnectionConfig",
+    "GitExtension",
+    "GitFile",
+    "GitFileCommit",
     "GitSnapshot",
     "HashColumnsTableConfig",
     "IfmAuthError",
