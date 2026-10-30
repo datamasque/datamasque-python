@@ -44,6 +44,13 @@ datamasque.client.models.files module
    :undoc-members:
    :show-inheritance:
 
+datamasque.client.models.git module
+-----------------------------------
+
+.. automodule:: datamasque.client.models.git
+   :members: GitSnapshot, GitFile, GitFileCommit
+   :show-inheritance:
+
 datamasque.client.models.ifm module
 -----------------------------------
 

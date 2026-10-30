@@ -60,6 +60,14 @@ datamasque.client.files module
    :undoc-members:
    :show-inheritance:
 
+datamasque.client.git module
+----------------------------
+
+.. automodule:: datamasque.client.git
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 datamasque.client.spcs module
 -----------------------------
 
