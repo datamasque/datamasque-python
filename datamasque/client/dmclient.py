@@ -6,6 +6,7 @@ from datamasque.client.discovery_config_libraries import DiscoveryConfigLibraryC
 from datamasque.client.discovery_configs import DiscoveryConfigClient
 from datamasque.client.files import FileClient
 from datamasque.client.git import GitClient
+from datamasque.client.instance_secret import InstanceSecretClient
 from datamasque.client.license import LicenseClient
 from datamasque.client.projects import ProjectClient
 from datamasque.client.resources import ResourceClient
@@ -40,6 +41,7 @@ class DataMasqueClient(
     RGConfigClient,
     UserClient,
     SettingsClient,
+    InstanceSecretClient,
 ):
     """
     Client for a DataMasque server instance.
