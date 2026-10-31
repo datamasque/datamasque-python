@@ -2,6 +2,13 @@
 History
 =======
 
+1.8.0 (unreleased)
+------------------
+
+* Added methods for the instance secret fingerprint and for linking the instance secret with another DataMasque instance.
+
+Requires server version TBD
+
 1.6.0 (unreleased)
 ------------------
 
