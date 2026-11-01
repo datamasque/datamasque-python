@@ -131,6 +131,7 @@ from datamasque.client.models.resource import (
     ResourceMoveConflict,
     ResourceMoveConflictReason,
     ResourceMoveResult,
+    ResourceOrdering,
     ResourcesByType,
     RulesetResource,
 )
@@ -306,6 +307,7 @@ __all__ = [
     "ResourceMoveConflict",
     "ResourceMoveConflictReason",
     "ResourceMoveResult",
+    "ResourceOrdering",
     "ResourceTypeName",
     "ResourcesByType",
     "Ruleset",
