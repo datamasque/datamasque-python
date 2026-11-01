@@ -1,7 +1,7 @@
 """Tests for listing and moving resources with the DataMasque client."""
 
 from datetime import datetime
-from typing import Optional
+from typing import Any, Optional
 
 import pytest
 import requests_mock
@@ -15,6 +15,7 @@ from datamasque.client import (
     ProjectId,
     Resource,
     ResourceMoveConflictReason,
+    ResourceOrdering,
     ResourceTypeName,
     RulesetResource,
 )
@@ -75,6 +76,7 @@ def test_list_resources_groups_them_by_type_name(client: DataMasqueClient) -> No
     (seed,) = resources["seeds"]
     assert type(seed) is Resource
     assert seed.project is None
+    assert seed.position is None
 
 
 def test_list_resources_sends_its_filters(client: DataMasqueClient) -> None:
@@ -93,15 +95,46 @@ def test_list_resources_sends_its_filters(client: DataMasqueClient) -> None:
             projects=[ProjectId(7), retail],
             types=[ResourceTypeName.rulesets, ResourceTypeName.connections],
             search="customers",
+            ordering=ResourceOrdering.modified,
         )
 
     assert m.last_request.qs == {
         "project": ["7", "8"],
         "type": ["rulesets", "connections"],
         "search": ["customers"],
+        "ordering": ["modified"],
         "limit": ["500"],
         "offset": ["0"],
     }
+
+
+@pytest.mark.parametrize(
+    ("kwargs", "expected"),
+    [
+        ({}, "type"),
+        ({"descending": True}, "-type"),
+        ({"ordering": ResourceOrdering.project}, "project"),
+        ({"ordering": ResourceOrdering.project, "descending": True}, "-project"),
+    ],
+)
+def test_list_resources_sends_its_ordering(client: DataMasqueClient, kwargs: dict[str, Any], expected: str) -> None:
+    with requests_mock.Mocker() as m:
+        m.get("http://test-server/api/resources/", json=page({}))
+        client.list_resources(**kwargs)
+
+    assert m.last_request.qs["ordering"] == [expected]
+
+
+def test_list_resources_keeps_each_resources_position(client: DataMasqueClient) -> None:
+    with requests_mock.Mocker() as m:
+        m.get(
+            "http://test-server/api/resources/",
+            json=page({"connections": [CONNECTION | {"position": 1}], "rulesets": [RULESET | {"position": 0}]}),
+        )
+        resources = client.list_resources(ordering=ResourceOrdering.modified, descending=True)
+
+    in_order = sorted((resource for group in resources.values() for resource in group), key=lambda r: r.position)
+    assert [resource.id for resource in in_order] == [RULESET["id"], CONNECTION["id"]]
 
 
 @pytest.mark.parametrize(

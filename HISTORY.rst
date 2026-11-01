@@ -32,6 +32,9 @@ History
 * ``get_generated_rulesets`` sets each ruleset's ``project`` to the connection's project.
 * Added project models and management APIs.
 * Added resource management APIs.
+* ``list_resources`` takes ``ordering`` and ``descending``, and each type's resources come back in that order.
+  Each listed ``Resource`` has a ``position``, its place in that order across every type.
+  Both require server version 3.26.21.
 
 1.6.0 (unreleased)
 ------------------
