@@ -29,6 +29,33 @@ class Resource(BaseModel):
     """`None` for a type that does not record it, currently connections."""
     modified: Optional[datetime] = None
     """`None` for a type that does not record it, currently connections."""
+    position: Optional[int] = None
+    """
+    Its index, counting from 0, among every resource the listing matched, in the listing's ordering.
+    It changes with the filters and ordering, so it does not identify the resource.
+    Requires server version 3.26.21, and is `None` on an older server.
+    """
+
+
+class ResourceOrdering(str, Enum):
+    """
+    A column `list_resources` sorts by, with the columns that break ties after it.
+
+    Ties are broken by type, then name, then project name, then ID, leaving out the column sorted by.
+    Types sort in the order `ResourceTypeName` declares them.
+    Names and project names compare ignoring case.
+    """
+
+    type = "type"
+    name = "name"
+    project = "project"
+    """
+    Sorts by project name.
+    A resource in no project sorts after every project,
+    or before every project when `descending` is set.
+    """
+    modified = "modified"
+    """A resource with no `modified` time sorts as the oldest."""
 
 
 class ConnectionResource(Resource):
