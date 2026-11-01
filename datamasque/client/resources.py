@@ -10,6 +10,7 @@ from datamasque.client.models.resource import (
     Resource,
     ResourceMoveConflict,
     ResourceMoveResult,
+    ResourceOrdering,
     ResourcesByType,
 )
 from datamasque.client.models.resource_type import ResourceTypeName
@@ -39,6 +40,8 @@ class ResourceClient(BaseClient):
         projects: Optional[Sequence[ProjectIdentifier]] = None,
         types: Optional[Sequence[ResourceTypeName]] = None,
         search: Optional[str] = None,
+        ordering: ResourceOrdering = ResourceOrdering.type,
+        descending: bool = False,
         page_size: int = 500,
     ) -> dict[ResourceTypeName, list[Resource]]:
         """
@@ -46,6 +49,11 @@ class ResourceClient(BaseClient):
 
         `projects` limits them to those projects, each given as a `Project`, its `ProjectId` or its `<id>-<slug>` form;
         `types` to those types; and `search` to resources whose name contains every word of it, ignoring case.
+        Each group's resources come in `ordering`, descending when `descending` is set.
+        Columns that break ties are always sorted ascending.
+        Sort the resources of every group together by `position` to get the whole listing in order.
+        `ordering` and `descending` require server version 3.26.21.
+        An older server ignores them, and each resource's `position` is `None`.
         The groups are the requested types, or every type the server has when `types` is not given.
         An empty `projects` or `types` matches no resources, without a request to the server.
         Connections, rulesets and discovery configs are listed as `ConnectionResource`, `RulesetResource`
@@ -69,6 +77,7 @@ class ResourceClient(BaseClient):
             params["type"] = [type_name.value for type_name in types]
         if search is not None:
             params["search"] = search
+        params["ordering"] = f"-{ordering.value}" if descending else ordering.value
 
         resources: defaultdict[ResourceTypeName, list[Resource]] = defaultdict(list)
         for results in self._iter_pages("/api/resources/", params=params, page_size=page_size):
