@@ -10,6 +10,7 @@ from datamasque.client.models.project import (
     ProjectCreateRequest,
     ProjectDeleteConflict,
     ProjectIdentifier,
+    ProjectUpdateRequest,
     unwrap_project_id,
 )
 
@@ -65,6 +66,29 @@ class ProjectClient(BaseClient):
         project = Project.model_validate(response.json())
         logger.info('Creation of project "%s" successful', project.name)
         return project
+
+    def update_project(self, project: ProjectIdentifier, request: ProjectUpdateRequest) -> Project:
+        """
+        Renames a project or changes its description, and returns the updated project.
+
+        Only admin users can, and API tokens cannot.
+        Renaming invalidates rulesets, discovery configs and generator configs that import a library of the project
+        by the old project name. Imports without a project name stay valid.
+        It also moves the project's seed and credential files, keeping connections working.
+        Seed and table references in rulesets that name the old project are not rewritten.
+
+        Raises:
+            DataMasqueApiError: the server rejects the name (see `ProjectCreateRequest`),
+                a file already exists where one of the project's files would move,
+                the project does not exist or is deleted, or any other non-2xx response.
+        """
+
+        project_id = unwrap_project_id(project)
+        data = request.model_dump(mode="json", exclude_none=True)
+        response = self.make_request("PATCH", f"/api/projects/{project_id}/", data=data)
+        updated_project = Project.model_validate(response.json())
+        logger.info("Update of project %s successful", project_id)
+        return updated_project
 
     def get_project_delete_conflicts(
         self,
