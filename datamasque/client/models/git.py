@@ -58,3 +58,32 @@ class GitTrackedEntity(BaseModel):
             data["git"] = snapshot
 
         return data
+
+
+class GitFileCommit(BaseModel):
+    """A commit that changed a file in the git repository."""
+
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
+
+    commit_sha: str = Field(alias="commit")
+    """The commit's SHA, which the `pull_*_from_git` methods take."""
+    date: datetime
+    """When the commit was authored."""
+    message: str
+    """The commit message."""
+
+
+class GitFile(BaseModel):
+    """A YAML file in the git repository, as a `list_*_git_files` method lists it."""
+
+    path: str
+    """
+    The file's path with its extension,
+    relative to the Git directory path for rulesets and to the type folder for the other types.
+    Pass it to the matching `pull_*_from_git` method.
+    """
+    commits: list[GitFileCommit]
+    """
+    The file's most recent commits, newest first (the server caps how many).
+    The `pull_*_from_git` methods also take the SHA of an older commit, such as one from `git log`.
+    """
