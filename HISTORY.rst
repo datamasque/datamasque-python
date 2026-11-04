@@ -2,7 +2,7 @@
 History
 =======
 
-1.5.1 (unreleased)
+1.5.1 (2026-11-05)
 ------------------
 
 * Every request now has a connect and a read timeout,
