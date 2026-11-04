@@ -14,6 +14,11 @@ History
 * ``RunInfo`` and ``UnfinishedRun`` gain a required ``project`` field:
   the run's project, taken from its ruleset's project when the run starts.
 * Added ``connect_timeout_seconds`` and ``read_timeout_seconds`` to the instance config models.
+* Added optional keyword-only ``config_type`` and ``discovery_kind`` arguments to ``get_default_discovery_config_yaml``,
+  typed by ``DiscoveryConfigType`` and the new ``DiscoveryKind`` enum.
+  ``discovery_kind=DiscoveryKind.unstructured`` with ``config_type=DiscoveryConfigType.file``
+  returns the template of an unstructured discovery config,
+  which counts entities in the text of documents.
 
 Requires server version 3.26.20
 

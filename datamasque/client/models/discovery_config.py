@@ -16,6 +16,13 @@ class DiscoveryConfigType(enum.Enum):
     file = "file"
 
 
+class DiscoveryKind(enum.Enum):
+    """What a file discovery config looks for: sensitive locators, or entities in the text of documents."""
+
+    structured = "structured"
+    unstructured = "unstructured"
+
+
 def unwrap_discovery_config_id(value: Any) -> Any:
     """
     Coerce a `DiscoveryConfig` to its `id`; pass other values through unchanged.

@@ -89,7 +89,12 @@ from datamasque.client.models.discovery import (
     TableConstraints,
     ValueCountStatus,
 )
-from datamasque.client.models.discovery_config import DiscoveryConfig, DiscoveryConfigId, DiscoveryConfigType
+from datamasque.client.models.discovery_config import (
+    DiscoveryConfig,
+    DiscoveryConfigId,
+    DiscoveryConfigType,
+    DiscoveryKind,
+)
 from datamasque.client.models.discovery_config_library import DiscoveryConfigLibrary, DiscoveryConfigLibraryId
 from datamasque.client.models.dm_instance import DataMasqueInstanceConfig
 from datamasque.client.models.files import (
@@ -209,6 +214,7 @@ __all__ = [
     "DiscoveryConfigLibraryId",
     "DiscoveryConfigNotFoundError",
     "DiscoveryConfigType",
+    "DiscoveryKind",
     "DiscoveryMatch",
     "CosmosDbConnectionConfig",
     "DocumentDbConnectionConfig",

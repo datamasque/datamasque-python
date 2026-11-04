@@ -28,6 +28,14 @@ datamasque.client.models.discovery module
    :undoc-members:
    :show-inheritance:
 
+datamasque.client.models.discovery_config module
+------------------------------------------------
+
+.. automodule:: datamasque.client.models.discovery_config
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 datamasque.client.models.dm_instance module
 -------------------------------------------
 
