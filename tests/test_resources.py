@@ -140,7 +140,7 @@ def test_list_resources_keeps_each_resources_position(client: DataMasqueClient) 
 @pytest.mark.parametrize(
     ("projects", "types", "expected"),
     [
-        ([], None, {}),
+        ([], None, {type_name.value: [] for type_name in ResourceTypeName}),
         ([], [ResourceTypeName.rulesets], {"rulesets": []}),
         ([ProjectId(7)], [], {}),
     ],
