@@ -2,6 +2,14 @@
 History
 =======
 
+1.5.1 (unreleased)
+------------------
+
+* Every request now has a connect and a read timeout,
+  so a server that stops answering raises ``DataMasqueTransportError`` instead of hanging the caller.
+  Set them with ``connect_timeout_seconds`` (default 10) and ``read_timeout_seconds`` (default 300)
+  on the instance config models.
+
 1.5.0 (2026-10-07)
 ------------------
 
