@@ -8,7 +8,7 @@ import requests_mock
 from pydantic import JsonValue, ValidationError
 
 from datamasque.client import DataMasqueClient
-from datamasque.client.exceptions import DataMasqueApiError, DataMasqueException
+from datamasque.client.exceptions import DataMasqueApiError
 from datamasque.client.models.discovery_config import (
     DiscoveryConfig,
     DiscoveryConfigId,
@@ -16,6 +16,7 @@ from datamasque.client.models.discovery_config import (
     unwrap_discovery_config_id,
 )
 from datamasque.client.models.status import ValidationStatus
+from tests.helpers import PROJECT, PROJECT_ID
 
 CONFIG_ID_1 = "aaaaaaaa-1111-2222-3333-444444444444"
 CONFIG_ID_2 = "bbbbbbbb-1111-2222-3333-444444444444"
@@ -31,6 +32,7 @@ def sample_config_list_response() -> dict[str, Any]:
             {
                 "id": CONFIG_ID_1,
                 "name": "my_config",
+                "project": PROJECT,
                 "config_type": "database",
                 "archived": False,
                 "created": "2025-01-01T12:00:00Z",
@@ -39,6 +41,7 @@ def sample_config_list_response() -> dict[str, Any]:
             {
                 "id": CONFIG_ID_2,
                 "name": "another_config",
+                "project": PROJECT,
                 "config_type": "database",
                 "archived": False,
                 "created": "2025-02-01T12:00:00Z",
@@ -53,6 +56,7 @@ def sample_config_detail_response() -> dict[str, Any]:
     return {
         "id": CONFIG_ID_1,
         "name": "my_config",
+        "project": PROJECT,
         "config_yaml": "labels: []\nmetadata_rules: []\nidd_rules: []\n",
         "config_type": "database",
         "archived": False,
@@ -65,6 +69,7 @@ def sample_config_detail_response() -> dict[str, Any]:
 def discovery_config() -> DiscoveryConfig:
     return DiscoveryConfig(
         name="test_config",
+        project=PROJECT,
         yaml="labels: []\nmetadata_rules: []\nidd_rules: []\n",
         config_type="database",
     )
@@ -95,6 +100,7 @@ def test_list_discovery_configs_pagination(client: DataMasqueClient) -> None:
             {
                 "id": CONFIG_ID_1,
                 "name": "c1",
+                "project": PROJECT,
                 "config_type": "database",
                 "archived": False,
                 "created": "2025-01-01T12:00:00Z",
@@ -103,6 +109,7 @@ def test_list_discovery_configs_pagination(client: DataMasqueClient) -> None:
             {
                 "id": CONFIG_ID_2,
                 "name": "c2",
+                "project": PROJECT,
                 "config_type": "database",
                 "archived": False,
                 "created": "2025-01-01T12:00:00Z",
@@ -118,6 +125,7 @@ def test_list_discovery_configs_pagination(client: DataMasqueClient) -> None:
             {
                 "id": "cccccccc-1111-2222-3333-444444444444",
                 "name": "c3",
+                "project": PROJECT,
                 "config_type": "database",
                 "archived": False,
                 "created": "2025-01-01T12:00:00Z",
@@ -171,6 +179,7 @@ def test_get_discovery_config_by_name_found(
             {
                 "id": CONFIG_ID_1,
                 "name": "my_config",
+                "project": PROJECT,
                 "config_type": "database",
                 "archived": False,
                 "created": "2025-01-01T12:00:00Z",
@@ -190,12 +199,16 @@ def test_get_discovery_config_by_name_found(
             json=sample_config_detail_response,
             status_code=200,
         )
-        config = client.get_discovery_config_by_name("my_config", DiscoveryConfigType.database)
+        config = client.get_discovery_config_by_name("my_config", DiscoveryConfigType.database, PROJECT_ID)
 
     assert config is not None
     assert config.name == "my_config"
-    assert "name_exact=my_config" in m.request_history[0].url
-    assert "config_type=database" in m.request_history[0].url
+    assert m.request_history[0].qs == {
+        "name_exact": ["my_config"],
+        "config_type": ["database"],
+        "project": [str(PROJECT_ID)],
+        "limit": ["1"],
+    }
 
 
 def test_get_discovery_config_by_name_not_found(client: DataMasqueClient) -> None:
@@ -207,7 +220,7 @@ def test_get_discovery_config_by_name_not_found(client: DataMasqueClient) -> Non
             json=empty_response,
             status_code=200,
         )
-        config = client.get_discovery_config_by_name("nonexistent", DiscoveryConfigType.database)
+        config = client.get_discovery_config_by_name("nonexistent", DiscoveryConfigType.database, PROJECT_ID)
 
     assert config is None
 
@@ -220,6 +233,7 @@ def test_get_discovery_config_by_name_raises_when_server_omits_id(client: DataMa
         "results": [
             {
                 "name": "my_config",
+                "project": PROJECT,
                 "config_type": "database",
                 "archived": False,
                 "created": "2025-01-01T12:00:00Z",
@@ -235,13 +249,14 @@ def test_get_discovery_config_by_name_raises_when_server_omits_id(client: DataMa
             status_code=200,
         )
         with pytest.raises(DataMasqueApiError, match="without an `id`"):
-            client.get_discovery_config_by_name("my_config", DiscoveryConfigType.database)
+            client.get_discovery_config_by_name("my_config", DiscoveryConfigType.database, PROJECT_ID)
 
 
 def test_create_discovery_config(client: DataMasqueClient, discovery_config: DiscoveryConfig) -> None:
     create_response = {
         "id": CONFIG_ID_1,
         "name": "test_config",
+        "project": PROJECT,
         "config_yaml": "labels: []\nmetadata_rules: []\nidd_rules: []\n",
         "config_type": "database",
         "is_valid": "in_progress",
@@ -268,6 +283,7 @@ def test_create_discovery_config(client: DataMasqueClient, discovery_config: Dis
     assert request_body["name"] == "test_config"
     assert request_body["config_yaml"] == "labels: []\nmetadata_rules: []\nidd_rules: []\n"
     assert request_body["config_type"] == "database"
+    assert request_body["project"] == PROJECT
     # Server-managed read-only fields must not be echoed back in the request body.
     assert "id" not in request_body
     assert "is_valid" not in request_body
@@ -281,6 +297,7 @@ def test_update_discovery_config(client: DataMasqueClient, discovery_config: Dis
     update_response = {
         "id": CONFIG_ID_1,
         "name": "test_config",
+        "project": PROJECT,
         "config_yaml": "labels: []\nmetadata_rules: []\nidd_rules: []\n",
         "config_type": "database",
         "archived": False,
@@ -326,6 +343,7 @@ def test_create_or_update_discovery_config_create(client: DataMasqueClient, disc
     create_response = {
         "id": CONFIG_ID_1,
         "name": "test_config",
+        "project": PROJECT,
         "config_yaml": "labels: []\nmetadata_rules: []\nidd_rules: []\n",
         "config_type": "database",
         "archived": False,
@@ -340,7 +358,9 @@ def test_create_or_update_discovery_config_create(client: DataMasqueClient, disc
 
     assert result.id == DiscoveryConfigId(CONFIG_ID_1)
     assert m.request_history[0].method == "GET"
+    assert m.request_history[0].qs["project"] == [PROJECT]
     assert m.request_history[1].method == "POST"
+    assert m.request_history[1].json()["project"] == PROJECT
 
 
 def test_create_or_update_discovery_config_update(client: DataMasqueClient, discovery_config: DiscoveryConfig) -> None:
@@ -352,6 +372,7 @@ def test_create_or_update_discovery_config_update(client: DataMasqueClient, disc
             {
                 "id": CONFIG_ID_1,
                 "name": "test_config",
+                "project": PROJECT,
                 "config_type": "database",
                 "archived": False,
                 "created": "2025-06-01T10:00:00Z",
@@ -362,6 +383,7 @@ def test_create_or_update_discovery_config_update(client: DataMasqueClient, disc
     update_response = {
         "id": CONFIG_ID_1,
         "name": "test_config",
+        "project": PROJECT,
         "config_yaml": "labels: []\nmetadata_rules: []\nidd_rules: []\n",
         "config_type": "database",
         "archived": False,
@@ -399,20 +421,28 @@ def test_delete_discovery_config_by_id_not_found(client: DataMasqueClient) -> No
 
 def test_delete_discovery_config_by_name(client: DataMasqueClient, sample_config_list_response: dict[str, Any]) -> None:
     with requests_mock.Mocker() as m:
-        m.get("http://test-server/api/discovery/configs/", json=sample_config_list_response, status_code=200)
+        # The server filters by name, so only the matching config is listed.
+        only_match = {**sample_config_list_response, "count": 1, "results": sample_config_list_response["results"][:1]}
+        m.get("http://test-server/api/discovery/configs/", json=only_match, status_code=200)
         m.delete(f"http://test-server/api/discovery/configs/{CONFIG_ID_1}/", status_code=204)
-        client.delete_discovery_config_by_name_if_exists("my_config", DiscoveryConfigType.database)
+        client.delete_discovery_config_by_name_if_exists("my_config", DiscoveryConfigType.database, PROJECT_ID)
 
     assert m.request_history[0].method == "GET"
+    assert m.request_history[0].qs == {
+        "name_exact": ["my_config"],
+        "config_type": ["database"],
+        "project": [str(PROJECT_ID)],
+        "limit": ["1"],
+    }
     assert m.request_history[1].method == "DELETE"
 
 
-def test_delete_discovery_config_by_name_not_found(
-    client: DataMasqueClient, sample_config_list_response: dict[str, Any]
-) -> None:
+def test_delete_discovery_config_by_name_not_found(client: DataMasqueClient) -> None:
+    empty_response = {"count": 0, "next": None, "previous": None, "results": []}
+
     with requests_mock.Mocker() as m:
-        m.get("http://test-server/api/discovery/configs/", json=sample_config_list_response, status_code=200)
-        client.delete_discovery_config_by_name_if_exists("nonexistent", DiscoveryConfigType.database)
+        m.get("http://test-server/api/discovery/configs/", json=empty_response, status_code=200)
+        client.delete_discovery_config_by_name_if_exists("nonexistent", DiscoveryConfigType.database, PROJECT_ID)
 
     assert m.call_count == 1
     assert m.request_history[0].method == "GET"
@@ -426,6 +456,7 @@ def test_delete_discovery_config_by_name_raises_when_server_omits_id(client: Dat
         "results": [
             {
                 "name": "my_config",
+                "project": PROJECT,
                 "config_type": "database",
                 "archived": False,
                 "created": "2025-01-01T12:00:00Z",
@@ -440,29 +471,8 @@ def test_delete_discovery_config_by_name_raises_when_server_omits_id(client: Dat
             json=list_response_without_id,
             status_code=200,
         )
-        with pytest.raises(DataMasqueException, match="without an `id`"):
-            client.delete_discovery_config_by_name_if_exists("my_config", DiscoveryConfigType.database)
-
-
-def test_delete_discovery_config_by_name_only_deletes_matching_type(client: DataMasqueClient) -> None:
-    shared_name_response = {
-        "count": 2,
-        "next": None,
-        "previous": None,
-        "results": [
-            {"id": CONFIG_ID_1, "name": "shared", "config_type": "database", "archived": False},
-            {"id": CONFIG_ID_2, "name": "shared", "config_type": "file", "archived": False},
-        ],
-    }
-
-    with requests_mock.Mocker() as m:
-        m.get("http://test-server/api/discovery/configs/", json=shared_name_response, status_code=200)
-        m.delete(f"http://test-server/api/discovery/configs/{CONFIG_ID_2}/", status_code=204)
-        client.delete_discovery_config_by_name_if_exists("shared", DiscoveryConfigType.file)
-
-    assert m.request_history[-1].method == "DELETE"
-    assert CONFIG_ID_2 in m.request_history[-1].url
-    assert CONFIG_ID_1 not in m.request_history[-1].url
+        with pytest.raises(DataMasqueApiError, match="without an `id`"):
+            client.delete_discovery_config_by_name_if_exists("my_config", DiscoveryConfigType.database, PROJECT_ID)
 
 
 def test_get_default_discovery_config_yaml(client: DataMasqueClient) -> None:
@@ -486,6 +496,7 @@ def test_discovery_config_parses_validation_fields() -> None:
         {
             "id": CONFIG_ID_1,
             "name": "my_config",
+            "project": PROJECT,
             "config_type": "database",
             "config_yaml": "labels: []",
             "is_valid": "invalid",
@@ -505,6 +516,7 @@ def test_discovery_config_validation_fields_optional() -> None:
         {
             "id": CONFIG_ID_1,
             "name": "my_config",
+            "project": PROJECT,
             "config_type": "database",
             "created": "2025-01-01T12:00:00Z",
             "modified": "2025-01-02T12:00:00Z",
@@ -521,12 +533,12 @@ def test_unwrap_discovery_config_id_passes_through_strings() -> None:
 
 
 def test_unwrap_discovery_config_id_extracts_id_from_model() -> None:
-    config = DiscoveryConfig(name="x", config_type="database", id=DiscoveryConfigId(CONFIG_ID_1))
+    config = DiscoveryConfig(name="x", project=PROJECT, config_type="database", id=DiscoveryConfigId(CONFIG_ID_1))
     assert unwrap_discovery_config_id(config) == CONFIG_ID_1
 
 
 def test_unwrap_discovery_config_id_raises_without_id() -> None:
-    config = DiscoveryConfig(name="x", config_type="database")
+    config = DiscoveryConfig(name="x", project=PROJECT, config_type="database")
     with pytest.raises(ValueError, match="id is None"):
         unwrap_discovery_config_id(config)
 
@@ -535,6 +547,7 @@ def _build_config_response(is_valid: str, **extra: JsonValue) -> dict[str, JsonV
     return {
         "id": CONFIG_ID_1,
         "name": "test_config",
+        "project": PROJECT,
         "config_type": "database",
         "is_valid": is_valid,
         "validation_error": None,
@@ -595,7 +608,7 @@ def test_discovery_config_rejects_malformed_error_entry() -> None:
 
 
 def test_create_discovery_config_with_empty_yaml_raises(client: DataMasqueClient) -> None:
-    config = DiscoveryConfig(name="test_config", yaml="", config_type="database")
+    config = DiscoveryConfig(name="test_config", project=PROJECT, yaml="", config_type="database")
 
     with requests_mock.Mocker() as m:
         with pytest.raises(ValueError, match="without YAML content"):
@@ -605,7 +618,7 @@ def test_create_discovery_config_with_empty_yaml_raises(client: DataMasqueClient
 
 
 def test_update_discovery_config_with_empty_yaml_raises(client: DataMasqueClient) -> None:
-    config = DiscoveryConfig(id=CONFIG_ID_1, name="test_config", yaml="", config_type="database")
+    config = DiscoveryConfig(id=CONFIG_ID_1, name="test_config", project=PROJECT, yaml="", config_type="database")
 
     with requests_mock.Mocker() as m:
         with pytest.raises(ValueError, match="without YAML content"):
