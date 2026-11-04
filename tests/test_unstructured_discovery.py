@@ -9,6 +9,7 @@ import requests_mock
 
 from datamasque.client import DataMasqueClient
 from datamasque.client.exceptions import DataMasqueApiError
+from datamasque.client.models.connection import ConnectionId
 from datamasque.client.models.runs import RunId
 from datamasque.client.models.unstructured_discovery import (
     UnstructuredDiscoveryFileStatus,
@@ -58,6 +59,40 @@ def _file(path: str, *, status: str = "read", skip_reason: str = "", findings: O
         "skip_reason": skip_reason,
         "findings": findings if findings is not None else [],
     }
+
+
+@pytest.mark.parametrize(
+    "last_run_field, expected",
+    [
+        ({"last_unstructured_discovery_run_id": 19}, RunId(19)),
+        ({"last_unstructured_discovery_run_id": None}, None),
+    ],
+)
+def test_get_last_unstructured_discovery_run_id_reads_the_connection(
+    client: DataMasqueClient, existing_connection_json: dict, last_run_field: dict, expected: Optional[RunId]
+) -> None:
+    with requests_mock.Mocker() as m:
+        m.get(
+            f"http://test-server/api/connections/{CONNECTION_ID}/",
+            json=existing_connection_json | {"id": CONNECTION_ID} | last_run_field,
+        )
+
+        assert client.get_last_unstructured_discovery_run_id(ConnectionId(CONNECTION_ID)) == expected
+
+
+def test_get_last_unstructured_discovery_run_id_raises_on_a_server_without_the_field(
+    client: DataMasqueClient, existing_connection_json: dict
+) -> None:
+    with requests_mock.Mocker() as m:
+        m.get(
+            f"http://test-server/api/connections/{CONNECTION_ID}/",
+            json=existing_connection_json | {"id": CONNECTION_ID},
+        )
+
+        with pytest.raises(KeyError) as exc_info:
+            client.get_last_unstructured_discovery_run_id(ConnectionId(CONNECTION_ID))
+
+    assert exc_info.value.args == ("last_unstructured_discovery_run_id",)
 
 
 def test_get_unstructured_discovery_directory_page_parses_the_run_and_its_directories(client: DataMasqueClient) -> None:

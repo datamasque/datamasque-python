@@ -29,6 +29,9 @@ History
   or a zip of CSV parts as ``bytes`` for a report of more than 1,000,000 rows.
   Each page is an ``UnstructuredDiscoveryPage``,
   which also carries the run's connection, end time and ``UnstructuredDiscoverySampling``.
+* Added ``get_last_unstructured_discovery_run_id``,
+  which returns the ID of a connection's newest finished unstructured discovery run,
+  or ``None`` when it has none.
 
 Requires server version 3.26.20
 

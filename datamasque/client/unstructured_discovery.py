@@ -1,6 +1,7 @@
 from typing import Iterator, Optional, Union
 
 from datamasque.client.base import BaseClient
+from datamasque.client.models.connection import ConnectionId
 from datamasque.client.models.runs import RunId
 from datamasque.client.models.unstructured_discovery import (
     UnstructuredDiscoveryDirectory,
@@ -17,7 +18,7 @@ class UnstructuredDiscoveryClient(BaseClient):
     """
     Unstructured discovery result API methods. Mixed into `DataMasqueClient`.
 
-    Each method raises `DataMasqueApiError` with a 404 response
+    Each method that takes a run ID raises `DataMasqueApiError` with a 404 response
     when the run is not an unstructured discovery run.
     """
 
@@ -30,6 +31,17 @@ class UnstructuredDiscoveryClient(BaseClient):
             params["status"] = status.value
 
         return params
+
+    def get_last_unstructured_discovery_run_id(self, connection_id: ConnectionId) -> Optional[RunId]:
+        """
+        Returns the ID of a connection's newest finished unstructured discovery run, with or without warnings.
+
+        Returns `None` when no unstructured discovery run on the connection has finished.
+        """
+
+        response = self.make_request("GET", f"/api/connections/{connection_id}/")
+        run_id = response.json()["last_unstructured_discovery_run_id"]
+        return RunId(run_id) if run_id is not None else None
 
     def get_unstructured_discovery_directory_page(
         self, run_id: RunId, *, limit: int = 50, offset: int = 0
