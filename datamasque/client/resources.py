@@ -65,7 +65,7 @@ class ResourceClient(BaseClient):
 
         # `requests` leaves out a parameter whose value is an empty list, which would remove the filter.
         if projects is not None and not projects:
-            return {type_name: [] for type_name in types or []}
+            return {type_name: [] for type_name in types or list(ResourceTypeName)}
 
         if types is not None and not types:
             return {}
