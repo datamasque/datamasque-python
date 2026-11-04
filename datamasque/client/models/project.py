@@ -79,7 +79,7 @@ class ProjectCreateRequest(BaseModel):
     """
     Request body for `POST /api/projects/`.
 
-    A name must not contain "/", ".." or a control character,
+    A name must not be ".", start with "DataMasque_", or contain "/", ".." or a control character,
     and must differ, ignoring case, from the name of every other active project.
     The server trims leading and trailing whitespace from `name` and `description`.
     """
