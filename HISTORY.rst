@@ -2,60 +2,39 @@
 History
 =======
 
-1.7.0 (unreleased)
+1.7.0 (2026-11-06)
 ------------------
 
+* Added project models and management APIs.
+* Added resource management APIs.
+* Added ``default_project`` to ``DataMasqueInstanceConfig``.
 * ``ConnectionConfig``, ``Ruleset``, ``RulesetLibrary``, ``DiscoveryConfig``, ``DiscoveryConfigLibrary``, ``RGConfig``
   and ``TableReference`` send their ``project`` to the server when it is set.
   It takes a project's ``<id>-<slug>`` reference, such as ``Project.reference``, or its ID as a string.
-  Left unset, a create goes into the server's default project.
+  Left unset, a create goes into the client's ``default_project``, else the server's default project.
   Each create sets the model's ``project`` to the project the server stored it in.
+* **Breaking:** names are unique per project, so every by-name helper takes a required ``project``:
+  ``get_*_by_name``, ``delete_*_by_name_if_exists`` and ``get_file_of_type_by_name``.
+  These ``project`` parameters take a ``Project`` or its ``ProjectId``.
+  ``create_or_update_*`` updates an existing resource only when it has the same name in the same project.
+  If the model has no ``project``, it looks in the client's ``default_project``, else the server's only active project,
+  and raises ``DataMasqueException`` when there is no active project or more than one.
 * **Breaking:** ``upload_file`` and ``upload_file_if_not_exists`` take a required ``project``.
 * **Breaking:** ``namespace`` is removed from ``RulesetLibrary`` and ``DiscoveryConfigLibrary``,
   and the client drops it from server responses so that it is never sent back.
   The library by-name helpers take ``project`` in its place.
-* **Breaking:** names are unique per project, so every by-name helper takes a required ``project``:
-  ``get_*_by_name``, ``delete_*_by_name_if_exists`` and ``get_file_of_type_by_name``.
-  ``create_or_update_*`` updates an existing resource only when it has the same name in the same project.
-  With the model's ``project`` unset, that is the server's only active project,
-  and ``DataMasqueException`` is raised when there is no active project or more than one.
-  The methods' ``project`` parameters take a ``Project`` or its ``ProjectId``.
 * **Breaking:** ``get_unfinished_runs`` returns its runs keyed by ``ConnectionId`` instead of connection name,
   because two connections in different projects can share a name.
 * ``list_connections``, ``list_table_references`` and ``list_files_of_type`` take an optional ``project`` filter.
-* Added ``default_project`` to ``DataMasqueInstanceConfig``.
-  A create whose model has no ``project`` goes into ``default_project``,
-  and ``create_or_update_*`` looks for an existing resource there,
-  before falling back to the server's only active project.
-  Updating a connection leaves it in its project.
 * ``DataMasqueFile`` gains a read-only ``project`` field, which is ``None`` for built-in seeds.
 * ``get_generated_rulesets`` sets each ruleset's ``project`` to the connection's project.
-* Added Git push, pull and file listing for rulesets, ruleset libraries, discovery configs
-  and discovery config libraries: ``list_*_git_files``, ``pull_*_from_git``, ``push_*_to_git``
-  and ``get_*_git_push_path``, with the ``GitFile``, ``GitFileCommit`` and ``GitExtension`` types.
-  A push writes the resource's file in its project's folder, with the ``extension`` it is given (``.yml`` or ``.yaml``).
-  A resource pushed before the server's upgrade to projects keeps its existing file
-  until it is renamed or moved to another project.
-  ``get_*_git_push_path`` returns the path a push writes, relative to the repository and without its extension.
-* Added project models and management APIs.
-* Added resource management APIs.
-* ``list_resources`` takes ``ordering`` and ``descending``, and each type's resources come back in that order.
-  Each listed ``Resource`` has a ``position``, its place in that order across every type.
-  Both require server version 3.26.21.
-* Added ``export_bundle`` and ``import_bundle``, which export and import Version 2 bundles
-  that keep each ruleset, library and seed file in its project.
-  ``import_bundle`` also imports deprecated Version 1 bundles,
-  putting their items that name no project into ``fallback_project``,
-  else the server's earliest-created active project; ``default_project`` does not apply.
-  Both require server version 3.26.21.
-* Added ``update_project``, which takes a ``ProjectUpdateRequest`` to rename a project or change its description,
-  and returns the updated ``Project``.
-  Only admin users can update projects, and API tokens cannot.
-* ``get_project`` sets ``Project.has_git_synced_resources``, which says whether the project holds a git-synced resource.
-  After a rename, a git-synced resource's next push writes a new copy under the new name, and the old copy stays.
+* Added Git APIs for rulesets, ruleset libraries, discovery configs and discovery config libraries.
+* Added bundle export and import APIs.
 
-1.6.0 (unreleased)
-------------------
+Requires server version 3.26.21
+
+1.6.0
+-----
 
 * Added a read-only ``project`` field to ``ConnectionConfig``, ``Ruleset``, ``RulesetLibrary``, ``DiscoveryConfig``,
   ``DiscoveryConfigLibrary``, ``RGConfig`` and ``TableReference``:
