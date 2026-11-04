@@ -47,8 +47,10 @@ class InstanceSecretEvent(BaseModel):
     kind: InstanceSecretEventKind
     peer_hostname: Optional[str]
     """The hostname of the other DataMasque instance, or `None` when the event involved no other instance."""
-    peer_fingerprint: Optional[str]
-    """The fingerprint compared with the other DataMasque instance, or `None` when the event involved no other instance."""
+    request_fingerprint: Optional[str]
+    """The fingerprint of the request code, or `None` when the event involved no other instance."""
+    response_fingerprint: Optional[str]
+    """The fingerprint of the response code, or `None` when the event involved no other instance."""
     username: str
     """The user who initiated the event."""
 
