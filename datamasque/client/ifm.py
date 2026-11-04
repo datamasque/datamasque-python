@@ -85,6 +85,7 @@ class DataMasqueIfmClient:
         # One session for both admin-server (JWT login/refresh) and IFM (data plane)
         # traffic -- different hosts, but a single session handles per-host pooling.
         self._session = _build_session(self.verify_ssl)
+        self._timeout = (connection_config.connect_timeout_seconds, connection_config.read_timeout_seconds)
 
     def authenticate(self) -> None:
         """Obtain an access (and refresh) token from the admin server, or via `token_source`."""
@@ -101,6 +102,7 @@ class DataMasqueIfmClient:
                 response = self._session.post(
                     login_url,
                     json={"username": self.username, "password": self.password},
+                    timeout=self._timeout,
                 )
         except requests.RequestException as e:
             raise DataMasqueTransportError(f"Failed to reach admin server at {login_url}: {e}") from e
@@ -127,6 +129,7 @@ class DataMasqueIfmClient:
                 response = self._session.post(
                     refresh_url,
                     json={"refresh": self.refresh_token},
+                    timeout=self._timeout,
                 )
         except requests.RequestException as e:
             raise DataMasqueTransportError(f"Failed to reach admin server at {refresh_url}: {e}") from e
@@ -194,6 +197,7 @@ class DataMasqueIfmClient:
                         json=json_body,
                         params=params,
                         headers={"Authorization": f"Bearer {self.access_token}"},
+                        timeout=self._timeout,
                     )
             except requests.RequestException as e:
                 raise DataMasqueTransportError(f"Failed to reach IFM server at {url}: {e}") from e
