@@ -154,8 +154,8 @@ class BundleImportResult(BaseModel):
     """`None` when the bundle has no seed files."""
     fallback_project: Optional[str] = None
     """
-    The name of the project that took the items that named no project, such as a Version 1 bundle's rulesets.
-    `None` when every item went into the project it names.
+    The name of the project that took the resources that named no project, such as a Version 1 bundle's rulesets.
+    `None` when the import created, restored or updated no such resources.
     """
     is_deprecated_bundle: bool = False
     """

@@ -139,6 +139,7 @@ class GitClient(BaseClient):
         With no `project` set, the project is the saved ruleset's when it has an `id`,
         else the client's `default_project`, else the server's only active project.
         The ruleset's `id`, else its name, type and project, identify the saved ruleset the push is for.
+        With an `id`, the ruleset's name, type and project must match the saved ruleset's.
         The push sends the given ruleset's `yaml`, not the saved one, so save the ruleset first.
         The server records the pushed commit as the saved ruleset's git provenance when their YAML matches,
         but the given ruleset is not updated.
@@ -208,6 +209,7 @@ class GitClient(BaseClient):
         With no `project` set, the project is the saved library's when it has an `id`,
         else the client's `default_project`, else the server's only active project.
         The library's `id`, else its name and project, identify the saved library the push is for.
+        With an `id`, the library's name and project must match the saved library's.
         The push sends the given library's `yaml`, not the saved one, so save the library first.
         The server records the pushed commit as the saved library's git provenance when their YAML matches,
         but the given library is not updated.
@@ -275,6 +277,7 @@ class GitClient(BaseClient):
         With no `project` set, the project is the saved config's when it has an `id`,
         else the client's `default_project`, else the server's only active project.
         The config's `id`, else its name, type and project, identify the saved config the push is for.
+        With an `id`, the config's name, type and project must match the saved config's.
         The push sends the given config's `yaml`, not the saved one, so save the config first.
         The server records the pushed commit on the saved config when their YAML matches,
         but `DiscoveryConfig` does not expose it.
@@ -346,6 +349,7 @@ class GitClient(BaseClient):
         With no `project` set, the project is the saved library's when it has an `id`,
         else the client's `default_project`, else the server's only active project.
         The library's `id`, else its name and project, identify the saved library the push is for.
+        With an `id`, the library's name and project must match the saved library's.
         The push sends the given library's `yaml`, not the saved one, so save the library first.
         The server records the pushed commit on the saved library when their YAML matches,
         but `DiscoveryConfigLibrary` does not expose it.
