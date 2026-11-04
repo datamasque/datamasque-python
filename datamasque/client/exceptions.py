@@ -1,3 +1,5 @@
+import enum
+
 from requests import Response
 
 
@@ -64,6 +66,49 @@ class RGConfigNotFoundError(DataMasqueApiError):
 
     The config does not exist, or has been deleted.
     """
+
+
+class InstanceSecretLinkErrorCode(enum.Enum):
+    """Why a step of instance secret linking failed."""
+
+    malformed_code = "malformed_code"
+    """The code is not a valid link code."""
+    newer_link_format = "newer_link_format"
+    """The code was created by a newer version of DataMasque."""
+    wrong_code_kind = "wrong_code_kind"
+    """A response code was given where a request code was expected, or the other way round."""
+    invalid_public_key = "invalid_public_key"
+    """The request code contains a key that is not valid."""
+    own_request = "own_request"
+    """The linking request was sent to the same DataMasque instance that generated it."""
+    request_expired = "request_expired"
+    """The request code has expired. Create a new request code."""
+    unknown_request = "unknown_request"
+    """The request that matches the response code was not found."""
+    unseal_failed = "unseal_failed"
+    """The instance secret in the response code could not be opened."""
+    invalid_secret = "invalid_secret"
+    """The response code contains an invalid instance secret."""
+    same_secret = "same_secret"
+    """This DataMasque instance already has the same instance secret as the other DataMasque instance."""
+    active_runs = "active_runs"
+    """Runs are in progress. Cancel them or wait for them to finish."""
+    verification_stale = "verification_stale"
+    """The instance secret or its history changed after the response code was verified. Verify the response again."""
+    host_header_too_long = "host_header_too_long"
+    """The hostname used to access DataMasque is longer than 253 characters, the longest that DNS allows."""
+
+
+class InstanceSecretLinkError(DataMasqueApiError):
+    """
+    Raised when a step of instance secret linking fails, for example because a code has expired.
+
+    The reason is on the `.code` attribute, and the message says what to do next.
+    """
+
+    def __init__(self, message: str, *, code: InstanceSecretLinkErrorCode, response: Response) -> None:
+        super().__init__(message, response=response)
+        self.code = code
 
 
 class DataMasqueTransportError(DataMasqueException):

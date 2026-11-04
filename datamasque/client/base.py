@@ -70,7 +70,7 @@ def _build_session(verify_ssl: bool) -> requests.Session:
 # before logging on an error path, so that passwords, API tokens, and similar secrets don't
 # end up in user-visible logs when a request fails.
 # Applied to both outgoing request bodies and incoming response bodies (if JSON-parseable to a dict).
-SENSITIVE_DATA_KEYS = ("password", "secret", "token", "key", "credential")
+SENSITIVE_DATA_KEYS = ("password", "secret", "token", "key", "credential", "response_code")
 
 
 def _redact_sensitive(value: Any) -> Any:
