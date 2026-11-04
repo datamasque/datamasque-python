@@ -47,10 +47,11 @@ default_role = "any"
 # Python identifiers that DO resolve still get cross-linked.
 suppress_warnings = ["ref.any"]
 
-# Exclude pydantic's `model_config` attribute from autodoc output —
-# it's plumbing, not public API, and clutters every model's docs page.
+# Exclude pydantic's `model_config` attribute and the `drop_namespace` validator from autodoc output.
+# Both are plumbing, not public API, and `model_config` would clutter every model's docs page.
+# Documenting `drop_namespace` would also fail the -W build: its `type` annotation matches every `.type` attribute.
 autodoc_default_options = {
-    "exclude-members": "model_config",
+    "exclude-members": "model_config,drop_namespace",
 }
 
 # Add any paths that contain templates here, relative to this directory.
