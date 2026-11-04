@@ -1,10 +1,9 @@
 import logging
-from typing import Iterator, Optional, Union
+from typing import Iterator, Optional
 
 from datamasque.client.base import BaseClient
-from datamasque.client.exceptions import DataMasqueApiError
+from datamasque.client.exceptions import DataMasqueApiError, DataMasqueException
 from datamasque.client.models.pagination import Page
-from datamasque.client.models.project import ProjectId, ProjectIdentifier, unwrap_project_id
 from datamasque.client.models.ruleset import Ruleset
 from datamasque.client.models.ruleset_library import RulesetLibrary, RulesetLibraryId
 
@@ -35,13 +34,17 @@ class RulesetLibraryClient(BaseClient):
         response = self.make_request("GET", f"/api/ruleset-libraries/{library_id}/")
         return RulesetLibrary.model_validate(response.json())
 
-    def _get_ruleset_library_id_by_name(self, name: str, project: Union[ProjectId, str]) -> Optional[RulesetLibraryId]:
-        """Return the ID of the library with the given name in the given project, or `None` if there is none."""
+    def get_ruleset_library_by_name(self, name: str, namespace: str = "") -> Optional[RulesetLibrary]:
+        """
+        Looks for a ruleset library matching the given name and namespace (case-sensitive, exact match).
+
+        Returns it (with full YAML content) if found, otherwise None.
+        """
 
         response = self.make_request(
             "GET",
             "/api/ruleset-libraries/",
-            params={"name_exact": name, "project": project, "limit": 1},
+            params={"name_exact": name, "namespace_exact": namespace, "limit": 1},
         )
         page = Page[RulesetLibrary].model_validate(response.json())
         if not page.results:
@@ -54,20 +57,6 @@ class RulesetLibraryClient(BaseClient):
                 response=response,
             )
 
-        return library_id
-
-    def get_ruleset_library_by_name(self, name: str, project: ProjectIdentifier) -> Optional[RulesetLibrary]:
-        """
-        Looks for a ruleset library matching the given name (case-sensitive, exact match) in the given project.
-
-        `project` is a `Project`, its `ProjectId` or its `<id>-<slug>` form.
-        Returns it (with full YAML content) if found, otherwise None.
-        """
-
-        library_id = self._get_ruleset_library_id_by_name(name, unwrap_project_id(project))
-        if library_id is None:
-            return None
-
         return self.get_ruleset_library(library_id)
 
     def create_ruleset_library(self, library: RulesetLibrary) -> RulesetLibrary:
@@ -79,13 +68,10 @@ class RulesetLibraryClient(BaseClient):
         and returns the library.
         """
 
-        data = library.model_dump(exclude_none=True, by_alias=True, mode="json") | self._default_project_field(
-            library.project
-        )
+        data = library.model_dump(exclude_none=True, by_alias=True, mode="json")
         response = self.make_request("POST", "/api/ruleset-libraries/", data=data)
         created_library = RulesetLibrary.model_validate(response.json())
         library.id = created_library.id
-        library.project = created_library.project
         library.is_valid = created_library.is_valid
         library.validation_errors = created_library.validation_errors
         library.unlicensed_feature_warnings = created_library.unlicensed_feature_warnings
@@ -118,16 +104,14 @@ class RulesetLibraryClient(BaseClient):
 
     def create_or_update_ruleset_library(self, library: RulesetLibrary) -> RulesetLibrary:
         """
-        Creates the library, or updates the existing one with the same name in the same project.
+        Creates the library if it doesn't exist, or updates it if a library with the same name already exists.
 
-        With no `project` set, the client's `default_project` is used, else the server's only active project,
-        and `DataMasqueException` is raised when it has no active project or more than one.
         Sets the library's `id` property.
         """
 
-        library_id = self._get_ruleset_library_id_by_name(library.name, self._resolve_project(library.project))
-        if library_id is not None:
-            library.id = library_id
+        existing = self.get_ruleset_library_by_name(library.name, library.namespace)
+        if existing is not None:
+            library.id = existing.id
             return self.update_ruleset_library(library)
 
         return self.create_ruleset_library(library)
@@ -147,18 +131,21 @@ class RulesetLibraryClient(BaseClient):
         self._delete_if_exists(f"/api/ruleset-libraries/{library_id}/", params=params)
 
     def delete_ruleset_library_by_name_if_exists(
-        self, library_name: str, project: ProjectIdentifier, *, force: bool = False
+        self, library_name: str, namespace: str = "", *, force: bool = False
     ) -> None:
         """
-        Deletes the ruleset library with the given name in the given project.
+        Deletes the ruleset library with the given name and namespace.
 
-        `project` is a `Project`, its `ProjectId` or its `<id>-<slug>` form.
         No-op if the library does not exist.
         """
 
-        library_id = self._get_ruleset_library_id_by_name(library_name, unwrap_project_id(project))
-        if library_id is not None:
-            self.delete_ruleset_library_by_id_if_exists(library_id, force=force)
+        all_libraries = self.list_ruleset_libraries()
+        matching = [lib for lib in all_libraries if lib.name == library_name and lib.namespace == namespace]
+        for lib in matching:
+            if lib.id is None:
+                raise DataMasqueException(f'Server returned a ruleset library named "{lib.name}" without an `id`.')
+
+            self.delete_ruleset_library_by_id_if_exists(lib.id, force=force)
 
     def iter_rulesets_using_library(self, library_id: RulesetLibraryId) -> Iterator[Ruleset]:
         """Lazily iterate rulesets that import the given library."""

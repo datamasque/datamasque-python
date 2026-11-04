@@ -13,7 +13,6 @@ from datamasque.client import (
 )
 from datamasque.client.exceptions import DataMasqueApiError
 from datamasque.client.models.status import ValidationStatus
-from tests.helpers import PROJECT, PROJECT_ID
 
 LIBRARY_ID_1 = "aaaaaaaa-1111-2222-3333-444444444444"
 LIBRARY_ID_2 = "bbbbbbbb-1111-2222-3333-444444444444"
@@ -26,7 +25,7 @@ def sample_library_list_response() -> list[dict[str, Any]]:
         {
             "id": LIBRARY_ID_1,
             "name": "my_library",
-            "project": PROJECT,
+            "namespace": "org",
             "is_valid": "valid",
             "validation_error": None,
             "usage_count": 0,
@@ -36,7 +35,7 @@ def sample_library_list_response() -> list[dict[str, Any]]:
         {
             "id": LIBRARY_ID_2,
             "name": "another_library",
-            "project": PROJECT,
+            "namespace": "",
             "is_valid": "invalid",
             "validation_error": "bad yaml",
             "usage_count": 2,
@@ -52,7 +51,7 @@ def sample_library_detail_response() -> dict[str, Any]:
     return {
         "id": LIBRARY_ID_1,
         "name": "my_library",
-        "project": PROJECT,
+        "namespace": "org",
         "config_yaml": "labels: []\nmetadata_rules: []\nidd_rules: []\n",
         "is_valid": "valid",
         "validation_error": None,
@@ -66,14 +65,14 @@ def sample_library_detail_response() -> dict[str, Any]:
 def config_library() -> DiscoveryConfigLibrary:
     return DiscoveryConfigLibrary(
         name="test_library",
-        project=PROJECT,
+        namespace="test_ns",
         yaml="labels: []\nmetadata_rules: []\nidd_rules: []\n",
     )
 
 
 def test_library_is_untyped() -> None:
     """A library carries no `config_type`; the same library serves both config types."""
-    library = DiscoveryConfigLibrary(name="test_library", project=PROJECT, yaml="labels: []\n")
+    library = DiscoveryConfigLibrary(name="test_library", yaml="labels: []\n")
     assert "config_type" not in library.model_dump(by_alias=True)
 
 
@@ -91,7 +90,7 @@ def test_list_discovery_config_libraries(
     assert len(libraries) == 2
     assert libraries[0].id == DiscoveryConfigLibraryId(LIBRARY_ID_1)
     assert libraries[0].name == "my_library"
-    assert libraries[0].project == PROJECT
+    assert libraries[0].namespace == "org"
     assert libraries[0].yaml is None
     assert libraries[0].is_valid is ValidationStatus.valid
     assert libraries[0].usage_count == 0
@@ -125,7 +124,7 @@ def test_get_discovery_config_library(client: DataMasqueClient, sample_library_d
 
     assert library.id == DiscoveryConfigLibraryId(LIBRARY_ID_1)
     assert library.name == "my_library"
-    assert library.project == PROJECT
+    assert library.namespace == "org"
     assert library.yaml == "labels: []\nmetadata_rules: []\nidd_rules: []\n"
     assert library.is_valid is ValidationStatus.valid
     assert library.usage_count == 0
@@ -147,12 +146,67 @@ def test_get_discovery_config_library_by_name_found(
             json=sample_library_detail_response,
             status_code=200,
         )
-        library = client.get_discovery_config_library_by_name("my_library", PROJECT_ID)
+        library = client.get_discovery_config_library_by_name("my_library", "org")
 
     assert library is not None
     assert library.name == "my_library"
     assert library.yaml == "labels: []\nmetadata_rules: []\nidd_rules: []\n"
-    assert m.request_history[0].qs == {"name_exact": ["my_library"], "project": [str(PROJECT_ID)]}
+    assert "name_exact=my_library" in m.request_history[0].url
+
+
+def test_get_discovery_config_library_by_name_matches_namespace_client_side(
+    client: DataMasqueClient, sample_library_detail_response: dict[str, Any]
+) -> None:
+    """The server's `namespace_exact` filter ignores empty strings, so namespace matching happens client-side."""
+    same_name_two_namespaces = [
+        {
+            "id": LIBRARY_ID_1,
+            "name": "my_library",
+            "namespace": "org",
+            "is_valid": "valid",
+            "created": "2025-01-01T12:00:00Z",
+            "modified": "2025-01-02T12:00:00Z",
+        },
+        {
+            "id": LIBRARY_ID_2,
+            "name": "my_library",
+            "namespace": "",
+            "is_valid": "valid",
+            "created": "2025-01-01T12:00:00Z",
+            "modified": "2025-01-02T12:00:00Z",
+        },
+    ]
+
+    with requests_mock.Mocker() as m:
+        m.get(
+            "http://test-server/api/discovery/config-libraries/",
+            json=same_name_two_namespaces,
+            status_code=200,
+        )
+        m.get(
+            f"http://test-server/api/discovery/config-libraries/{LIBRARY_ID_1}/",
+            json=sample_library_detail_response,
+            status_code=200,
+        )
+        library = client.get_discovery_config_library_by_name("my_library", "org")
+
+    assert library is not None
+    assert library.id == DiscoveryConfigLibraryId(LIBRARY_ID_1)
+
+
+def test_get_discovery_config_library_by_name_default_namespace_does_not_match_other_namespaces(
+    client: DataMasqueClient, sample_library_list_response: list[dict[str, Any]]
+) -> None:
+    with requests_mock.Mocker() as m:
+        m.get(
+            "http://test-server/api/discovery/config-libraries/",
+            json=[sample_library_list_response[0]],
+            status_code=200,
+        )
+        library = client.get_discovery_config_library_by_name("my_library")
+
+    assert library is None
+    assert m.call_count == 1
 
 
 def test_get_discovery_config_library_by_name_not_found(client: DataMasqueClient) -> None:
@@ -162,7 +216,7 @@ def test_get_discovery_config_library_by_name_not_found(client: DataMasqueClient
             json=[],
             status_code=200,
         )
-        library = client.get_discovery_config_library_by_name("nonexistent", PROJECT_ID)
+        library = client.get_discovery_config_library_by_name("nonexistent")
 
     assert library is None
 
@@ -172,7 +226,7 @@ def test_get_discovery_config_library_by_name_raises_when_server_omits_id(client
     list_response_without_id = [
         {
             "name": "my_library",
-            "project": PROJECT,
+            "namespace": "org",
             "is_valid": "valid",
             "created": "2025-01-01T12:00:00Z",
             "modified": "2025-01-02T12:00:00Z",
@@ -186,14 +240,14 @@ def test_get_discovery_config_library_by_name_raises_when_server_omits_id(client
             status_code=200,
         )
         with pytest.raises(DataMasqueApiError, match="without an `id`"):
-            client.get_discovery_config_library_by_name("my_library", PROJECT_ID)
+            client.get_discovery_config_library_by_name("my_library", "org")
 
 
 def test_create_discovery_config_library(client: DataMasqueClient, config_library: DiscoveryConfigLibrary) -> None:
     create_response = {
         "id": LIBRARY_ID_1,
         "name": "test_library",
-        "project": PROJECT,
+        "namespace": "test_ns",
         "config_yaml": "labels: []\nmetadata_rules: []\nidd_rules: []\n",
         "is_valid": "valid",
         "validation_error": None,
@@ -220,7 +274,7 @@ def test_create_discovery_config_library(client: DataMasqueClient, config_librar
     request_body = m.last_request.json()
     assert request_body == {
         "name": "test_library",
-        "project": PROJECT,
+        "namespace": "test_ns",
         "config_yaml": "labels: []\nmetadata_rules: []\nidd_rules: []\n",
     }
 
@@ -231,7 +285,7 @@ def test_create_discovery_config_library_reports_validation_error(
     create_response = {
         "id": LIBRARY_ID_1,
         "name": "test_library",
-        "project": PROJECT,
+        "namespace": "test_ns",
         "config_yaml": "labels: []\nmetadata_rules: []\nidd_rules: []\n",
         "is_valid": "invalid",
         "validation_error": "metadata_rules is not a list",
@@ -258,7 +312,7 @@ def test_update_discovery_config_library(client: DataMasqueClient, config_librar
     update_response = {
         "id": LIBRARY_ID_1,
         "name": "test_library",
-        "project": PROJECT,
+        "namespace": "test_ns",
         "config_yaml": "labels: []\nmetadata_rules: []\nidd_rules: []\n",
         "is_valid": "valid",
         "validation_error": None,
@@ -284,7 +338,7 @@ def test_update_discovery_config_library(client: DataMasqueClient, config_librar
     request_body = m.last_request.json()
     assert request_body == {
         "name": "test_library",
-        "project": PROJECT,
+        "namespace": "test_ns",
         "config_yaml": "labels: []\nmetadata_rules: []\nidd_rules: []\n",
     }
 
@@ -312,7 +366,7 @@ def test_create_or_update_discovery_config_library_create(
     create_response = {
         "id": LIBRARY_ID_1,
         "name": "test_library",
-        "project": PROJECT,
+        "namespace": "test_ns",
         "config_yaml": "labels: []\nmetadata_rules: []\nidd_rules: []\n",
         "is_valid": "valid",
         "validation_error": None,
@@ -335,9 +389,8 @@ def test_create_or_update_discovery_config_library_create(
 
     assert result.id == DiscoveryConfigLibraryId(LIBRARY_ID_1)
     assert m.request_history[0].method == "GET"
-    assert m.request_history[0].qs == {"name_exact": ["test_library"], "project": [PROJECT]}
+    assert "name_exact=test_library" in m.request_history[0].url
     assert m.request_history[1].method == "POST"
-    assert m.request_history[1].json()["project"] == PROJECT
 
 
 def test_create_or_update_discovery_config_library_update(
@@ -347,7 +400,7 @@ def test_create_or_update_discovery_config_library_update(
         {
             "id": LIBRARY_ID_1,
             "name": "test_library",
-            "project": PROJECT,
+            "namespace": "test_ns",
             "is_valid": "valid",
             "created": "2025-06-01T10:00:00Z",
             "modified": "2025-06-01T10:00:00Z",
@@ -356,7 +409,7 @@ def test_create_or_update_discovery_config_library_update(
     update_response = {
         "id": LIBRARY_ID_1,
         "name": "test_library",
-        "project": PROJECT,
+        "namespace": "test_ns",
         "config_yaml": "labels: []\nmetadata_rules: []\nidd_rules: []\n",
         "is_valid": "valid",
         "validation_error": None,
@@ -427,10 +480,10 @@ def test_delete_discovery_config_library_by_name(
             f"http://test-server/api/discovery/config-libraries/{LIBRARY_ID_1}/",
             status_code=204,
         )
-        client.delete_discovery_config_library_by_name_if_exists("my_library", PROJECT_ID)
+        client.delete_discovery_config_library_by_name_if_exists("my_library", "org")
 
     assert m.request_history[0].method == "GET"
-    assert m.request_history[0].qs == {"name_exact": ["my_library"], "project": [str(PROJECT_ID)]}
+    assert "name_exact=my_library" in m.request_history[0].url
     assert m.request_history[1].method == "DELETE"
 
 
@@ -443,45 +496,17 @@ def test_delete_discovery_config_library_by_name_not_found(
             json=sample_library_list_response,
             status_code=200,
         )
-        client.delete_discovery_config_library_by_name_if_exists("nonexistent", PROJECT_ID)
+        client.delete_discovery_config_library_by_name_if_exists("nonexistent")
 
     assert m.call_count == 1
     assert m.request_history[0].method == "GET"
 
 
 def test_create_discovery_config_library_with_empty_yaml_raises(client: DataMasqueClient) -> None:
-    library = DiscoveryConfigLibrary(name="test_library", project=PROJECT, yaml="")
+    library = DiscoveryConfigLibrary(name="test_library", yaml="")
 
     with requests_mock.Mocker() as m:
         with pytest.raises(ValueError, match="without YAML content"):
             client.create_discovery_config_library(library)
 
         assert not any(request.method == "POST" for request in m.request_history)
-
-
-def test_namespace_in_a_response_is_dropped_and_not_sent_back(
-    client: DataMasqueClient, sample_library_detail_response: dict[str, Any]
-) -> None:
-    """The server lets a sent `namespace` override `project`, so the client never echoes one back."""
-    response = {**sample_library_detail_response, "namespace": "org"}
-
-    with requests_mock.Mocker() as m:
-        m.get(
-            f"http://test-server/api/discovery/config-libraries/{LIBRARY_ID_1}/",
-            json=response,
-            status_code=200,
-        )
-        m.put(
-            f"http://test-server/api/discovery/config-libraries/{LIBRARY_ID_1}/",
-            json=response,
-            status_code=200,
-        )
-        library = client.get_discovery_config_library(DiscoveryConfigLibraryId(LIBRARY_ID_1))
-        client.update_discovery_config_library(library)
-
-    assert "namespace" not in library.model_dump()
-    assert m.last_request.json() == {
-        "name": "my_library",
-        "project": PROJECT,
-        "config_yaml": "labels: []\nmetadata_rules: []\nidd_rules: []\n",
-    }

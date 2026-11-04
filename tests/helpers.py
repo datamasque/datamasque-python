@@ -9,40 +9,8 @@ from datamasque.client.models.connection import (
     S3ConnectionConfig,
     SnowflakeConnectionConfig,
 )
-from datamasque.client.models.project import Project, ProjectId
 
 fake = Faker()
-
-PROJECT = "1-default"
-"""The project reference the tests put resources in."""
-
-PROJECT_ID = ProjectId(1)
-"""The ID of `PROJECT`, as the client methods take it."""
-
-OTHER_PROJECT = Project.model_validate(
-    {
-        "id": 2,
-        "reference": "2-banking",
-        "name": "Banking",
-        "description": "",
-        "created": "2026-10-01T10:00:00Z",
-        "updated": "2026-10-01T10:00:00Z",
-    }
-)
-"""A second project, for tests that pass a `Project` to a client method."""
-
-
-def active_projects_page(count: int) -> dict[str, object]:
-    """Builds the `GET /api/projects/?limit=1` response of a server with `count` active projects, `PROJECT` first."""
-    project = {
-        "id": PROJECT_ID,
-        "reference": PROJECT,
-        "name": "Default",
-        "description": "",
-        "created": "2026-10-01T10:00:00Z",
-        "updated": "2026-10-01T10:00:00Z",
-    }
-    return {"count": count, "next": None, "previous": None, "results": [project] if count else []}
 
 
 def parse_multipart_form(request) -> dict:  # noqa: C901
@@ -101,7 +69,6 @@ def parse_multipart_form(request) -> dict:  # noqa: C901
 
 def database_connection_config():
     return DatabaseConnectionConfig(
-        project=PROJECT,
         name=fake.word(),
         user=fake.user_name(),
         password=fake.password(),
@@ -115,7 +82,6 @@ def database_connection_config():
 
 def file_connection_config():
     return S3ConnectionConfig(
-        project=PROJECT,
         name=fake.word(),
         base_directory=fake.uri_path(),
         bucket=fake.uri_page(),
@@ -128,7 +94,6 @@ def sample_mounted_share_connection_json(*, id, name):
     return {
         "name": name,
         "id": id,
-        "project": PROJECT,
         "mask_type": "file",
         "type": "mounted_share_connection",
         "base_directory": "",
@@ -153,7 +118,6 @@ def make_ok_response() -> Response:
 
 def snowflake_connection_config():
     return SnowflakeConnectionConfig(
-        project=PROJECT,
         name="snowflake",
         database="test_db",
         user="snowflake_user",

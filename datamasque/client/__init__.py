@@ -23,21 +23,10 @@ from datamasque.client.exceptions import (
     InvalidDiscoveryConfigError,
     InvalidLibraryError,
     InvalidRulesetError,
-    ProjectDeleteConflictError,
     RGConfigNotFoundError,
     RunNotCancellableError,
 )
-from datamasque.client.git import GitExtension
 from datamasque.client.ifm import DataMasqueIfmClient
-from datamasque.client.models.bundle import (
-    BundleImportCounts,
-    BundleImportItemResults,
-    BundleImportResult,
-    BundleImportStatus,
-    LibraryImportResult,
-    RulesetImportResult,
-    SeedFileImportResult,
-)
 from datamasque.client.models.connection import (
     AzureConnectionConfig,
     CassandraConnectionConfig,
@@ -111,7 +100,7 @@ from datamasque.client.models.files import (
     SnowflakeKeyFile,
     SslZipFile,
 )
-from datamasque.client.models.git import GitFile, GitFileCommit, GitSnapshot
+from datamasque.client.models.git import GitSnapshot
 from datamasque.client.models.ifm import (
     DataMasqueIfmInstanceConfig,
     IfmLog,
@@ -126,27 +115,6 @@ from datamasque.client.models.ifm import (
     RulesetPlanUpdateRequest,
 )
 from datamasque.client.models.license import LicenseInfo, SwitchableLicenseMetadata
-from datamasque.client.models.project import (
-    Project,
-    ProjectCreateRequest,
-    ProjectDeleteConflict,
-    ProjectDeleteConflictReason,
-    ProjectId,
-    ProjectIdentifier,
-    ProjectUpdateRequest,
-)
-from datamasque.client.models.resource import (
-    ConnectionResource,
-    DiscoveryConfigResource,
-    Resource,
-    ResourceMoveConflict,
-    ResourceMoveConflictReason,
-    ResourceMoveResult,
-    ResourceOrdering,
-    ResourcesByType,
-    RulesetResource,
-)
-from datamasque.client.models.resource_type import ResourceTypeName
 from datamasque.client.models.rg_config import RGConfig, RGConfigId
 from datamasque.client.models.ruleset import Ruleset, RulesetId, RulesetType
 from datamasque.client.models.ruleset_library import RulesetLibrary, RulesetLibraryId
@@ -214,17 +182,12 @@ __all__ = [
     "AzureConnectionConfig",
     "BooleanPreview",
     "BooleanStatistics",
-    "BundleImportCounts",
-    "BundleImportItemResults",
-    "BundleImportResult",
-    "BundleImportStatus",
     "CassandraConnectionConfig",
     "ColumnKind",
     "ColumnPreview",
     "CommonStatistics",
     "ConnectionConfig",
     "ConnectionId",
-    "ConnectionResource",
     "ConstraintColumns",
     "DataMasqueApiError",
     "DataMasqueClient",
@@ -245,7 +208,6 @@ __all__ = [
     "DiscoveryConfigLibrary",
     "DiscoveryConfigLibraryId",
     "DiscoveryConfigNotFoundError",
-    "DiscoveryConfigResource",
     "DiscoveryConfigType",
     "DiscoveryMatch",
     "CosmosDbConnectionConfig",
@@ -269,9 +231,6 @@ __all__ = [
     "FirstCharsStatistics",
     "ForeignKeyRef",
     "GcsConnectionConfig",
-    "GitExtension",
-    "GitFile",
-    "GitFileCommit",
     "GitSnapshot",
     "HashColumnsTableConfig",
     "IfmAuthError",
@@ -289,7 +248,6 @@ __all__ = [
     "LengthEntry",
     "LengthUnit",
     "LengthsStatistics",
-    "LibraryImportResult",
     "LicenseInfo",
     "LicenseLock",
     "Locator",
@@ -311,30 +269,14 @@ __all__ = [
     "PatternComposition",
     "PatternEntry",
     "PatternsStatistics",
-    "Project",
-    "ProjectCreateRequest",
-    "ProjectDeleteConflict",
-    "ProjectDeleteConflictError",
-    "ProjectDeleteConflictReason",
-    "ProjectId",
-    "ProjectIdentifier",
-    "ProjectUpdateRequest",
     "RGConfig",
     "RGConfigId",
     "RGConfigNotFoundError",
     "ReferencingForeignKey",
-    "Resource",
-    "ResourceMoveConflict",
-    "ResourceMoveConflictReason",
-    "ResourceMoveResult",
-    "ResourceOrdering",
-    "ResourceTypeName",
-    "ResourcesByType",
     "Ruleset",
     "RulesetGenerationRequest",
     "RulesetGenerationWithRGConfigRequest",
     "RulesetId",
-    "RulesetImportResult",
     "RulesetLibrary",
     "RulesetLibraryId",
     "RulesetPlan",
@@ -342,7 +284,6 @@ __all__ = [
     "RulesetPlanOptions",
     "RulesetPlanPartialUpdateRequest",
     "RulesetPlanUpdateRequest",
-    "RulesetResource",
     "RulesetType",
     "RunConnectionRef",
     "RunId",
@@ -359,7 +300,6 @@ __all__ = [
     "SchemaDiscoveryRequest",
     "SchemaDiscoveryResult",
     "SeedFile",
-    "SeedFileImportResult",
     "SelectedColumns",
     "SelectedData",
     "SelectedFileData",

@@ -8,7 +8,6 @@ import requests_mock
 from datamasque.client.exceptions import DataMasqueApiError
 from datamasque.client.models.ruleset import RulesetType
 from datamasque.client.models.status import ValidationErrorType, ValidationStatus
-from tests.helpers import PROJECT, PROJECT_ID
 
 
 def test_list_rulesets(client, existing_rulesets_json):
@@ -35,7 +34,7 @@ def test_create_or_update_ruleset_create(client, ruleset):
         # Test creating a new ruleset with upsert
         m.post(
             "http://test-server/api/rulesets/?upsert=true",
-            json={"id": "2", "name": "test_ruleset", "project": PROJECT, "is_valid": "in_progress"},
+            json={"id": "2", "name": "test_ruleset", "is_valid": "in_progress"},
             status_code=201,
         )
 
@@ -47,7 +46,6 @@ def test_create_or_update_ruleset_create(client, ruleset):
         sent = m.last_request.json()
         assert sent["config_yaml"] == "version: '1.0'\ntasks: []"
         assert sent["mask_type"] == "database"
-        assert sent["project"] == PROJECT
 
 
 def test_create_or_update_ruleset_create_fail(client, ruleset):
@@ -66,7 +64,7 @@ def test_create_or_update_ruleset_update(client, ruleset):
         # Test updating an existing ruleset with upsert (returns 200 status for update)
         m.post(
             "http://test-server/api/rulesets/?upsert=true",
-            json={"id": "1", "name": "test_ruleset", "project": PROJECT, "is_valid": "valid"},
+            json={"id": "1", "name": "test_ruleset", "is_valid": "valid"},
             status_code=200,
         )
 
@@ -96,31 +94,41 @@ def test_delete_ruleset_by_id(client):
 
 
 def test_delete_ruleset_by_name(client, existing_rulesets_json):
-    """The server filters by name, type and project, so a same-named ruleset elsewhere is never returned."""
     with requests_mock.Mocker() as m:
         m.get(
-            f"http://test-server/api/v2/rulesets/?name_exact=file_masking_ruleset&mask_type=file&project={PROJECT_ID}",
-            json=[existing_rulesets_json[1]],
+            "http://test-server/api/v2/rulesets/",
+            json=existing_rulesets_json,
             status_code=200,
-            complete_qs=True,
         )
         m.delete("http://test-server/api/rulesets/2/", status_code=204)
-        client.delete_ruleset_by_name_if_exists("file_masking_ruleset", RulesetType.file, PROJECT_ID)
+        client.delete_ruleset_by_name_if_exists("file_masking_ruleset", RulesetType.file)
 
     assert m.call_count == 2
     assert m.request_history[0].method == "GET"
     assert m.request_history[1].method == "DELETE"
 
 
-def test_delete_ruleset_that_does_not_exist(client):
+def test_delete_ruleset_by_name_skips_other_type(client, existing_rulesets_json):
     with requests_mock.Mocker() as m:
         m.get(
-            f"http://test-server/api/v2/rulesets/?name_exact=not_a_ruleset&mask_type=database&project={PROJECT_ID}",
-            json=[],
+            "http://test-server/api/v2/rulesets/",
+            json=existing_rulesets_json,
             status_code=200,
-            complete_qs=True,
         )
-        client.delete_ruleset_by_name_if_exists("not_a_ruleset", RulesetType.database, PROJECT_ID)
+        client.delete_ruleset_by_name_if_exists("file_masking_ruleset", RulesetType.database)
+
+    assert m.call_count == 1
+    assert m.request_history[0].method == "GET"
+
+
+def test_delete_ruleset_that_does_not_exist(client, existing_rulesets_json):
+    with requests_mock.Mocker() as m:
+        m.get(
+            "http://test-server/api/v2/rulesets/",
+            json=existing_rulesets_json,
+            status_code=200,
+        )
+        client.delete_ruleset_by_name_if_exists("not_a_ruleset", RulesetType.database)
 
     assert m.call_count == 1
     assert m.request_history[0].method == "GET"
@@ -134,7 +142,6 @@ def test_create_or_update_ruleset_populates_validation_errors(client, ruleset):
             json={
                 "id": "2",
                 "name": "test_ruleset",
-                "project": PROJECT,
                 "is_valid": "invalid",
                 "validation_errors": [
                     {
@@ -162,7 +169,7 @@ def test_create_or_update_ruleset_validation_errors_empty_when_valid(client, rul
     with requests_mock.Mocker() as m:
         m.post(
             "http://test-server/api/rulesets/?upsert=true",
-            json={"id": "2", "name": "test_ruleset", "project": PROJECT, "is_valid": "valid"},
+            json={"id": "2", "name": "test_ruleset", "is_valid": "valid"},
             status_code=201,
         )
         result = client.create_or_update_ruleset(ruleset)
@@ -188,13 +195,7 @@ def test_create_or_update_ruleset_populates_unlicensed_feature_warnings(client, 
     with requests_mock.Mocker() as m:
         m.post(
             "http://test-server/api/rulesets/?upsert=true",
-            json={
-                "id": "2",
-                "name": "test_ruleset",
-                "project": PROJECT,
-                "is_valid": "valid",
-                "unlicensed_feature_warnings": returned,
-            },
+            json={"id": "2", "name": "test_ruleset", "is_valid": "valid", "unlicensed_feature_warnings": returned},
             status_code=201,
         )
         result = client.create_or_update_ruleset(ruleset)
@@ -207,7 +208,7 @@ def test_create_or_update_ruleset_unlicensed_feature_warnings_default_to_none(cl
     with requests_mock.Mocker() as m:
         m.post(
             "http://test-server/api/rulesets/?upsert=true",
-            json={"id": "2", "name": "test_ruleset", "project": PROJECT, "is_valid": "in_progress"},
+            json={"id": "2", "name": "test_ruleset", "is_valid": "in_progress"},
             status_code=201,
         )
         result = client.create_or_update_ruleset(ruleset)
@@ -224,7 +225,6 @@ def test_list_rulesets_unlicensed_feature_warnings(client):
                 {
                     "id": "1",
                     "name": "unstructured_ruleset",
-                    "project": PROJECT,
                     "mask_type": "database",
                     "is_valid": "valid",
                     "unlicensed_feature_warnings": [
@@ -234,7 +234,6 @@ def test_list_rulesets_unlicensed_feature_warnings(client):
                 {
                     "id": "2",
                     "name": "licensed_ruleset",
-                    "project": PROJECT,
                     "mask_type": "database",
                     "is_valid": "valid",
                     "unlicensed_feature_warnings": [],
@@ -242,7 +241,6 @@ def test_list_rulesets_unlicensed_feature_warnings(client):
                 {
                     "id": "3",
                     "name": "unvalidated_ruleset",
-                    "project": PROJECT,
                     "mask_type": "database",
                     "is_valid": "in_progress",
                     "unlicensed_feature_warnings": None,
@@ -267,7 +265,6 @@ def test_create_or_update_ruleset_does_not_send_read_only_fields(client, ruleset
             json={
                 "id": "2",
                 "name": "test_ruleset",
-                "project": PROJECT,
                 "is_valid": "invalid",
                 "validation_errors": [{"message": "bad", "validation_error_type": "ruleset"}],
                 "unlicensed_feature_warnings": [
@@ -286,7 +283,6 @@ def test_create_or_update_ruleset_does_not_send_read_only_fields(client, ruleset
         assert read_only_field not in body
     # Input fields are still present.
     assert body["config_yaml"] == "version: '1.0'\ntasks: []"
-    assert body["project"] == PROJECT
 
 
 def test_create_or_update_ruleset_collapses_git_snapshot(client, ruleset):
@@ -297,7 +293,6 @@ def test_create_or_update_ruleset_collapses_git_snapshot(client, ruleset):
             json={
                 "id": "2",
                 "name": "test_ruleset",
-                "project": PROJECT,
                 "is_valid": "valid",
                 "git_branch": "main",
                 "git_commit_sha": "abc123",
@@ -323,7 +318,6 @@ def test_create_or_update_ruleset_git_none_when_not_synced(client, ruleset):
             json={
                 "id": "2",
                 "name": "test_ruleset",
-                "project": PROJECT,
                 "is_valid": "valid",
                 "git_branch": None,
                 "git_commit_sha": None,
@@ -346,7 +340,6 @@ def test_list_rulesets_collapses_git_snapshot(client):
                 {
                     "id": "1",
                     "name": "synced_ruleset",
-                    "project": PROJECT,
                     "mask_type": "database",
                     "config_yaml": "version: '1.0'",
                     "is_valid": "valid",
@@ -358,7 +351,6 @@ def test_list_rulesets_collapses_git_snapshot(client):
                 {
                     "id": "2",
                     "name": "local_ruleset",
-                    "project": PROJECT,
                     "mask_type": "database",
                     "config_yaml": "version: '1.0'",
                     "is_valid": "valid",

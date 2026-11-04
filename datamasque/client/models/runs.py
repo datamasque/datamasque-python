@@ -146,8 +146,7 @@ class RunInfo(BaseModel):
     """
     Its project's `<id>-<slug>` reference, e.g. `1-default`.
 
-    The project of the run's ruleset, else its discovery config, else its source connection.
-    The run moves when that resource moves to another project.
+    Taken from the ruleset's project when the run starts, and never changes after that.
     """
 
     @model_validator(mode="before")

@@ -16,8 +16,6 @@ class DataMasqueFile(BaseModel):
     created_date: datetime
     modified_date: Optional[datetime] = None
     id: Optional[FileId] = None
-    project: Optional[str] = None
-    """Its project's `<id>-<slug>` reference, or `None` for a built-in seed, which belongs to no project."""
 
     @model_validator(mode="before")
     @classmethod
