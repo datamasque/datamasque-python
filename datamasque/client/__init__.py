@@ -177,6 +177,16 @@ from datamasque.client.models.table_reference import (
     TableReferenceId,
     TableReferenceOptions,
 )
+from datamasque.client.models.unstructured_discovery import (
+    UnstructuredDiscoveryDirectory,
+    UnstructuredDiscoveryFile,
+    UnstructuredDiscoveryFileStatus,
+    UnstructuredDiscoveryFinding,
+    UnstructuredDiscoveryPage,
+    UnstructuredDiscoverySampling,
+    UnstructuredDiscoverySkippedCount,
+    UnstructuredDiscoverySummary,
+)
 from datamasque.client.models.user import User, UserId, UserRole
 
 __version__ = version("datamasque-python")
@@ -329,6 +339,14 @@ __all__ = [
     "TemporalStatistics",
     "TemporalSummaries",
     "UnfinishedRun",
+    "UnstructuredDiscoveryDirectory",
+    "UnstructuredDiscoveryFile",
+    "UnstructuredDiscoveryFileStatus",
+    "UnstructuredDiscoveryFinding",
+    "UnstructuredDiscoveryPage",
+    "UnstructuredDiscoverySampling",
+    "UnstructuredDiscoverySkippedCount",
+    "UnstructuredDiscoverySummary",
     "UnsupportedPreview",
     "UnsupportedStatistics",
     "User",

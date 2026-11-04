@@ -108,6 +108,14 @@ datamasque.client.models.status module
    :undoc-members:
    :show-inheritance:
 
+datamasque.client.models.unstructured_discovery module
+------------------------------------------------------
+
+.. automodule:: datamasque.client.models.unstructured_discovery
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 datamasque.client.models.user module
 ------------------------------------
 

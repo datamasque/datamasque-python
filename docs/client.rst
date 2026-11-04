@@ -132,6 +132,14 @@ datamasque.client.settings module
    :undoc-members:
    :show-inheritance:
 
+datamasque.client.unstructured_discovery module
+-----------------------------------------------
+
+.. automodule:: datamasque.client.unstructured_discovery
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 datamasque.client.users module
 ------------------------------
 

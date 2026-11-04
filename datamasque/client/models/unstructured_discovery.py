@@ -1,0 +1,127 @@
+"""Typed response shapes for an unstructured discovery run's results."""
+
+import enum
+from datetime import datetime
+from typing import Generic, Optional, TypeVar
+
+from pydantic import BaseModel, ConfigDict
+
+from datamasque.client.models.pagination import Page
+from datamasque.client.models.runs import RunConnectionRef, RunId
+
+T = TypeVar("T")
+
+
+class UnstructuredDiscoveryFileStatus(enum.Enum):
+    """Whether an unstructured discovery run read a file's text."""
+
+    read = "read"
+    unread = "unread"
+    """The run tried to read the file and could not; `skip_reason` says why."""
+
+
+class UnstructuredDiscoverySampling(enum.Enum):
+    """How many files of each directory an unstructured discovery run read."""
+
+    sampled = "sampled"
+    """At most `files_per_directory` files of each directory."""
+    all = "all"
+    """Every file of each directory that the run could read."""
+    unknown = "unknown"
+    """The run's discovery config cannot be read."""
+
+
+class UnstructuredDiscoverySkippedCount(BaseModel):
+    """How many of a directory's files the run skipped for one reason, at one extension."""
+
+    model_config = ConfigDict(extra="allow")
+
+    # A string rather than an enum, because each server release can add reasons.
+    skip_reason: str
+    file_extension: str
+    """The extension without a leading dot, blank for files that have none."""
+    count: int
+
+
+class UnstructuredDiscoveryDirectory(BaseModel):
+    """One directory an unstructured discovery run found on the connection, and what its files add up to."""
+
+    model_config = ConfigDict(extra="allow")
+
+    directory: str
+    """The directory's path, blank at the connection root."""
+    files_found: int
+    """How many files were found in the directory, read or not."""
+    files_read: int
+    files_with_findings: int
+    """
+    How many of the directory's files the run read hold a finding.
+    With a `labels` or `categories` filter, only a file holding a matching label counts.
+    """
+    size_bytes: int
+    """The total size, in bytes, of the directory's files, read or not."""
+    entity_counts: dict[str, int]
+    """Each label's occurrences, summed over the directory's files."""
+    skipped: list[UnstructuredDiscoverySkippedCount]
+    """
+    How many of the directory's files the run skipped, by reason and extension.
+    A file a running or cancelled run has not reached yet is counted in `files_found` but not here.
+    """
+
+
+class UnstructuredDiscoveryFinding(BaseModel):
+    """How many times one label was found in one file."""
+
+    model_config = ConfigDict(extra="allow")
+
+    label: str
+    """The label's `name` in the discovery config."""
+    description: str
+    occurrences: int
+    categories: list[str]
+
+
+class UnstructuredDiscoveryFile(BaseModel):
+    """One file an unstructured discovery run tried to read, and how many times each label was found in it."""
+
+    model_config = ConfigDict(extra="allow")
+
+    path: str
+    file_extension: str
+    size_bytes: int
+    status: UnstructuredDiscoveryFileStatus
+    skip_reason: str
+    """Why the run could not read the file, blank if it did."""
+    findings: list[UnstructuredDiscoveryFinding]
+
+
+class UnstructuredDiscoveryPage(Page[T], Generic[T]):
+    """
+    A page of an unstructured discovery run's directories, or of one directory's files.
+
+    Every page also carries the run it belongs to and how the run sampled each directory.
+    `get_unstructured_discovery_summary` returns the run's totals.
+    """
+
+    run_id: RunId
+    connection: RunConnectionRef
+    finished_at: Optional[datetime] = None
+    """When the run ended, `None` until it has."""
+    sampling: UnstructuredDiscoverySampling
+    files_per_directory: Optional[int] = None
+    """The sample size when `sampling` is `UnstructuredDiscoverySampling.sampled`, `None` otherwise."""
+
+
+class UnstructuredDiscoverySummary(BaseModel):
+    """An unstructured discovery run's totals."""
+
+    model_config = ConfigDict(extra="allow")
+
+    run_id: RunId
+    files_found: int
+    """How many files were found on the connection, summed over the directories."""
+    files_read: int
+    files_with_findings: int
+    """How many of the files the run read hold a finding."""
+    bytes_opened: int
+    """The total size, in bytes, of the files the run read."""
