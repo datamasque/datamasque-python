@@ -1,12 +1,10 @@
 """Tests for `ConnectionClient` (CRUD + Snowflake-specific behaviour)."""
 
 from datetime import datetime, timezone
-from typing import Union
 
 import pytest
 import requests_mock
 
-from datamasque.client import DataMasqueClient, Project, ProjectId
 from datamasque.client.exceptions import DataMasqueApiError, DataMasqueException
 from datamasque.client.models.connection import (
     AzureConnectionConfig,
@@ -33,9 +31,6 @@ from datamasque.client.models.connection import (
     validate_connection,
 )
 from tests.helpers import (
-    OTHER_PROJECT,
-    PROJECT,
-    PROJECT_ID,
     sample_mounted_share_connection_json,
     snowflake_connection_config,
 )
@@ -101,69 +96,6 @@ def test_create_or_update_connection_create_fail(client, connection_config, exis
             client.create_or_update_connection(connection_config)
 
 
-def test_create_or_update_connection_sends_the_project(
-    client: DataMasqueClient, connection_config: ConnectionConfig
-) -> None:
-    """The lookup for an existing connection is filtered to the connection's project, and the body carries it."""
-    with requests_mock.Mocker() as m:
-        m.get("http://test-server/api/connections/", json=[], status_code=200)
-        m.post("http://test-server/api/connections/", json={"id": "2"}, status_code=201)
-
-        client.create_or_update_connection(connection_config)
-
-    assert m.request_history[0].qs == {"project": [PROJECT]}
-    assert m.last_request.json()["project"] == PROJECT
-
-
-def test_create_or_update_connection_ignores_same_name_in_another_project(
-    client: DataMasqueClient, connection_config: ConnectionConfig
-) -> None:
-    """A same-named connection in another project is not updated, because the listing is filtered by project."""
-    other_project_connection = sample_mounted_share_connection_json(name=connection_config.name, id="1") | {
-        "project": "2-banking"
-    }
-    with requests_mock.Mocker() as m:
-        m.get("http://test-server/api/connections/", json=[other_project_connection], status_code=200)
-        m.get(
-            f"http://test-server/api/connections/?project={PROJECT}",
-            json=[],
-            status_code=200,
-            complete_qs=True,
-        )
-        m.post("http://test-server/api/connections/", json={"id": "2"}, status_code=201)
-
-        result = client.create_or_update_connection(connection_config)
-
-    assert result.id == ConnectionId("2")
-    assert [request.method for request in m.request_history] == ["GET", "POST"]
-
-
-@pytest.mark.parametrize("project", [ProjectId(2), OTHER_PROJECT])
-def test_list_connections_filters_by_project(client: DataMasqueClient, project: Union[ProjectId, Project]) -> None:
-    with requests_mock.Mocker() as m:
-        m.get("http://test-server/api/connections/", json=[], status_code=200)
-        client.list_connections(project)
-
-    assert m.last_request.qs == {"project": ["2"]}
-
-
-def test_list_connections_keeps_same_name_in_different_projects(client: DataMasqueClient) -> None:
-    """Connection names are unique per project, so an unfiltered listing can hold two connections with one name."""
-    connections = [
-        sample_mounted_share_connection_json(name="shared", id="1"),
-        sample_mounted_share_connection_json(name="shared", id="2") | {"project": OTHER_PROJECT.reference},
-    ]
-    with requests_mock.Mocker() as m:
-        m.get("http://test-server/api/connections/", json=connections, status_code=200)
-        result = client.list_connections()
-
-    assert m.last_request.qs == {}
-    assert [(connection.id, connection.project) for connection in result] == [
-        ("1", PROJECT),
-        ("2", OTHER_PROJECT.reference),
-    ]
-
-
 def test_list_connnections(client):
     with requests_mock.Mocker() as m:
         m.get(
@@ -172,7 +104,6 @@ def test_list_connnections(client):
                 # Realistic API data, hence why it's so verbose
                 {
                     "name": "s3",
-                    "project": PROJECT,
                     "bucket": "my-s3-bucket",
                     "base_directory": "",
                     "type": "s3_connection",
@@ -186,7 +117,6 @@ def test_list_connnections(client):
                 },
                 {
                     "name": "azure",
-                    "project": PROJECT,
                     "type": "azure_blob_connection",
                     "base_directory": "",
                     "mask_type": "file",
@@ -201,7 +131,6 @@ def test_list_connnections(client):
                 },
                 {
                     "name": "mounted_share_dest",
-                    "project": PROJECT,
                     "type": "mounted_share_connection",
                     "base_directory": "dest",
                     "mask_type": "file",
@@ -220,7 +149,6 @@ def test_list_connnections(client):
                     "db_type": "mysql",
                     "database": "mydatabase",
                     "name": "mysql",
-                    "project": PROJECT,
                     "schema": "",
                     "is_read_only": False,
                     "password_encrypted": "some_base64_here",
@@ -235,7 +163,6 @@ def test_list_connnections(client):
                     "version": "1.0",
                     "mask_type": "database",
                     "name": "db_dynamo",
-                    "project": PROJECT,
                     "s3_bucket_name": "my-dynamo-staging-bucket",
                     "dynamo_append_datetime": False,
                     "dynamo_append_suffix": "-masked",
@@ -266,7 +193,6 @@ def test_list_connnections(client):
                     "db_type": "mssql_linked",
                     "database": "database_name",
                     "name": "mssql-linked",
-                    "project": PROJECT,
                     "schema": "",
                     "is_read_only": False,
                     "password_encrypted": "some_base64_here",
@@ -282,7 +208,6 @@ def test_list_connnections(client):
                     "version": "1.0",
                     "mask_type": "database",
                     "name": "db_dynamo_2",
-                    "project": PROJECT,
                     "s3_bucket_name": "my-dynamo-staging-bucket-2",
                     "dynamo_append_datetime": False,
                     "dynamo_append_suffix": "-masked",
@@ -307,7 +232,6 @@ def test_list_connnections(client):
                     "db_type": "snowflake",
                     "database": "icicle",
                     "name": "snowflake",
-                    "project": PROJECT,
                     "schema": "snowball",
                     "snowflake_role": "snowballs do indeed roll",
                     "snowflake_account_id": "ABCDEF-123456",
@@ -329,7 +253,6 @@ def test_list_connnections(client):
                     "db_type": "snowflake",
                     "database": "igloo",
                     "name": "snowflake_minimal_with_key",
-                    "project": PROJECT,
                     "snowflake_account_id": "ACCOUNT-1234",
                     "snowflake_warehouse": "clothing_store",
                     "snowflake_private_key": "2831289a-4398-abcd-4112-fe09a1239f89",
@@ -458,11 +381,10 @@ def test_delete_connection_by_name(client):
             status_code=200,
         )
 
-        client.delete_connection_by_name_if_exists(connection_name, PROJECT_ID)
+        client.delete_connection_by_name_if_exists(connection_name)
 
     assert m.call_count == 3
     assert m.request_history[0].method == "GET"
-    assert m.request_history[0].qs == {"project": [str(PROJECT_ID)]}
     assert m.request_history[1].method == "DELETE"
     assert m.request_history[2].method == "DELETE"
 
@@ -483,7 +405,7 @@ def test_delete_connection_that_does_not_exist(client):
             ],
             status_code=200,
         )
-        client.delete_connection_by_name_if_exists("my_connection", PROJECT_ID)
+        client.delete_connection_by_name_if_exists("my_connection")
 
     assert m.call_count == 1
     assert m.request_history[0].method == "GET"
@@ -545,7 +467,6 @@ def test_list_snowflake_connection_from_older_server_drops_external_stage(client
                     "db_type": "snowflake",
                     "database": "s3_db",
                     "name": "snowflake_s3",
-                    "project": PROJECT,
                     "snowflake_account_id": "S3-ACCOUNT",
                     "snowflake_warehouse": "s3_warehouse",
                     "snowflake_storage_integration_name": "s3_integration",
@@ -573,7 +494,6 @@ def test_s3_connection_model_validate():
     payload = {
         "id": "88dabb63-aca5-4cc4-8f76-f78736a42f39",
         "name": "s3",
-        "project": PROJECT,
         "mask_type": "file",
         "type": "s3_connection",
         "base_directory": "data/",
@@ -599,7 +519,6 @@ def test_connection_model_validate_parses_license_lock() -> None:
     payload = {
         "id": "88dabb63-aca5-4cc4-8f76-f78736a42f39",
         "name": "s3",
-        "project": PROJECT,
         "mask_type": "file",
         "type": "s3_connection",
         "base_directory": "data/",
@@ -623,7 +542,6 @@ def test_connection_model_validate_null_license_lock() -> None:
     payload = {
         "id": "id-1",
         "name": "s3",
-        "project": PROJECT,
         "mask_type": "file",
         "type": "s3_connection",
         "base_directory": "",
@@ -641,7 +559,6 @@ def test_connection_model_validate_parses_freeze_fields() -> None:
     payload = {
         "id": "db-1",
         "name": "pg",
-        "project": PROJECT,
         "mask_type": "database",
         "db_type": "postgres",
         "host": "h",
@@ -665,7 +582,6 @@ def test_connection_freeze_fields_default_when_absent() -> None:
     payload = {
         "id": "db-1",
         "name": "pg",
-        "project": PROJECT,
         "mask_type": "database",
         "db_type": "postgres",
         "host": "h",
@@ -694,7 +610,6 @@ _LICENSE_LOCK_PAYLOAD = {"locked_at": "2026-01-01T12:00:00Z", "editable_from": "
             {
                 "id": "id-1",
                 "name": "s3",
-                "project": PROJECT,
                 "mask_type": "file",
                 "type": "s3_connection",
                 "base_directory": "",
@@ -709,7 +624,6 @@ _LICENSE_LOCK_PAYLOAD = {"locked_at": "2026-01-01T12:00:00Z", "editable_from": "
             {
                 "id": "db-1",
                 "name": "pg",
-                "project": PROJECT,
                 "mask_type": "database",
                 "db_type": "postgres",
                 "host": "h",
@@ -725,7 +639,6 @@ _LICENSE_LOCK_PAYLOAD = {"locked_at": "2026-01-01T12:00:00Z", "editable_from": "
             {
                 "id": "dyn-1",
                 "name": "dyn",
-                "project": PROJECT,
                 "mask_type": "database",
                 "db_type": "dynamo_db",
                 "s3_bucket_name": "bucket",
@@ -740,7 +653,6 @@ _LICENSE_LOCK_PAYLOAD = {"locked_at": "2026-01-01T12:00:00Z", "editable_from": "
             {
                 "id": "mongo-1",
                 "name": "mongo",
-                "project": PROJECT,
                 "mask_type": "database",
                 "db_type": "mongodb",
                 "host": "mongo.example",
@@ -759,7 +671,6 @@ _LICENSE_LOCK_PAYLOAD = {"locked_at": "2026-01-01T12:00:00Z", "editable_from": "
             {
                 "id": "sf-1",
                 "name": "snowflake",
-                "project": PROJECT,
                 "mask_type": "database",
                 "db_type": "snowflake",
                 "user": "snowman",
@@ -802,7 +713,6 @@ def test_s3_connection_model_validate_no_iam_role():
     payload = {
         "id": "id-1",
         "name": "s3",
-        "project": PROJECT,
         "mask_type": "file",
         "type": "s3_connection",
         "base_directory": "",
@@ -819,7 +729,6 @@ def test_databricks_connection_model_validate():
     payload = {
         "id": "db-id-1",
         "name": "databricks",
-        "project": PROJECT,
         "mask_type": "database",
         "db_type": "databricks",
         "server_hostname": "adb-1234.azuredatabricks.net",
@@ -846,7 +755,6 @@ def test_databricks_connection_model_validate_blanks_encrypted_token():
     payload = {
         "id": "db-id-2",
         "name": "databricks",
-        "project": PROJECT,
         "mask_type": "database",
         "db_type": "databricks",
         "server_hostname": "adb-1234.azuredatabricks.net",
@@ -866,7 +774,6 @@ def test_validate_connection_dispatches_databricks():
     payload = {
         "id": "db-id-3",
         "name": "databricks",
-        "project": PROJECT,
         "mask_type": "database",
         "db_type": "databricks",
         "server_hostname": "adb-1234.azuredatabricks.net",
@@ -885,7 +792,6 @@ def test_azure_connection_model_validate_blanks_encrypted_connection_string():
     payload = {
         "id": "490502e5-5bf6-4abb-b67b-c6091d40ecf0",
         "name": "azure",
-        "project": PROJECT,
         "mask_type": "file",
         "type": "azure_blob_connection",
         "base_directory": "",
@@ -908,7 +814,6 @@ def test_gcs_connection_model_validate_blanks_encrypted_service_account_key():
     payload = {
         "id": "0f9f5d2e-8d1a-4a1f-9f57-3f2c1b0c9a11",
         "name": "gcs",
-        "project": PROJECT,
         "mask_type": "file",
         "type": "gcs_connection",
         "base_directory": "inbound",
@@ -930,7 +835,6 @@ def test_gcs_connection_model_validate_blanks_encrypted_service_account_key():
 
 def test_gcs_connection_serializes_the_key_for_create():
     conn = GcsConnectionConfig(
-        project=PROJECT,
         name="gcs",
         bucket="my-gcs-bucket",
         service_account_key='{"type": "service_account"}',
@@ -960,7 +864,6 @@ def test_database_connection_model_validate_drops_schema_for_mysql():
     payload = {
         "id": "f0557fb3-1c9a-4cb1-bcf4-9699cf496bf7",
         "name": "mysql",
-        "project": PROJECT,
         "mask_type": "database",
         "db_type": "mysql",
         "host": "my-mysql-host",
@@ -983,7 +886,6 @@ def test_database_connection_model_validate_keeps_schema_for_postgres():
     payload = {
         "id": "abc",
         "name": "pg",
-        "project": PROJECT,
         "mask_type": "database",
         "db_type": "postgres",
         "host": "pg-host",
@@ -1002,7 +904,6 @@ def test_database_connection_model_validate_databricks_lakebase():
     payload = {
         "id": "abc-lakebase",
         "name": "lakebase",
-        "project": PROJECT,
         "mask_type": "database",
         "db_type": "databricks_lakebase",
         "host": "lakebase-host",
@@ -1024,7 +925,6 @@ def test_mssql_linked_connection_model_validate_includes_linked_server():
     payload = {
         "id": "48a7af45-f63f-4e05-bf9f-7b1cc3a0e89d",
         "name": "mssql-linked",
-        "project": PROJECT,
         "mask_type": "database",
         "db_type": "mssql_linked",
         "host": "mssql-linked-host",
@@ -1047,7 +947,6 @@ def test_dynamo_connection_model_validate_with_sse():
     payload = {
         "id": "d7257552-0485-4806-b0fb-d72b4d268073",
         "name": "db_dynamo",
-        "project": PROJECT,
         "mask_type": "database",
         "db_type": "dynamo_db",
         "s3_bucket_name": "my-dynamo-staging-bucket",
@@ -1076,7 +975,6 @@ def test_dynamo_connection_model_validate_without_sse_uses_default():
     payload = {
         "id": "id-2",
         "name": "db_dynamo",
-        "project": PROJECT,
         "mask_type": "database",
         "db_type": "dynamo_db",
         "s3_bucket_name": "bucket",
@@ -1098,7 +996,6 @@ def test_snowflake_connection_model_validate_drops_external_stage_location(stage
     payload = {
         "id": "f0557fb3-1c9a-4cb1-bcf4-9699cf496bf7",
         "name": "snowflake",
-        "project": PROJECT,
         "mask_type": "database",
         "db_type": "snowflake",
         "user": "snowman",
@@ -1132,7 +1029,6 @@ def test_snowflake_connection_model_validate_minimal_payload():
     payload = {
         "id": "id-3",
         "name": "snowflake",
-        "project": PROJECT,
         "mask_type": "database",
         "db_type": "snowflake",
         "user": "frosty",
@@ -1153,7 +1049,6 @@ def test_connection_config_dispatch_picks_subclass():
     s3_payload = {
         "id": "id-s3",
         "name": "s3",
-        "project": PROJECT,
         "mask_type": "file",
         "type": "s3_connection",
         "base_directory": "",
@@ -1164,7 +1059,6 @@ def test_connection_config_dispatch_picks_subclass():
     db_payload = {
         "id": "id-pg",
         "name": "pg",
-        "project": PROJECT,
         "mask_type": "database",
         "db_type": "postgres",
         "host": "h",
@@ -1194,7 +1088,6 @@ def test_dynamo_connection_round_trip_with_iam_role_and_prefix():
     payload = {
         "id": "id-dynamo-1",
         "name": "db_dynamo",
-        "project": PROJECT,
         "mask_type": "database",
         "db_type": "dynamo_db",
         "s3_bucket_name": "staging-bucket",
@@ -1218,7 +1111,6 @@ def test_dynamo_connection_round_trip_with_iam_role_and_prefix():
 def test_dynamo_connection_model_dump_omits_unset_iam_role_and_prefix():
     """When the new optional fields are unset, `model_dump` must omit them entirely (not send `null`)."""
     conn = DynamoConnectionConfig(
-        project=PROJECT,
         name="db_dynamo",
         s3_bucket_name="bucket",
         dynamo_append_datetime=False,
@@ -1237,7 +1129,6 @@ def test_dynamo_model_validate_defaults_to_none_when_fields_absent():
     payload = {
         "id": "id-dynamo-2",
         "name": "db_dynamo",
-        "project": PROJECT,
         "mask_type": "database",
         "db_type": "dynamo_db",
         "s3_bucket_name": "bucket",
@@ -1255,7 +1146,6 @@ def test_dynamo_model_validate_defaults_to_none_when_fields_absent():
 def test_mongo_connection_model_dump_minimal():
     """An unauthenticated, plain TCP connection sends only the required keys plus the defaulted booleans."""
     conn = MongoConnectionConfig(
-        project=PROJECT,
         name="mongo",
         host="mongo.example",
         database="people",
@@ -1274,7 +1164,6 @@ def test_mongo_connection_model_dump_minimal():
 
 def test_mongo_connection_model_dump_full():
     conn = MongoConnectionConfig(
-        project=PROJECT,
         name="mongo",
         host="mongo.example",
         port=27018,
@@ -1306,7 +1195,6 @@ def test_mongo_connection_model_dump_full():
 def test_mongo_connection_model_dump_omits_falsy_optional_flags():
     """`tls`, `direct_connection`, `user`, `password`, and `replica_set` are only sent when truthy."""
     conn = MongoConnectionConfig(
-        project=PROJECT,
         name="mongo",
         host="mongo.example",
         database="people",
@@ -1324,7 +1212,7 @@ def test_mongo_connection_model_dump_omits_falsy_optional_flags():
 
 def test_mongo_connection_retry_writes_defaults_true_and_is_omitted():
     """retry_writes defaults to True (matching the server default), so it is left out of the payload."""
-    conn = MongoConnectionConfig(project=PROJECT, name="mongo", host="mongo.example", database="people")
+    conn = MongoConnectionConfig(name="mongo", host="mongo.example", database="people")
     assert conn.retry_writes is True
     api_dict = conn.model_dump(exclude_none=True, by_alias=True, mode="json")
     assert "retry_writes" not in api_dict
@@ -1332,18 +1220,14 @@ def test_mongo_connection_retry_writes_defaults_true_and_is_omitted():
 
 def test_mongo_connection_sends_retry_writes_when_disabled():
     """retry_writes is sent only when explicitly disabled (e.g. AWS DocumentDB rejects retryable writes)."""
-    conn = MongoConnectionConfig(
-        project=PROJECT, name="mongo", host="mongo.example", database="people", retry_writes=False
-    )
+    conn = MongoConnectionConfig(name="mongo", host="mongo.example", database="people", retry_writes=False)
     api_dict = conn.model_dump(exclude_none=True, by_alias=True, mode="json")
     assert api_dict["retry_writes"] is False
 
 
 def test_documentdb_connection_sends_retry_writes_when_disabled():
     """A DocumentDB connection inherits retry_writes and sends it when disabled."""
-    conn = DocumentDbConnectionConfig(
-        project=PROJECT, name="docdb", host="docdb.example", database="people", retry_writes=False
-    )
+    conn = DocumentDbConnectionConfig(name="docdb", host="docdb.example", database="people", retry_writes=False)
     api_dict = conn.model_dump(exclude_none=True, by_alias=True, mode="json")
     assert api_dict["db_type"] == "documentdb"
     assert api_dict["retry_writes"] is False
@@ -1353,7 +1237,6 @@ def test_mongo_connection_model_validate_blanks_encrypted_password():
     payload = {
         "id": "mongo-id-1",
         "name": "mongo",
-        "project": PROJECT,
         "mask_type": "database",
         "db_type": "mongodb",
         "host": "mongo.example",
@@ -1385,7 +1268,6 @@ def test_mongo_connection_model_validate_defaults_when_optional_fields_missing()
     payload = {
         "id": "mongo-id-2",
         "name": "mongo-min",
-        "project": PROJECT,
         "mask_type": "database",
         "db_type": "mongodb",
         "host": "mongo.example",
@@ -1406,7 +1288,6 @@ def test_connection_config_dispatch_picks_mongo_subclass():
     payload = {
         "id": "mongo-id-3",
         "name": "mongo",
-        "project": PROJECT,
         "mask_type": "database",
         "db_type": "mongodb",
         "host": "mongo.example",
@@ -1417,7 +1298,6 @@ def test_connection_config_dispatch_picks_mongo_subclass():
 
 def test_mongo_tls_ca_fields_emitted_when_tls_enabled():
     conn = MongoConnectionConfig(
-        project=PROJECT,
         name="mongo",
         host="mongo.example",
         database="people",
@@ -1432,7 +1312,7 @@ def test_mongo_tls_ca_fields_emitted_when_tls_enabled():
 
 
 def test_mongo_tls_ca_fields_omitted_when_unset_but_tls_enabled():
-    conn = MongoConnectionConfig(project=PROJECT, name="mongo", host="mongo.example", database="people", tls=True)
+    conn = MongoConnectionConfig(name="mongo", host="mongo.example", database="people", tls=True)
     d = conn.model_dump(exclude_none=True, by_alias=True, mode="json")
     assert d["tls"] is True
     assert "tls_ca_file" not in d
@@ -1442,7 +1322,6 @@ def test_mongo_tls_ca_fields_omitted_when_unset_but_tls_enabled():
 def test_mongo_tls_ca_fields_omitted_when_tls_disabled():
     """Even when set, the TLS-dependent fields are not sent while TLS is disabled."""
     conn = MongoConnectionConfig(
-        project=PROJECT,
         name="mongo",
         host="mongo.example",
         database="people",
@@ -1459,7 +1338,6 @@ def test_mongo_tls_ca_fields_roundtrip():
     payload = {
         "id": "mongo-tls-1",
         "name": "mongo",
-        "project": PROJECT,
         "mask_type": "database",
         "db_type": "mongodb",
         "host": "mongo.example",
@@ -1478,7 +1356,6 @@ def test_mongo_tls_ca_fields_default_when_missing():
     payload = {
         "id": "mongo-tls-2",
         "name": "mongo",
-        "project": PROJECT,
         "mask_type": "database",
         "db_type": "mongodb",
         "host": "mongo.example",
@@ -1491,7 +1368,6 @@ def test_mongo_tls_ca_fields_default_when_missing():
 
 def test_documentdb_connection_model_dump():
     conn = DocumentDbConnectionConfig(
-        project=PROJECT,
         name="docdb",
         host="dtq-documentdb.cluster.example",
         database="people",
@@ -1515,7 +1391,6 @@ def test_connection_config_dispatch_picks_documentdb_subclass():
     payload = {
         "id": "docdb-id-1",
         "name": "docdb",
-        "project": PROJECT,
         "mask_type": "database",
         "db_type": "documentdb",
         "host": "dtq-documentdb.cluster.example",
@@ -1529,7 +1404,6 @@ def test_connection_config_dispatch_picks_documentdb_subclass():
 def _cosmosdb_connection(**overrides) -> CosmosDbConnectionConfig:
     """Build a Cosmos DB config, leaving the port to the connection type's own default."""
     return CosmosDbConnectionConfig(
-        project=PROJECT,
         name="cosmos",
         host="dtq-cosmos.mongo.cosmos.azure.com",
         database="people",
@@ -1575,7 +1449,6 @@ def test_connection_config_dispatch_picks_cosmosdb_subclass():
     payload = {
         "id": "cosmos-id-1",
         "name": "cosmos",
-        "project": PROJECT,
         "mask_type": "database",
         "db_type": "cosmosdb",
         "host": "dtq-cosmos.mongo.cosmos.azure.com",
@@ -1600,7 +1473,6 @@ def test_database_connection_config_rejects_document_store_database_types(
     """`DatabaseConnectionConfig` is for SQL engines; each document store has its own class."""
     with pytest.raises(ValueError, match=message):
         DatabaseConnectionConfig(
-            project=PROJECT,
             name="doc-store",
             host="doc-store.example",
             port=27017,
@@ -1614,7 +1486,6 @@ def test_database_connection_config_rejects_document_store_database_types(
 def test_create_or_update_mongo_connection(client):
     """End-to-end: a Mongo connection round-trips through `create_or_update_connection`."""
     conn = MongoConnectionConfig(
-        project=PROJECT,
         name="mongo",
         host="mongo.example",
         database="people",
@@ -1642,7 +1513,6 @@ def test_create_or_update_mongo_connection(client):
 
 def _database_connection(database_type: DatabaseType, **extra) -> DatabaseConnectionConfig:
     return DatabaseConnectionConfig(
-        project=PROJECT,
         name="conn",
         host="mydb.abc123.ap-southeast-2.rds.amazonaws.com",
         port=5432,
@@ -1737,7 +1607,6 @@ def test_database_connection_config_rejects_engines_with_their_own_class(
 ) -> None:
     with pytest.raises(ValueError, match=message):
         DatabaseConnectionConfig(
-            project=PROJECT,
             name="own-class",
             host="db.example",
             port=1,
@@ -1750,7 +1619,6 @@ def test_database_connection_config_rejects_engines_with_their_own_class(
 
 def test_cassandra_connection_serializes_password_as_dbpassword():
     conn = CassandraConnectionConfig(
-        project=PROJECT,
         name="cassandra",
         host="cassandra.example",
         database="people",
@@ -1775,9 +1643,9 @@ def test_cassandra_connection_serializes_password_as_dbpassword():
 
 def test_cassandra_connection_without_credentials_omits_user_and_password():
     """Cassandra allows unauthenticated access; the server rejects a username sent without a password."""
-    d = CassandraConnectionConfig(
-        project=PROJECT, name="cassandra", host="cassandra.example", database="people"
-    ).model_dump(exclude_none=True, by_alias=True, mode="json")
+    d = CassandraConnectionConfig(name="cassandra", host="cassandra.example", database="people").model_dump(
+        exclude_none=True, by_alias=True, mode="json"
+    )
 
     assert "user" not in d
     assert "dbpassword" not in d
@@ -1787,7 +1655,6 @@ def test_connection_config_dispatch_picks_cassandra_subclass():
     payload = {
         "id": "cassandra-id-1",
         "name": "cassandra",
-        "project": PROJECT,
         "mask_type": "database",
         "db_type": "cassandra",
         "host": "cassandra.example",
@@ -1811,7 +1678,6 @@ def test_connection_config_dispatch_picks_cassandra_subclass():
 def test_sap_ase_connection_serializes_without_a_schema():
     """ASE has no schema setting: the schema is the table owner."""
     conn = SapAseConnectionConfig(
-        project=PROJECT,
         name="sap_ase",
         host="ase.example",
         database="people",
@@ -1837,9 +1703,9 @@ def test_sap_ase_connection_serializes_without_a_schema():
 
 
 def test_sap_ase_connection_omits_unset_tls_options():
-    d = SapAseConnectionConfig(
-        project=PROJECT, name="sap_ase", host="ase.example", database="people", user="sa"
-    ).model_dump(exclude_none=True, by_alias=True, mode="json")
+    d = SapAseConnectionConfig(name="sap_ase", host="ase.example", database="people", user="sa").model_dump(
+        exclude_none=True, by_alias=True, mode="json"
+    )
 
     assert "tls_server_name" not in d
     assert "connect_timeout" not in d
@@ -1850,7 +1716,6 @@ def test_connection_config_dispatch_picks_sap_ase_subclass():
     payload = {
         "id": "sap-ase-id-1",
         "name": "sap_ase",
-        "project": PROJECT,
         "mask_type": "database",
         "db_type": "sap_ase",
         "host": "ase.example",
@@ -1869,7 +1734,6 @@ def test_connection_config_dispatch_picks_sap_ase_subclass():
 
 def test_salesforce_connection_serializes_for_create():
     conn = SalesforceConnectionConfig(
-        project=PROJECT,
         name="salesforce",
         instance_url="https://example--uat.sandbox.my.salesforce.com",
         login_url="https://example--uat.sandbox.my.salesforce.com",
@@ -1896,7 +1760,6 @@ def test_salesforce_connection_serializes_for_create():
 def test_salesforce_connection_without_passphrase_omits_it():
     """An unencrypted private key needs no passphrase."""
     d = SalesforceConnectionConfig(
-        project=PROJECT,
         name="salesforce",
         instance_url="https://example.my.salesforce.com",
         login_url="https://example.my.salesforce.com",
@@ -1912,7 +1775,6 @@ def test_connection_config_dispatch_picks_salesforce_subclass():
     payload = {
         "id": "salesforce-id-1",
         "name": "salesforce",
-        "project": PROJECT,
         "mask_type": "database",
         "db_type": "salesforce",
         "instance_url": "https://example.my.salesforce.com",

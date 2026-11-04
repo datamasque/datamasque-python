@@ -4,14 +4,6 @@ datamasque.client.models package
 Submodules
 ----------
 
-datamasque.client.models.bundle module
---------------------------------------
-
-.. automodule:: datamasque.client.models.bundle
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
 datamasque.client.models.connection module
 ------------------------------------------
 
@@ -52,13 +44,6 @@ datamasque.client.models.files module
    :undoc-members:
    :show-inheritance:
 
-datamasque.client.models.git module
------------------------------------
-
-.. automodule:: datamasque.client.models.git
-   :members: GitSnapshot, GitFile, GitFileCommit
-   :show-inheritance:
-
 datamasque.client.models.ifm module
 -----------------------------------
 
@@ -71,30 +56,6 @@ datamasque.client.models.license module
 ---------------------------------------
 
 .. automodule:: datamasque.client.models.license
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
-datamasque.client.models.project module
----------------------------------------
-
-.. automodule:: datamasque.client.models.project
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
-datamasque.client.models.resource module
-----------------------------------------
-
-.. automodule:: datamasque.client.models.resource
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
-datamasque.client.models.resource_type module
----------------------------------------------
-
-.. automodule:: datamasque.client.models.resource_type
    :members:
    :undoc-members:
    :show-inheritance:

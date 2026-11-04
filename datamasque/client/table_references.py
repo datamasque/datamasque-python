@@ -1,9 +1,8 @@
 import logging
-from typing import Optional, Union
+from typing import Optional
 
 from datamasque.client.base import BaseClient
 from datamasque.client.exceptions import DataMasqueApiError
-from datamasque.client.models.project import ProjectId, ProjectIdentifier, unwrap_project_id
 from datamasque.client.models.table_reference import TableReference, TableReferenceId
 
 logger = logging.getLogger(__name__)
@@ -12,19 +11,16 @@ logger = logging.getLogger(__name__)
 class TableReferenceClient(BaseClient):
     """Table reference CRUD API methods. Mixed into `DataMasqueClient`."""
 
-    def list_table_references(self, project: Optional[ProjectIdentifier] = None) -> list[TableReference]:
+    def list_table_references(self) -> list[TableReference]:
         """
-        Lists all table references, or only those in `project` when it is given.
-
-        `project` is a `Project`, its `ProjectId` or its `<id>-<slug>` form.
+        Lists all table references.
 
         Unlike most list endpoints, this one is not paginated;
         the server returns every table reference in a single response.
         Deleted table references are archived rather than removed, and are not listed.
         """
 
-        params = {"project": unwrap_project_id(project)} if project is not None else None
-        response = self.make_request("GET", "/api/table-references/", params=params)
+        response = self.make_request("GET", "/api/table-references/")
         return [TableReference.model_validate(item) for item in response.json()]
 
     def get_table_reference(self, table_reference_id: TableReferenceId) -> TableReference:
@@ -33,27 +29,26 @@ class TableReferenceClient(BaseClient):
         response = self.make_request("GET", f"/api/table-references/{table_reference_id}/")
         return TableReference.model_validate(response.json())
 
-    def get_table_reference_by_name(self, name: str, project: ProjectIdentifier) -> Optional[TableReference]:
+    def get_table_reference_by_name(self, name: str) -> Optional[TableReference]:
         """
-        Looks for a table reference with the given name (case-sensitive, exact match) in the given project.
+        Looks for a table reference with the given name (case-sensitive, exact match).
 
-        Names are unique across a project's live table references, so at most one can match.
-        `project` is a `Project`, its `ProjectId` or its `<id>-<slug>` form.
+        Names are unique across live table references, so at most one can match.
         Returns it if found, otherwise `None`.
 
-        The endpoint takes no name filter, so the match is made client-side over the project's listing.
+        The endpoint takes no name filter, so the match is made client-side over the full listing.
         """
 
-        matches = [reference for reference in self.list_table_references(project) if reference.name == name]
+        matches = [reference for reference in self.list_table_references() if reference.name == name]
         if not matches:
             return None
 
         return matches[0]
 
-    def _get_table_reference_id_by_name(self, name: str, project: Union[ProjectId, str]) -> Optional[TableReferenceId]:
-        """Return the ID of the table reference with the given name in the given project, or `None` if there is none."""
+    def _get_table_reference_id_by_name(self, name: str) -> Optional[TableReferenceId]:
+        """Return the ID of the table reference with the given name, or `None` if there is none."""
 
-        response = self.make_request("GET", "/api/table-references/", params={"project": project})
+        response = self.make_request("GET", "/api/table-references/")
         matches = [item for item in response.json() if item.get("name") == name]
         if not matches:
             return None
@@ -79,13 +74,9 @@ class TableReferenceClient(BaseClient):
         data = table_reference.model_dump(by_alias=True, mode="json")
         if data.get("options") is None:
             data.pop("options", None)
-        if data.get("project") is None:
-            data.pop("project", None)
-        data |= self._default_project_field(table_reference.project)
         response = self.make_request("POST", "/api/table-references/", data=data)
         created = TableReference.model_validate(response.json())
         table_reference.id = created.id
-        table_reference.project = created.project
         table_reference.options = created.options
         table_reference.created = created.created
         table_reference.modified = created.modified
@@ -110,8 +101,6 @@ class TableReferenceClient(BaseClient):
         data = table_reference.model_dump(by_alias=True, mode="json")
         if data.get("options") is None:
             data.pop("options", None)
-        if data.get("project") is None:
-            data.pop("project", None)
         response = self.make_request("PUT", f"/api/table-references/{table_reference.id}/", data=data)
         updated = TableReference.model_validate(response.json())
         table_reference.options = updated.options
@@ -121,16 +110,12 @@ class TableReferenceClient(BaseClient):
 
     def create_or_update_table_reference(self, table_reference: TableReference) -> TableReference:
         """
-        Creates the table reference, or updates the existing one with the same name in the same project.
+        Creates the table reference, or updates the existing one with the same name.
 
-        With no `project` set, the client's `default_project` is used, else the server's only active project,
-        and `DataMasqueException` is raised when it has no active project or more than one.
         Sets the table reference's `id` property.
         """
 
-        existing_id = self._get_table_reference_id_by_name(
-            table_reference.name, self._resolve_project(table_reference.project)
-        )
+        existing_id = self._get_table_reference_id_by_name(table_reference.name)
         if existing_id is not None:
             table_reference.id = existing_id
             return self.update_table_reference(table_reference)
@@ -147,14 +132,13 @@ class TableReferenceClient(BaseClient):
 
         self._delete_if_exists(f"/api/table-references/{table_reference_id}/")
 
-    def delete_table_reference_by_name_if_exists(self, name: str, project: ProjectIdentifier) -> None:
+    def delete_table_reference_by_name_if_exists(self, name: str) -> None:
         """
-        Deletes the table reference with the given name in the given project.
+        Deletes the table reference with the given name.
 
-        `project` is a `Project`, its `ProjectId` or its `<id>-<slug>` form.
         No-op if no such table reference exists.
         """
 
-        table_reference_id = self._get_table_reference_id_by_name(name, unwrap_project_id(project))
+        table_reference_id = self._get_table_reference_id_by_name(name)
         if table_reference_id is not None:
             self.delete_table_reference_by_id_if_exists(table_reference_id)

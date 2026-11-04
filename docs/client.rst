@@ -20,14 +20,6 @@ datamasque.client.base module
    :undoc-members:
    :show-inheritance:
 
-datamasque.client.bundles module
---------------------------------
-
-.. automodule:: datamasque.client.bundles
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
 datamasque.client.connections module
 ------------------------------------
 
@@ -68,14 +60,6 @@ datamasque.client.files module
    :undoc-members:
    :show-inheritance:
 
-datamasque.client.git module
-----------------------------
-
-.. automodule:: datamasque.client.git
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
 datamasque.client.spcs module
 -----------------------------
 
@@ -96,22 +80,6 @@ datamasque.client.license module
 --------------------------------
 
 .. automodule:: datamasque.client.license
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
-datamasque.client.projects module
----------------------------------
-
-.. automodule:: datamasque.client.projects
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
-datamasque.client.resources module
-----------------------------------
-
-.. automodule:: datamasque.client.resources
    :members:
    :undoc-members:
    :show-inheritance:
