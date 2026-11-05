@@ -4,11 +4,13 @@ from typing import Union
 
 from datamasque.client.base import BaseClient
 from datamasque.client.exceptions import (
+    DataMasqueException,
     FailedToStartError,
     InvalidLibraryError,
     InvalidRulesetError,
     RunNotCancellableError,
 )
+from datamasque.client.models.connection import ConnectionId
 from datamasque.client.models.runs import MaskingRunRequest, RunId, RunInfo, UnfinishedRun
 from datamasque.client.models.status import MaskingRunStatus
 
@@ -63,10 +65,10 @@ class RunClient(BaseClient):
             return response.content
         return response.text
 
-    def get_unfinished_runs(self) -> dict[str, UnfinishedRun]:
-        """Queries the DM instance for unfinished runs, and returns them organised by connection name."""
+    def get_unfinished_runs(self) -> dict[ConnectionId, UnfinishedRun]:
+        """Queries the DM instance for unfinished runs, and returns them organised by connection ID."""
 
-        unfinished_runs = {}
+        unfinished_runs: dict[ConnectionId, UnfinishedRun] = {}
         for status in (
             MaskingRunStatus.queued,
             MaskingRunStatus.running,
@@ -89,9 +91,22 @@ class RunClient(BaseClient):
             for run in data.get("results", []):
                 unfinished_run = UnfinishedRun.model_validate(run)
 
-                unfinished_runs[unfinished_run.source_connection.name] = unfinished_run
-                if unfinished_run.destination_connection is not None:
-                    unfinished_runs[unfinished_run.destination_connection.name] = unfinished_run
+                source = unfinished_run.source_connection
+                if source.id is None:
+                    raise DataMasqueException(
+                        f"Server returned unfinished run {unfinished_run.id} without a source connection ID."
+                    )
+
+                unfinished_runs[source.id] = unfinished_run
+
+                destination = unfinished_run.destination_connection
+                if destination is not None:
+                    if destination.id is None:
+                        raise DataMasqueException(
+                            f"Server returned unfinished run {unfinished_run.id} without a destination connection ID."
+                        )
+
+                    unfinished_runs[destination.id] = unfinished_run
 
         return unfinished_runs
 
