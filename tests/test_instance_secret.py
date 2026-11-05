@@ -141,6 +141,7 @@ SERVER_LINK_ERROR_CODES = (
     "active_runs",
     "verification_stale",
     "host_header_too_long",
+    "insecure_instance_secret",
 )
 
 
