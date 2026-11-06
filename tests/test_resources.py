@@ -14,6 +14,7 @@ from datamasque.client import (
     Project,
     ProjectId,
     Resource,
+    ResourceMoveConflictError,
     ResourceMoveConflictReason,
     ResourceOrdering,
     ResourceTypeName,
@@ -216,14 +217,35 @@ def test_get_resource_move_conflicts_sends_the_resources_and_destination(client:
     assert conflicts[0].name == "customers_db"
 
 
-def test_move_resources_returns_the_count_moved_and_the_conflicts(client: DataMasqueClient) -> None:
+def test_move_resources_returns_the_count_moved(client: DataMasqueClient) -> None:
     with requests_mock.Mocker() as m:
-        m.post("http://test-server/api/resources/move/", json={"moved": 1, "conflicts": [NAME_CLASH]})
+        m.post("http://test-server/api/resources/move/", json={"moved": 2})
         result = client.move_resources(MOVING, ProjectId(8))
 
     assert m.last_request.json() == MOVE_REQUEST
-    assert result.moved == 1
-    assert [conflict.id for conflict in result.conflicts] == [CONNECTION["id"]]
+    assert result.moved == 2
+
+
+def test_move_resources_raises_the_conflicts_that_stopped_the_move(client: DataMasqueClient) -> None:
+    with requests_mock.Mocker() as m:
+        m.post(
+            "http://test-server/api/resources/move/",
+            status_code=409,
+            json={"detail": "No resources moved.", "conflicts": [NAME_CLASH]},
+        )
+        with pytest.raises(ResourceMoveConflictError, match="No resources moved.") as exc_info:
+            client.move_resources(MOVING, ProjectId(8))
+
+    assert [conflict.id for conflict in exc_info.value.conflicts] == [CONNECTION["id"]]
+
+
+def test_move_resources_raises_an_api_error_for_a_409_with_no_conflicts(client: DataMasqueClient) -> None:
+    with requests_mock.Mocker() as m:
+        m.post("http://test-server/api/resources/move/", status_code=409, json={"detail": "A file appeared."})
+        with pytest.raises(DataMasqueApiError) as exc_info:
+            client.move_resources(MOVING, ProjectId(8))
+
+    assert not isinstance(exc_info.value, ResourceMoveConflictError)
 
 
 def test_move_resources_moves_what_list_resources_returned_to_a_project(client: DataMasqueClient) -> None:
@@ -238,7 +260,7 @@ def test_move_resources_moves_what_list_resources_returned_to_a_project(client: 
     )
     with requests_mock.Mocker() as m:
         m.get("http://test-server/api/resources/", json=page({"rulesets": [RULESET], "connections": [CONNECTION]}))
-        m.post("http://test-server/api/resources/move/", json={"moved": 2, "conflicts": []})
+        m.post("http://test-server/api/resources/move/", json={"moved": 2})
         client.move_resources(client.list_resources(), retail)
 
     assert m.last_request.json() == MOVE_REQUEST
@@ -247,7 +269,7 @@ def test_move_resources_moves_what_list_resources_returned_to_a_project(client: 
 def test_move_resources_takes_a_listed_resources_project_as_the_destination(client: DataMasqueClient) -> None:
     listed = RulesetResource.model_validate(RULESET)
     with requests_mock.Mocker() as m:
-        m.post("http://test-server/api/resources/move/", json={"moved": 2, "conflicts": []})
+        m.post("http://test-server/api/resources/move/", json={"moved": 2})
         client.move_resources(MOVING, listed.project)
 
     assert m.last_request.json()["destination"] == "7"
