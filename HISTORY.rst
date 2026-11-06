@@ -7,6 +7,8 @@ History
 
 * Added project models and management APIs.
 * Added resource management APIs.
+* ``move_resources`` moves everything or nothing, and raises ``ResourceMoveConflictError`` on a conflict.
+  ``ResourceMoveResult`` no longer has ``conflicts``.
 * Added ``default_project`` to ``DataMasqueInstanceConfig``.
 * ``ConnectionConfig``, ``Ruleset``, ``RulesetLibrary``, ``DiscoveryConfig``, ``DiscoveryConfigLibrary``, ``RGConfig``
   and ``TableReference`` send their ``project`` to the server when it is set.
