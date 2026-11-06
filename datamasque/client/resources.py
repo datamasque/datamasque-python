@@ -4,6 +4,7 @@ from collections.abc import Sequence
 from typing import Optional
 
 from datamasque.client.base import BaseClient
+from datamasque.client.exceptions import ResourceMoveConflictError
 from datamasque.client.models.project import ProjectIdentifier, unwrap_project_id
 from datamasque.client.models.resource import (
     RESOURCE_MODEL_BY_TYPE_NAME,
@@ -118,24 +119,36 @@ class ResourceClient(BaseClient):
         Moves `resources` to the destination project, with their files and runs.
 
         `resources` can be the result of `list_resources`, or any part of it, and can contain up to 2,000 resources.
-        A resource that conflicts with the destination, or with another resource in `resources`,
-        stays where it is and is listed in the result's `conflicts`; every other resource moves.
+        All of them move, or none do.
+        A resource already in the destination stays there, and the others move.
+        `get_resource_move_conflicts` lists the conflicts without trying to move anything.
         Rulesets, discovery configs and RG configs whose library imports resolve differently after the move
         are marked invalid.
 
         Raises:
             ValueError: `resources` is empty.
+            ResourceMoveConflictError: a resource conflicts with the destination, or with another resource in
+                `resources`; its `conflicts` says why.
             DataMasqueApiError: the server rejects the move, for example because the destination does not exist,
                 `resources` contains more than 2,000 resources,
                 or the caller does not have permission to move one of the resource types.
         """
 
-        response = self.make_request("POST", "/api/resources/move/", data=_move_request(resources, destination))
-        result = ResourceMoveResult.model_validate(response.json())
-        logger.info(
-            "Moved %d resources to project %s; %d could not move",
-            result.moved,
-            unwrap_project_id(destination),
-            len(result.conflicts),
+        response = self.make_request(
+            "POST",
+            "/api/resources/move/",
+            data=_move_request(resources, destination),
+            require_status_check=False,
         )
+        if response.status_code == 409 and "conflicts" in response.json():
+            body = response.json()
+            raise ResourceMoveConflictError(
+                str(body["detail"]),
+                response=response,
+                conflicts=[ResourceMoveConflict.model_validate(conflict) for conflict in body["conflicts"]],
+            )
+
+        self._raise_for_status(response)
+        result = ResourceMoveResult.model_validate(response.json())
+        logger.info("Moved %d resources to project %s", result.moved, unwrap_project_id(destination))
         return result
