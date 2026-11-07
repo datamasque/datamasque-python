@@ -16,7 +16,7 @@ class UnstructuredDiscoveryFileStatus(enum.Enum):
     """Whether an unstructured discovery run read a file's text."""
 
     read = "read"
-    unread = "unread"
+    failed = "failed"
     """The run tried to read the file and could not; `skip_reason` says why."""
 
 

@@ -215,7 +215,7 @@ def test_get_unstructured_discovery_file_page_parses_the_files_and_their_finding
         _file("Finance/Invoices/0142.pdf", findings=[finding]),
         _file(
             "Finance/Invoices/0143.pdf",
-            status="unread",
+            status="failed",
             skip_reason="An error occurred while running data discovery",
             character_count=None,
         ),
@@ -232,7 +232,7 @@ def test_get_unstructured_discovery_file_page_parses_the_files_and_their_finding
         "limit": ["1000"],
         "offset": ["5"],
     }
-    read_file, unread_file = page.results
+    read_file, failed_file = page.results
     assert read_file.path == "Finance/Invoices/0142.pdf"
     assert read_file.file_extension == "pdf"
     assert read_file.size_bytes == 204817
@@ -244,13 +244,13 @@ def test_get_unstructured_discovery_file_page_parses_the_files_and_their_finding
     assert read_file.findings[0].description == "Email address"
     assert read_file.findings[0].occurrences == 4
     assert read_file.findings[0].categories == ["PII"]
-    assert unread_file.status is UnstructuredDiscoveryFileStatus.unread
-    assert unread_file.outcome is UnstructuredDiscoveryFileOutcome.failed
-    assert unread_file.skip_reason == "An error occurred while running data discovery"
-    assert unread_file.character_count is None
-    assert unread_file.findings == []
+    assert failed_file.status is UnstructuredDiscoveryFileStatus.failed
+    assert failed_file.outcome is UnstructuredDiscoveryFileOutcome.failed
+    assert failed_file.skip_reason == "An error occurred while running data discovery"
+    assert failed_file.character_count is None
+    assert failed_file.findings == []
     assert not read_file.model_extra
-    assert not unread_file.model_extra
+    assert not failed_file.model_extra
 
 
 def test_get_unstructured_discovery_file_page_sends_a_blank_directory_for_the_root(client: DataMasqueClient) -> None:
@@ -277,7 +277,7 @@ def test_iter_unstructured_discovery_directories_follows_the_next_page(client: D
 
 @pytest.mark.parametrize(
     "status, expected_status_query",
-    [(None, {}), (UnstructuredDiscoveryFileStatus.unread, {"status": ["unread"]})],
+    [(None, {}), (UnstructuredDiscoveryFileStatus.failed, {"status": ["failed"]})],
 )
 def test_iter_unstructured_discovery_files_asks_for_one_directory(
     client: DataMasqueClient,
