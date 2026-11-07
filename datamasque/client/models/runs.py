@@ -148,6 +148,16 @@ class RunInfo(BaseModel):
 
     Taken from the ruleset's project when the run starts, and never changes after that.
     """
+    ai_engine_model: Optional[str] = None
+    """
+    The AI Engine model the run's `ai_detect` matchers use, as the engine reports it.
+    Blank for a run that uses no AI Engine, and `None` on a server that does not report it.
+    """
+    ai_engine_version: Optional[str] = None
+    """
+    The version of the AI Engine the run's `ai_detect` matchers use, as the engine reports it.
+    Blank for a run that uses no AI Engine, and `None` on a server that does not report it.
+    """
 
     @model_validator(mode="before")
     @classmethod

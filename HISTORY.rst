@@ -32,6 +32,9 @@ History
 * Added ``get_last_unstructured_discovery_run_id``,
   which returns the ID of a connection's newest finished unstructured discovery run,
   or ``None`` when it has none.
+* Added ``ai_engine_model`` and ``ai_engine_version`` to ``RunInfo``:
+  the AI Engine model and engine version the run's ``ai_detect`` matchers use,
+  blank for a run that uses no AI Engine, and ``None`` on a server that does not report them.
 
 Requires server version 3.26.20
 

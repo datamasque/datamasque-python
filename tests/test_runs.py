@@ -1,5 +1,7 @@
 """Tests for `RunClient` (start, status, log, run-report endpoints)."""
 
+from typing import Optional
+
 import pytest
 import requests_mock
 
@@ -338,6 +340,35 @@ def test_get_run_info(client):
         assert isinstance(result, RunInfo)
         assert result.id == 1
         assert result.name == "r1"
+
+
+@pytest.mark.parametrize(
+    "ai_engine_fields, expected_model, expected_version",
+    [
+        ({"ai_engine_model": "base", "ai_engine_version": "1.26.11"}, "base", "1.26.11"),
+        ({"ai_engine_model": "", "ai_engine_version": ""}, "", ""),
+        ({}, None, None),
+    ],
+    ids=["ai_detect_run", "run_without_ai_detect", "server_without_the_fields"],
+)
+def test_run_info_reads_the_ai_engine_model_and_version(
+    ai_engine_fields: dict, expected_model: Optional[str], expected_version: Optional[str]
+) -> None:
+    run = RunInfo.model_validate(
+        {
+            "id": 1,
+            "status": "finished",
+            "mask_type": "file_data_discovery",
+            "source_connection_name": "documents",
+            "ruleset_name": "",
+            "project": "1-default",
+            **ai_engine_fields,
+        }
+    )
+
+    assert run.ai_engine_model == expected_model
+    assert run.ai_engine_version == expected_version
+    assert not run.model_extra
 
 
 def test_masking_run_request_model_dump_minimal():
