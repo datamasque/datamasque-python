@@ -89,6 +89,8 @@ class UnstructuredDiscoveryFile(BaseModel):
     path: str
     file_extension: str
     size_bytes: int
+    character_count: Optional[int] = None
+    """How many characters of the file's text the run searched, `None` where the run reported none."""
     status: UnstructuredDiscoveryFileStatus
     skip_reason: str
     """Why the run could not read the file, blank if it did."""
@@ -112,6 +114,21 @@ class UnstructuredDiscoveryPage(Page[T], Generic[T]):
     """The sample size when `sampling` is `UnstructuredDiscoverySampling.sampled`, `None` otherwise."""
 
 
+class UnstructuredDiscoveryLabelTotal(BaseModel):
+    """How many times one label was found over an unstructured discovery run's files."""
+
+    model_config = ConfigDict(extra="allow")
+
+    label: str
+    """The label's `name` in the discovery config."""
+    description: str
+    categories: list[str]
+    occurrences: int
+    """How many times the label was found, summed over the files."""
+    file_count: int
+    """How many files hold the label."""
+
+
 class UnstructuredDiscoverySummary(BaseModel):
     """An unstructured discovery run's totals."""
 
@@ -121,7 +138,21 @@ class UnstructuredDiscoverySummary(BaseModel):
     files_found: int
     """How many files were found on the connection, summed over the directories."""
     files_read: int
+    files_failed: int
+    """How many files the run tried to read and could not."""
+    files_skipped: int
+    """
+    How many of the files found the run has not tried to read:
+    those it skipped, and those a running or cancelled run has not reached.
+    `files_found` is `files_read` plus `files_failed` plus `files_skipped`.
+    """
+    files_without_text: int
+    """How many of the files the run read held no text to search, as a scanned document may not."""
     files_with_findings: int
     """How many of the files the run read hold a finding."""
     bytes_opened: int
     """The total size, in bytes, of the files the run read."""
+    files_over_run_limit: int
+    """How many files the run did not read because it reached the config's `files_per_run`."""
+    labels: list[UnstructuredDiscoveryLabelTotal]
+    """Each label found, most found first; labels found equally often are listed by name."""

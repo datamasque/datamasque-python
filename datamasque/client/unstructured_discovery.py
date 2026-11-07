@@ -112,7 +112,7 @@ class UnstructuredDiscoveryClient(BaseClient):
 
     def get_unstructured_discovery_summary(self, run_id: RunId) -> UnstructuredDiscoverySummary:
         """
-        Returns an unstructured discovery run's totals.
+        Returns an unstructured discovery run's totals, and how many times it found each label.
 
         They are counted from the run's stored results on each request,
         so they change while results are still being stored.
@@ -125,6 +125,10 @@ class UnstructuredDiscoveryClient(BaseClient):
         """
         Returns an unstructured discovery run's findings, one row for each label found in each file.
 
+        A file the run read and found nothing in has one row,
+        with a blank label, description and categories, and 0 occurrences.
+        A file the run could not read has no row.
+        Every row carries its file's `character_count`, blank where the run reported none.
         Returns CSV text (`str`) that starts with a byte-order mark,
         or a zip of numbered CSV parts as `bytes` when the server splits a report of more than 1,000,000 rows.
         The first row of each CSV names the columns.

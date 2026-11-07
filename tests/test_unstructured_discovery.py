@@ -50,11 +50,19 @@ def _directory(directory: str) -> dict:
     }
 
 
-def _file(path: str, *, status: str = "read", skip_reason: str = "", findings: Optional[list[dict]] = None) -> dict:
+def _file(
+    path: str,
+    *,
+    status: str = "read",
+    skip_reason: str = "",
+    character_count: Optional[int] = 5120,
+    findings: Optional[list[dict]] = None,
+) -> dict:
     return {
         "path": path,
         "file_extension": "pdf",
         "size_bytes": 204817,
+        "character_count": character_count,
         "status": status,
         "skip_reason": skip_reason,
         "findings": findings if findings is not None else [],
@@ -138,7 +146,10 @@ def test_get_unstructured_discovery_file_page_parses_the_files_and_their_finding
     rows = [
         _file("Finance/Invoices/0142.pdf", findings=[finding]),
         _file(
-            "Finance/Invoices/0143.pdf", status="unread", skip_reason="An error occurred while running data discovery"
+            "Finance/Invoices/0143.pdf",
+            status="unread",
+            skip_reason="An error occurred while running data discovery",
+            character_count=None,
         ),
     ]
     with requests_mock.Mocker(case_sensitive=True) as m:
@@ -157,6 +168,7 @@ def test_get_unstructured_discovery_file_page_parses_the_files_and_their_finding
     assert read_file.path == "Finance/Invoices/0142.pdf"
     assert read_file.file_extension == "pdf"
     assert read_file.size_bytes == 204817
+    assert read_file.character_count == 5120
     assert read_file.status is UnstructuredDiscoveryFileStatus.read
     assert read_file.skip_reason == ""
     assert read_file.findings[0].label == "EMAIL"
@@ -165,7 +177,10 @@ def test_get_unstructured_discovery_file_page_parses_the_files_and_their_finding
     assert read_file.findings[0].categories == ["PII"]
     assert unread_file.status is UnstructuredDiscoveryFileStatus.unread
     assert unread_file.skip_reason == "An error occurred while running data discovery"
+    assert unread_file.character_count is None
     assert unread_file.findings == []
+    assert not read_file.model_extra
+    assert not unread_file.model_extra
 
 
 def test_get_unstructured_discovery_file_page_sends_a_blank_directory_for_the_root(client: DataMasqueClient) -> None:
@@ -212,8 +227,27 @@ def test_iter_unstructured_discovery_files_asks_for_one_directory(
     }
 
 
-def test_get_unstructured_discovery_summary(client: DataMasqueClient) -> None:
-    totals = {"run_id": 41, "files_found": 340, "files_read": 20, "files_with_findings": 14, "bytes_opened": 8123344}
+def test_get_unstructured_discovery_summary_parses_the_totals_and_each_label(client: DataMasqueClient) -> None:
+    totals = {
+        "run_id": 41,
+        "files_found": 340,
+        "files_read": 20,
+        "files_failed": 2,
+        "files_skipped": 318,
+        "files_without_text": 3,
+        "files_with_findings": 14,
+        "bytes_opened": 8123344,
+        "files_over_run_limit": 7,
+        "labels": [
+            {
+                "label": "EMAIL",
+                "description": "Email address",
+                "categories": ["PII", "Contact"],
+                "occurrences": 62,
+                "file_count": 11,
+            }
+        ],
+    }
     with requests_mock.Mocker() as m:
         m.get(f"{RESULTS_URL}summary/", json=totals)
         summary = client.get_unstructured_discovery_summary(RunId(41))
@@ -221,15 +255,27 @@ def test_get_unstructured_discovery_summary(client: DataMasqueClient) -> None:
     assert summary.run_id == 41
     assert summary.files_found == 340
     assert summary.files_read == 20
+    assert summary.files_failed == 2
+    assert summary.files_skipped == 318
+    assert summary.files_without_text == 3
     assert summary.files_with_findings == 14
     assert summary.bytes_opened == 8123344
+    assert summary.files_over_run_limit == 7
+    label_total = summary.labels[0]
+    assert label_total.label == "EMAIL"
+    assert label_total.description == "Email address"
+    assert label_total.categories == ["PII", "Contact"]
+    assert label_total.occurrences == 62
+    assert label_total.file_count == 11
     assert not summary.model_extra
+    assert not label_total.model_extra
 
 
 def test_get_unstructured_report_returns_the_csv_text(client: DataMasqueClient) -> None:
     csv_text = (
-        "\ufeffpath,directory,file_name,label,description,occurrences,categories\r\n"
-        "réunions/0142.pdf,réunions,0142.pdf,EMAIL,Email address,4,PII;Contact\r\n"
+        "\ufeffpath,directory,file_name,label,description,occurrences,categories,character_count\r\n"
+        "réunions/0142.pdf,réunions,0142.pdf,EMAIL,Email address,4,PII;Contact,5120\r\n"
+        "réunions/0143.pdf,réunions,0143.pdf,,,0,,96\r\n"
     )
     with requests_mock.Mocker() as m:
         m.get(
