@@ -37,8 +37,8 @@ History
   or ``None`` when it has none.
 * Added ``ai_engine_model`` and ``ai_engine_version`` to ``RunInfo``:
   the AI Engine model and engine version the run's ``ai_detect`` matchers use,
-  blank when the run recorded none, such as a run that uses no AI Engine,
-  and ``None`` on a server that does not report them.
+  ``None`` when the run recorded none, such as a run that uses no AI Engine,
+  or on a server that does not report them.
 
 Requires server version 3.26.20
 

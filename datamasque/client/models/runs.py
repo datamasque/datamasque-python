@@ -153,14 +153,14 @@ class RunInfo(BaseModel):
     The AI Engine model the run's `ai_detect` matchers use:
     for a Local AI Engine, the name of its model file or folder,
     and for a Bedrock AI Engine, the Bedrock model set in its configuration.
-    Blank when the run recorded none, such as a run that uses no AI Engine,
-    and `None` on a server that does not report it.
+    `None` when the run recorded none, such as a run that uses no AI Engine,
+    or on a server that does not report it.
     """
     ai_engine_version: Optional[str] = None
     """
     The version the AI Engine reported when the run started.
-    Blank when the run recorded none, such as a run that uses no AI Engine,
-    and `None` on a server that does not report it.
+    `None` when the run recorded none, such as a run that uses no AI Engine,
+    or on a server that does not report it.
     """
 
     @model_validator(mode="before")

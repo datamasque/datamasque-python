@@ -350,7 +350,7 @@ def test_get_run_info(client):
             "dm-ai-ner-small-1.0.0-20260601.tar.enc",
             "1.26.11",
         ),
-        ({"ai_engine_model": "", "ai_engine_version": ""}, "", ""),
+        ({"ai_engine_model": None, "ai_engine_version": None}, None, None),
         ({}, None, None),
     ],
     ids=["ai_detect_run", "run_without_ai_detect", "server_without_the_fields"],
