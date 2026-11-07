@@ -22,8 +22,11 @@ History
 * Added methods that read an unstructured discovery run's results:
   ``get_unstructured_discovery_directory_page`` and ``iter_unstructured_discovery_directories``
   for the directories found on the connection,
+  optionally narrowed by ``search``, ``labels`` and ``categories``
+  and sorted by ``UnstructuredDiscoveryDirectoryOrdering``,
   ``get_unstructured_discovery_file_page`` and ``iter_unstructured_discovery_files`` for the files of one directory,
-  optionally narrowed by ``UnstructuredDiscoveryFileStatus``,
+  optionally narrowed by ``UnstructuredDiscoveryFileStatus``, ``search``, ``labels``, ``categories``
+  and ``UnstructuredDiscoveryFileOutcome``,
   ``get_unstructured_discovery_summary`` for its totals and how many times it found each label,
   and ``get_unstructured_report`` for its findings CSV,
   or a zip of CSV parts as ``bytes`` for a report of more than 1,000,000 rows.

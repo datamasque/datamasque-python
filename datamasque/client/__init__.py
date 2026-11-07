@@ -179,7 +179,9 @@ from datamasque.client.models.table_reference import (
 )
 from datamasque.client.models.unstructured_discovery import (
     UnstructuredDiscoveryDirectory,
+    UnstructuredDiscoveryDirectoryOrdering,
     UnstructuredDiscoveryFile,
+    UnstructuredDiscoveryFileOutcome,
     UnstructuredDiscoveryFileStatus,
     UnstructuredDiscoveryFinding,
     UnstructuredDiscoveryLabelTotal,
@@ -341,7 +343,9 @@ __all__ = [
     "TemporalSummaries",
     "UnfinishedRun",
     "UnstructuredDiscoveryDirectory",
+    "UnstructuredDiscoveryDirectoryOrdering",
     "UnstructuredDiscoveryFile",
+    "UnstructuredDiscoveryFileOutcome",
     "UnstructuredDiscoveryFileStatus",
     "UnstructuredDiscoveryFinding",
     "UnstructuredDiscoveryLabelTotal",

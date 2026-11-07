@@ -12,6 +12,8 @@ from datamasque.client.exceptions import DataMasqueApiError
 from datamasque.client.models.connection import ConnectionId
 from datamasque.client.models.runs import RunId
 from datamasque.client.models.unstructured_discovery import (
+    UnstructuredDiscoveryDirectoryOrdering,
+    UnstructuredDiscoveryFileOutcome,
     UnstructuredDiscoveryFileStatus,
     UnstructuredDiscoverySampling,
 )
@@ -58,6 +60,13 @@ def _file(
     character_count: Optional[int] = 5120,
     findings: Optional[list[dict]] = None,
 ) -> dict:
+    findings = findings if findings is not None else []
+    if status != "read":
+        outcome = "failed"
+    elif findings:
+        outcome = "findings"
+    else:
+        outcome = "no_text" if character_count == 0 else "nothing_found"
     return {
         "path": path,
         "file_extension": "pdf",
@@ -65,7 +74,8 @@ def _file(
         "character_count": character_count,
         "status": status,
         "skip_reason": skip_reason,
-        "findings": findings if findings is not None else [],
+        "outcome": outcome,
+        "findings": findings,
     }
 
 
@@ -108,7 +118,7 @@ def test_get_unstructured_discovery_directory_page_parses_the_run_and_its_direct
         m.get(RESULTS_URL, json=_envelope([_directory("finance/invoices")]))
         page = client.get_unstructured_discovery_directory_page(RunId(41), limit=10, offset=20)
 
-    assert m.last_request.qs == {"limit": ["10"], "offset": ["20"]}
+    assert m.last_request.qs == {"ordering": ["directory"], "limit": ["10"], "offset": ["20"]}
     assert page.run_id == 41
     assert page.connection.id == CONNECTION_ID
     assert page.connection.name == "invoices"
@@ -134,11 +144,69 @@ def test_get_unstructured_discovery_directory_page_asks_for_the_first_page_by_de
         m.get(RESULTS_URL, json=_envelope([], sampling="all", files_per_directory=None, finished_at=None))
         page = client.get_unstructured_discovery_directory_page(RunId(41))
 
-    assert m.last_request.qs == {"limit": ["50"], "offset": ["0"]}
+    assert m.last_request.qs == {"ordering": ["directory"], "limit": ["50"], "offset": ["0"]}
     assert page.results == []
     assert page.sampling is UnstructuredDiscoverySampling.all
     assert page.files_per_directory is None
     assert page.finished_at is None
+
+
+@pytest.mark.parametrize(
+    "call, expected_limit",
+    [
+        (lambda client, **filters: client.get_unstructured_discovery_directory_page(RunId(41), **filters), "50"),
+        (lambda client, **filters: list(client.iter_unstructured_discovery_directories(RunId(41), **filters)), "1000"),
+    ],
+    ids=["page", "iterator"],
+)
+def test_unstructured_discovery_directories_send_the_search_and_label_filters(
+    client: DataMasqueClient, call: Callable[..., object], expected_limit: str
+) -> None:
+    with requests_mock.Mocker(case_sensitive=True) as m:
+        m.get(RESULTS_URL, json=_envelope([_directory("Finance/Invoices")]))
+        call(client, search="Invoices", labels=["EMAIL", "CREDIT_CARD"], categories=["PII", "Financial"])
+
+    assert m.last_request.qs == {
+        "search": ["Invoices"],
+        "labels": ["EMAIL,CREDIT_CARD"],
+        "categories": ["PII,Financial"],
+        "ordering": ["directory"],
+        "limit": [expected_limit],
+        "offset": ["0"],
+    }
+
+
+@pytest.mark.parametrize(
+    "ordering, descending, expected_ordering",
+    [
+        (UnstructuredDiscoveryDirectoryOrdering.directory, True, "-directory"),
+        (UnstructuredDiscoveryDirectoryOrdering.files_found, False, "files_found"),
+        (UnstructuredDiscoveryDirectoryOrdering.files_read, True, "-files_read"),
+        (UnstructuredDiscoveryDirectoryOrdering.files_with_findings, True, "-files_with_findings"),
+        (UnstructuredDiscoveryDirectoryOrdering.size_bytes, False, "size_bytes"),
+        (UnstructuredDiscoveryDirectoryOrdering.occurrences, True, "-occurrences"),
+    ],
+)
+@pytest.mark.parametrize(
+    "call",
+    [
+        lambda client, **ordering: client.get_unstructured_discovery_directory_page(RunId(41), **ordering),
+        lambda client, **ordering: list(client.iter_unstructured_discovery_directories(RunId(41), **ordering)),
+    ],
+    ids=["page", "iterator"],
+)
+def test_unstructured_discovery_directories_send_the_ordering(
+    client: DataMasqueClient,
+    call: Callable[..., object],
+    ordering: UnstructuredDiscoveryDirectoryOrdering,
+    descending: bool,
+    expected_ordering: str,
+) -> None:
+    with requests_mock.Mocker(case_sensitive=True) as m:
+        m.get(RESULTS_URL, json=_envelope([_directory("Finance/Invoices")]))
+        call(client, ordering=ordering, descending=descending)
+
+    assert m.last_request.qs["ordering"] == [expected_ordering]
 
 
 def test_get_unstructured_discovery_file_page_parses_the_files_and_their_findings(client: DataMasqueClient) -> None:
@@ -170,12 +238,14 @@ def test_get_unstructured_discovery_file_page_parses_the_files_and_their_finding
     assert read_file.size_bytes == 204817
     assert read_file.character_count == 5120
     assert read_file.status is UnstructuredDiscoveryFileStatus.read
+    assert read_file.outcome is UnstructuredDiscoveryFileOutcome.findings
     assert read_file.skip_reason == ""
     assert read_file.findings[0].label == "EMAIL"
     assert read_file.findings[0].description == "Email address"
     assert read_file.findings[0].occurrences == 4
     assert read_file.findings[0].categories == ["PII"]
     assert unread_file.status is UnstructuredDiscoveryFileStatus.unread
+    assert unread_file.outcome is UnstructuredDiscoveryFileOutcome.failed
     assert unread_file.skip_reason == "An error occurred while running data discovery"
     assert unread_file.character_count is None
     assert unread_file.findings == []
@@ -201,7 +271,7 @@ def test_iter_unstructured_discovery_directories_follows_the_next_page(client: D
         directories = list(client.iter_unstructured_discovery_directories(RunId(41)))
 
     assert [directory.directory for directory in directories] == ["a", "b"]
-    assert m.request_history[0].qs == {"limit": ["1000"], "offset": ["0"]}
+    assert m.request_history[0].qs == {"ordering": ["directory"], "limit": ["1000"], "offset": ["0"]}
     assert m.request_history[1].url == next_url
 
 
@@ -224,6 +294,41 @@ def test_iter_unstructured_discovery_files_asks_for_one_directory(
         "limit": ["1000"],
         "offset": ["0"],
         **expected_status_query,
+    }
+
+
+@pytest.mark.parametrize(
+    "call, expected_limit",
+    [
+        (lambda client, **filters: client.get_unstructured_discovery_file_page(RunId(41), "claims", **filters), "50"),
+        (
+            lambda client, **filters: list(client.iter_unstructured_discovery_files(RunId(41), "claims", **filters)),
+            "1000",
+        ),
+    ],
+    ids=["page", "iterator"],
+)
+def test_unstructured_discovery_files_send_the_search_label_and_outcome_filters(
+    client: DataMasqueClient, call: Callable[..., object], expected_limit: str
+) -> None:
+    with requests_mock.Mocker(case_sensitive=True) as m:
+        m.get(RESULTS_URL, json=_envelope([_file("claims/Claim-1.pdf")]))
+        call(
+            client,
+            search="Claim",
+            labels=["EMAIL", "CREDIT_CARD"],
+            categories=["PII", "Financial"],
+            outcomes=[UnstructuredDiscoveryFileOutcome.no_text, UnstructuredDiscoveryFileOutcome.failed],
+        )
+
+    assert m.last_request.qs == {
+        "directory": ["claims"],
+        "search": ["Claim"],
+        "labels": ["EMAIL,CREDIT_CARD"],
+        "categories": ["PII,Financial"],
+        "outcome": ["no_text,failed"],
+        "limit": [expected_limit],
+        "offset": ["0"],
     }
 
 

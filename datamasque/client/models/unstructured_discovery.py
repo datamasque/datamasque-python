@@ -20,6 +20,40 @@ class UnstructuredDiscoveryFileStatus(enum.Enum):
     """The run tried to read the file and could not; `skip_reason` says why."""
 
 
+class UnstructuredDiscoveryFileOutcome(enum.Enum):
+    """What an unstructured discovery run made of a file it tried to read."""
+
+    findings = "findings"
+    """The run found at least one label in the file."""
+    no_text = "no_text"
+    """The run read the file and found no text to search in it, as in a scanned document."""
+    nothing_found = "nothing_found"
+    """The run read the file's text and found no label in it."""
+    failed = "failed"
+    """The run tried to read the file and could not."""
+
+
+class UnstructuredDiscoveryDirectoryOrdering(enum.Enum):
+    """
+    A column the directories of an unstructured discovery run are sorted by.
+
+    Directories that tie are sorted by path.
+    """
+
+    directory = "directory"
+    """The directory's path."""
+    files_found = "files_found"
+    files_read = "files_read"
+    files_with_findings = "files_with_findings"
+    """With a `labels` or `categories` filter, only a file holding a matching label counts."""
+    size_bytes = "size_bytes"
+    occurrences = "occurrences"
+    """
+    The sum of the directory's `entity_counts`.
+    With a `labels` or `categories` filter, only the matching labels count.
+    """
+
+
 class UnstructuredDiscoverySampling(enum.Enum):
     """How many files of each directory an unstructured discovery run read."""
 
@@ -94,6 +128,8 @@ class UnstructuredDiscoveryFile(BaseModel):
     status: UnstructuredDiscoveryFileStatus
     skip_reason: str
     """Why the run could not read the file, blank if it did."""
+    outcome: UnstructuredDiscoveryFileOutcome
+    """What the run made of the file."""
     findings: list[UnstructuredDiscoveryFinding]
 
 
