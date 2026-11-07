@@ -345,7 +345,11 @@ def test_get_run_info(client):
 @pytest.mark.parametrize(
     "ai_engine_fields, expected_model, expected_version",
     [
-        ({"ai_engine_model": "base", "ai_engine_version": "1.26.11"}, "base", "1.26.11"),
+        (
+            {"ai_engine_model": "dm-ai-ner-small-1.0.0-20260601.tar.enc", "ai_engine_version": "1.26.11"},
+            "dm-ai-ner-small-1.0.0-20260601.tar.enc",
+            "1.26.11",
+        ),
         ({"ai_engine_model": "", "ai_engine_version": ""}, "", ""),
         ({}, None, None),
     ],
