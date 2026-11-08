@@ -248,6 +248,33 @@ def test_move_resources_raises_an_api_error_for_a_409_with_no_conflicts(client: 
     assert not isinstance(exc_info.value, ResourceMoveConflictError)
 
 
+def test_move_resources_raises_an_api_error_for_a_409_that_is_not_json(client: DataMasqueClient) -> None:
+    with requests_mock.Mocker() as m:
+        m.post("http://test-server/api/resources/move/", status_code=409, text="Conflict")
+        with pytest.raises(DataMasqueApiError) as exc_info:
+            client.move_resources(MOVING, ProjectId(8))
+
+    assert not isinstance(exc_info.value, ResourceMoveConflictError)
+    assert str(exc_info.value) == "API request to http://test-server/api/resources/move/ failed with status 409"
+
+
+@pytest.mark.parametrize("status_code", [400, 403, 404])
+def test_move_resources_raises_an_api_error_with_the_status(
+    client: DataMasqueClient, caplog: pytest.LogCaptureFixture, status_code: int
+) -> None:
+    with requests_mock.Mocker() as m:
+        m.post("http://test-server/api/resources/move/", status_code=status_code, json={"detail": "Refused."})
+        with pytest.raises(DataMasqueApiError) as exc_info:
+            client.move_resources(MOVING, ProjectId(8))
+
+    assert exc_info.value.response is not None
+    assert exc_info.value.response.status_code == status_code
+    assert str(exc_info.value) == (
+        f"API request to http://test-server/api/resources/move/ failed with status {status_code}"
+    )
+    assert any(record.getMessage().startswith("Request data was:") for record in caplog.records)
+
+
 def test_move_resources_moves_what_list_resources_returned_to_a_project(client: DataMasqueClient) -> None:
     retail = Project.model_validate(
         {
