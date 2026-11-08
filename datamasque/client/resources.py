@@ -32,6 +32,10 @@ def _move_request(resources: ResourcesByType, destination: ProjectIdentifier) ->
     return {"destination": str(unwrap_project_id(destination)), "resources": keys}
 
 
+def _get_conflicts(body: dict) -> list[ResourceMoveConflict]:
+    return [ResourceMoveConflict.model_validate(conflict) for conflict in body["conflicts"]]
+
+
 class ResourceClient(BaseClient):
     """Resource listing and move API methods. Mixed into `DataMasqueClient`."""
 
@@ -99,7 +103,7 @@ class ResourceClient(BaseClient):
         `resources` can contain up to 2,000 resources.
 
         Returns:
-            The conflicts that would keep any of `resources` from moving (if any).
+            The conflicts for `resources` (if any). An `already_in_destination` conflict does not stop a move.
 
         Raises:
             ValueError: `resources` is empty.
@@ -108,7 +112,7 @@ class ResourceClient(BaseClient):
         """
 
         response = self.make_request("POST", "/api/resources/move-check/", data=_move_request(resources, destination))
-        return [ResourceMoveConflict.model_validate(conflict) for conflict in response.json()["conflicts"]]
+        return _get_conflicts(response.json())
 
     def move_resources(
         self,
@@ -121,7 +125,7 @@ class ResourceClient(BaseClient):
         `resources` can be the result of `list_resources`, or any part of it, and can contain up to 2,000 resources.
         All of them move, or none do.
         A resource already in the destination stays there, and the others move.
-        `get_resource_move_conflicts` lists the conflicts without trying to move anything.
+        `get_resource_move_conflicts` lists the conflicts without trying to move anything. An `already_in_destination` conflict does not stop a move.
         Rulesets, discovery configs and RG configs whose library imports resolve differently after the move
         are marked invalid.
 
@@ -134,21 +138,26 @@ class ResourceClient(BaseClient):
                 or the caller does not have permission to move one of the resource types.
         """
 
+        request_data = _move_request(resources, destination)
         response = self.make_request(
             "POST",
             "/api/resources/move/",
-            data=_move_request(resources, destination),
+            data=request_data,
             require_status_check=False,
         )
-        if response.status_code == 409 and "conflicts" in response.json():
-            body = response.json()
-            raise ResourceMoveConflictError(
-                str(body["detail"]),
-                response=response,
-                conflicts=[ResourceMoveConflict.model_validate(conflict) for conflict in body["conflicts"]],
-            )
+        if response.status_code == 409:
+            try:
+                body = response.json()
+            except ValueError:
+                body = None
+            if isinstance(body, dict) and "conflicts" in body:
+                raise ResourceMoveConflictError(
+                    str(body["detail"]),
+                    response=response,
+                    conflicts=_get_conflicts(body),
+                )
 
-        self._raise_for_status(response)
+        self._raise_for_status(response, request_data=request_data)
         result = ResourceMoveResult.model_validate(response.json())
         logger.info("Moved %d resources to project %s", result.moved, unwrap_project_id(destination))
         return result
