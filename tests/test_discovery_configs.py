@@ -532,7 +532,7 @@ def test_get_default_discovery_config_yaml_raises_when_the_server_refuses_the_ki
 
 
 def test_default_discovery_config_parameters_are_keyword_only(client: DataMasqueClient) -> None:
-    with pytest.raises(TypeError):
+    with pytest.raises(TypeError, match="takes 1 positional argument but 2 were given"):
         client.get_default_discovery_config_yaml(DiscoveryConfigType.file)
 
 
