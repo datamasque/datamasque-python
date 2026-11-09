@@ -97,12 +97,15 @@ class UnstructuredDiscoveryClient(BaseClient):
         Returns one page of the directories an unstructured discovery run found on the connection.
 
         `search` keeps the directories whose path contains it, ignoring case,
-        and the directories holding a file whose name contains it.
+        and the directories holding a file the run tried to read whose name contains it.
         `labels` keeps the directories holding any of those labels,
         and `categories` the directories holding a label that carries any of those categories;
         given both, a label must match both.
+        Files with no text to search and files the run could not read hold no label,
+        so they do not keep a directory.
         With `labels` or `categories`, a file matches `search` only if it holds a matching label,
-        or the run found no text to search in it or could not read it.
+        or the run read it and found no text to search in it;
+        a file the run could not read never matches.
         Each directory's `entity_counts` still counts every label it holds.
         The directories come in `ordering`, descending when `descending` is set,
         and directories that tie are sorted by path, ascending.
@@ -166,7 +169,8 @@ class UnstructuredDiscoveryClient(BaseClient):
         `labels` keeps the files holding any of those labels,
         and `categories` the files holding a label that carries any of those categories;
         given both, a label must match both.
-        Either one also keeps the files the run read and found no text to search in, which may hold any label.
+        Either one also keeps the files the run read and found no text to search in, which may hold any label,
+        and drops the files the run could not read.
         The files with findings come first,
         then the files with no text to search, those with nothing found and those the run could not read,
         each group sorted by name.
