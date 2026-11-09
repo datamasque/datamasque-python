@@ -16,6 +16,7 @@ class UnstructuredDiscoveryFileStatus(enum.Enum):
     """Whether an unstructured discovery run read a file's text."""
 
     read = "read"
+    """The run read the file; its `character_count` is 0 when it held no text to search."""
     failed = "failed"
     """The run tried to read the file and could not; `skip_reason` says why."""
 
@@ -87,6 +88,10 @@ class UnstructuredDiscoveryDirectory(BaseModel):
     files_found: int
     """How many files were found in the directory, read or not."""
     files_read: int
+    """
+    How many of the directory's files the run read,
+    including those with no text to search but not those it could not read.
+    """
     files_with_findings: int
     """
     How many of the directory's files the run read hold a finding.
@@ -174,6 +179,7 @@ class UnstructuredDiscoverySummary(BaseModel):
     files_found: int
     """How many files were found on the connection, summed over the directories."""
     files_read: int
+    """How many files the run read, including those with no text to search but not those it could not read."""
     files_failed: int
     """How many files the run tried to read and could not."""
     files_skipped: int
