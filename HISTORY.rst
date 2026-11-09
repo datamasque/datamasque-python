@@ -18,7 +18,7 @@ History
   typed by ``DiscoveryConfigType`` and the new ``DiscoveryKind`` enum.
   ``discovery_kind=DiscoveryKind.unstructured`` with ``config_type=DiscoveryConfigType.file``
   returns the template of an unstructured discovery config,
-  which counts entities in the text of documents.
+  which counts the occurrences of its labels in the text of documents.
 * Added methods that read an unstructured discovery run's results:
   ``get_unstructured_discovery_directory_page`` and ``iter_unstructured_discovery_directories``
   for the directories found on the connection,

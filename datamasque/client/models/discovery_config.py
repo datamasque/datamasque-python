@@ -17,7 +17,7 @@ class DiscoveryConfigType(enum.Enum):
 
 
 class DiscoveryKind(enum.Enum):
-    """What a file discovery config looks for: sensitive locators, or entities in the text of documents."""
+    """What a file discovery config looks for: sensitive locators, or its labels in the text of documents."""
 
     structured = "structured"
     unstructured = "unstructured"
