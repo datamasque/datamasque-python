@@ -26,7 +26,7 @@ class UnstructuredDiscoveryFileOutcome(enum.Enum):
     findings = "findings"
     """The run found at least one label in the file."""
     no_text = "no_text"
-    """The run read the file and found no text to search in it, as in a scanned document."""
+    """The run read the file and found no text to search in it."""
     nothing_found = "nothing_found"
     """The run read the file's text and found no label in it."""
     failed = "failed"
@@ -60,7 +60,7 @@ class UnstructuredDiscoverySampling(enum.Enum):
     sampled = "sampled"
     """At most `files_per_directory` files of each directory."""
     all = "all"
-    """Every file of each directory that the run could read."""
+    """The run set no limit on how many files of each directory it read."""
     unknown = "unknown"
     """The run's discovery config cannot be read."""
 
@@ -124,7 +124,7 @@ class UnstructuredDiscoveryFile(BaseModel):
     file_extension: str
     size_bytes: int
     character_count: Optional[int] = None
-    """How many characters of the file's text the run searched, `None` where the run reported none."""
+    """How many characters of the file's text the run searched; `None` for a file the run could not read."""
     status: UnstructuredDiscoveryFileStatus
     skip_reason: str
     """Why the run could not read the file, blank if it did."""
@@ -183,7 +183,7 @@ class UnstructuredDiscoverySummary(BaseModel):
     `files_found` is `files_read` plus `files_failed` plus `files_skipped`.
     """
     files_without_text: int
-    """How many of the files the run read held no text to search, as a scanned document may not."""
+    """How many of the files the run read held no text to search."""
     files_with_findings: int
     """How many of the files the run read hold a finding."""
     bytes_opened: int
