@@ -232,7 +232,7 @@ class UnstructuredDiscoveryClient(BaseClient):
         A label's categories share one cell, joined with `;`.
         """
 
-        response = self.make_request("GET", f"/api/runs/{run_id}/unstructured-report/")
+        response = self.make_request("GET", f"/api/runs/{run_id}/unstructured-discovery/report/")
         if response.headers.get("Content-Type", "").startswith("application/zip"):
             return response.content
         return response.text

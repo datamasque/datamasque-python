@@ -19,7 +19,7 @@ from datamasque.client.models.unstructured_discovery import (
 )
 
 RESULTS_URL = "http://test-server/api/runs/41/unstructured-discovery/"
-REPORT_URL = "http://test-server/api/runs/41/unstructured-report/"
+REPORT_URL = "http://test-server/api/runs/41/unstructured-discovery/report/"
 CONNECTION_ID = "aaaaaaaa-1111-2222-3333-444444444444"
 
 ClientCall = Callable[[DataMasqueClient], object]
