@@ -161,7 +161,8 @@ class UnstructuredDiscoveryClient(BaseClient):
         an empty string names the connection root.
         `status` keeps only the files with that status,
         and `outcomes` only the files with any of those outcomes.
-        `search` keeps the files whose name contains it, ignoring case.
+        `search` keeps the files whose name contains it, ignoring case,
+        or every file when the directory's path contains it.
         `labels` keeps the files holding any of those labels,
         and `categories` the files holding a label that carries any of those categories;
         given both, a label must match both.
