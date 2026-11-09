@@ -101,8 +101,8 @@ class UnstructuredDiscoveryClient(BaseClient):
         `labels` keeps the directories holding any of those labels,
         and `categories` the directories holding a label that carries any of those categories;
         given both, a label must match both.
-        Files with no text to search and files the run could not read hold no label,
-        so they do not keep a directory.
+        Files with no text to search and files the run could not read have no findings,
+        so neither filter keeps a directory for them.
         With `labels` or `categories`, a file matches `search` only if it holds a matching label,
         or the run read it and found no text to search in it;
         a file the run could not read never matches.
