@@ -240,6 +240,4 @@ class UnstructuredDiscoveryClient(BaseClient):
         """
 
         response = self.make_request("GET", f"/api/runs/{run_id}/unstructured-discovery/report/")
-        if response.headers.get("Content-Type", "").startswith("application/zip"):
-            return response.content
-        return response.text
+        return self._read_csv_or_zip(response)
