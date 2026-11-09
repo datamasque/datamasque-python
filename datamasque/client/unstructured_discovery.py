@@ -230,10 +230,12 @@ class UnstructuredDiscoveryClient(BaseClient):
         A file the run read and found nothing in has one row,
         with a blank label, description and categories, and 0 occurrences.
         A file the run could not read has no row.
-        Every row carries its file's `character_count`, blank where the run reported none.
+        Every row carries its file's `character_count`,
+        how many characters of the file's text the run searched.
         Returns CSV text (`str`) that starts with a byte-order mark,
         or a zip of numbered CSV parts as `bytes` when the server splits a report of more than 1,000,000 rows.
-        The first row of each CSV names the columns.
+        The first row of each CSV names the columns:
+        `path`, `directory`, `file_name`, `label`, `description`, `occurrences`, `categories` and `character_count`.
         A label's categories share one cell, joined with `;`.
         """
 
