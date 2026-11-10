@@ -18,13 +18,20 @@ LINK_REQUEST_JSON = {
 }
 
 
-def event_json(kind: str, *, peer_hostname: Optional[str] = None, peer_fingerprint: Optional[str] = None) -> dict:
+def event_json(
+    kind: str,
+    *,
+    peer_hostname: Optional[str] = None,
+    request_fingerprint: Optional[str] = None,
+    response_fingerprint: Optional[str] = None,
+) -> dict:
     return {
         "id": "3f2b8c1e-5d4a-4e6f-9a7b-1c2d3e4f5a6b",
         "created_at": "2026-10-30T11:00:00Z",
         "kind": kind,
         "peer_hostname": peer_hostname,
-        "peer_fingerprint": peer_fingerprint,
+        "request_fingerprint": request_fingerprint,
+        "response_fingerprint": response_fingerprint,
         "username": "admin",
     }
 
@@ -36,13 +43,20 @@ def test_get_instance_secret_fingerprint_returns_the_fingerprint(client):
 
 
 def test_get_instance_secret_link_history_parses_events(client):
-    shared = event_json("shared", peer_hostname="other.example.com", peer_fingerprint="ABCD-EFGH-JKMN-PQRS")
+    shared = event_json(
+        "shared",
+        peer_hostname="other.example.com",
+        request_fingerprint="7KQ2-9MXA-3HDP-T0WZ",
+        response_fingerprint="ABCD-EFGH-JKMN-PQRS",
+    )
     with requests_mock.Mocker() as m:
         m.get(f"{LINK_URL}/history/", json={"current_links": [shared], "events": [shared, event_json("initialised")]})
         history = client.get_instance_secret_link_history()
 
     assert history.current_links[0].kind is InstanceSecretEventKind.shared
     assert history.current_links[0].peer_hostname == "other.example.com"
+    assert history.current_links[0].request_fingerprint == "7KQ2-9MXA-3HDP-T0WZ"
+    assert history.current_links[0].response_fingerprint == "ABCD-EFGH-JKMN-PQRS"
     assert [event.kind for event in history.events] == [
         InstanceSecretEventKind.shared,
         InstanceSecretEventKind.initialised,
@@ -127,6 +141,7 @@ SERVER_LINK_ERROR_CODES = (
     "active_runs",
     "verification_stale",
     "host_header_too_long",
+    "insecure_instance_secret",
 )
 
 

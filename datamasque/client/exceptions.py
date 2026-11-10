@@ -97,6 +97,8 @@ class InstanceSecretLinkErrorCode(enum.Enum):
     """The instance secret or its history changed after the response code was verified. Verify the response again."""
     host_header_too_long = "host_header_too_long"
     """The hostname used to access DataMasque is longer than 253 characters, the longest that DNS allows."""
+    insecure_instance_secret = "insecure_instance_secret"
+    """The instance secret of this DataMasque instance is not secure enough to share. Rotate it, then try again."""
 
 
 class InstanceSecretLinkError(DataMasqueApiError):
