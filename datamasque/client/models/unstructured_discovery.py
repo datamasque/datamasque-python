@@ -201,7 +201,7 @@ class UnstructuredDiscoverySummary(BaseModel):
     report_rows: int
     """
     How many rows the findings report has.
-    `get_unstructured_report` returns a zip of CSV parts above 1,000,000 rows.
+    `get_unstructured_discovery_report` returns a zip of CSV parts above 1,000,000 rows.
     """
     files_found: int
     """How many files were found on the connection, summed over the directories."""

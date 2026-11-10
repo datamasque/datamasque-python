@@ -234,7 +234,7 @@ class UnstructuredDiscoveryClient(BaseClient):
         response = self.make_request("GET", f"/api/runs/{run_id}/unstructured-discovery/summary/")
         return UnstructuredDiscoverySummary.model_validate(response.json())
 
-    def get_unstructured_report(self, run_id: RunId) -> Union[str, bytes]:
+    def get_unstructured_discovery_report(self, run_id: RunId) -> Union[str, bytes]:
         """
         Returns an unstructured discovery run's findings, one row for each label found in each file.
 

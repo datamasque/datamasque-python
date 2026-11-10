@@ -445,7 +445,7 @@ def test_get_unstructured_discovery_summary_reads_an_engine_without_a_model_name
     assert summary.ai_engine.engine_version == "1.26.11"
 
 
-def test_get_unstructured_report_returns_the_csv_text(client: DataMasqueClient) -> None:
+def test_get_unstructured_discovery_report_returns_the_csv_text(client: DataMasqueClient) -> None:
     csv_text = (
         "\ufeffpath,directory,file_name,label,description,occurrences,categories,character_count\r\n"
         "réunions/0142.pdf,réunions,0142.pdf,EMAIL,Email address,4,PII;Contact,5120\r\n"
@@ -458,15 +458,15 @@ def test_get_unstructured_report_returns_the_csv_text(client: DataMasqueClient) 
             headers={"Content-Type": "text/csv; charset=utf-8"},
         )
 
-        assert client.get_unstructured_report(RunId(41)) == csv_text
+        assert client.get_unstructured_discovery_report(RunId(41)) == csv_text
 
 
-def test_get_unstructured_report_returns_zip_bytes_when_split(client: DataMasqueClient) -> None:
+def test_get_unstructured_discovery_report_returns_zip_bytes_when_split(client: DataMasqueClient) -> None:
     zip_bytes = b"PK\x03\x04 split report zip bytes"
     with requests_mock.Mocker() as m:
         m.get(REPORT_URL, content=zip_bytes, headers={"Content-Type": "application/zip"})
 
-        assert client.get_unstructured_report(RunId(41)) == zip_bytes
+        assert client.get_unstructured_discovery_report(RunId(41)) == zip_bytes
 
 
 @pytest.mark.parametrize(
@@ -475,7 +475,7 @@ def test_get_unstructured_report_returns_zip_bytes_when_split(client: DataMasque
         (DIRECTORIES_URL, lambda client: client.get_unstructured_discovery_directory_page(RunId(41))),
         (FILES_URL, lambda client: client.get_unstructured_discovery_file_page(RunId(41), "")),
         (f"{RESULTS_URL}summary/", lambda client: client.get_unstructured_discovery_summary(RunId(41))),
-        (REPORT_URL, lambda client: client.get_unstructured_report(RunId(41))),
+        (REPORT_URL, lambda client: client.get_unstructured_discovery_report(RunId(41))),
     ],
 )
 def test_reading_a_run_that_is_not_unstructured_discovery_raises(
