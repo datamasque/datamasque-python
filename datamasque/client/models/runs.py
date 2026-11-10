@@ -7,6 +7,7 @@ from typing import Any, NewType, Optional, Union
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from datamasque.client.models.connection import ConnectionConfig, ConnectionId, unwrap_connection_id
+from datamasque.client.models.discovery_config import DiscoveryKind
 from datamasque.client.models.ruleset import Ruleset, RulesetId, unwrap_ruleset_id
 from datamasque.client.models.status import MaskingRunStatus
 
@@ -161,6 +162,11 @@ class RunInfo(BaseModel):
     The version the AI Engine reported when the run started.
     `None` when the run recorded none, such as a run that uses no AI Engine,
     or on a server that does not report it.
+    """
+    discovery_kind: Optional[DiscoveryKind] = None
+    """
+    What a file discovery run looked for: sensitive locators, or labels in the text of documents.
+    `None` for a run that ran no discovery task, or on a server that does not report it.
     """
 
     @model_validator(mode="before")

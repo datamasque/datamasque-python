@@ -2,14 +2,16 @@ from typing import Iterator, Optional, Union
 
 from datamasque.client.base import BaseClient
 from datamasque.client.models.connection import ConnectionId
+from datamasque.client.models.discovery_config import DiscoveryKind
+from datamasque.client.models.pagination import Page
 from datamasque.client.models.runs import RunId
+from datamasque.client.models.status import MaskingRunStatus
 from datamasque.client.models.unstructured_discovery import (
     UnstructuredDiscoveryDirectory,
     UnstructuredDiscoveryDirectoryOrdering,
     UnstructuredDiscoveryFile,
     UnstructuredDiscoveryFileOutcome,
     UnstructuredDiscoveryFileStatus,
-    UnstructuredDiscoveryPage,
     UnstructuredDiscoverySummary,
 )
 
@@ -66,7 +68,7 @@ class UnstructuredDiscoveryClient(BaseClient):
             params["status"] = status.value
         params |= UnstructuredDiscoveryClient._build_label_filter_params(search, labels, categories)
         if outcomes is not None:
-            params["outcome"] = LIST_SEPARATOR.join(outcome.value for outcome in outcomes)
+            params["outcomes"] = LIST_SEPARATOR.join(outcome.value for outcome in outcomes)
 
         return params
 
@@ -75,11 +77,20 @@ class UnstructuredDiscoveryClient(BaseClient):
         Returns the ID of a connection's newest finished unstructured discovery run, with or without warnings.
 
         Returns `None` when no unstructured discovery run on the connection has finished.
+        A dry run stores no results, so it is never returned.
         """
 
-        response = self.make_request("GET", f"/api/connections/{connection_id}/")
-        run_id = response.json()["last_unstructured_discovery_run_id"]
-        return RunId(run_id) if run_id is not None else None
+        params = {
+            "discovery_kind": DiscoveryKind.unstructured.value,
+            "source_connection": connection_id,
+            "dry_run": "false",
+            "run_status": [MaskingRunStatus.finished.value, MaskingRunStatus.finished_with_warnings.value],
+            "ordering": "-id",
+            "limit": 1,
+        }
+        response = self.make_request("GET", "/api/runs/", params=params)
+        runs = response.json()["results"]
+        return RunId(runs[0]["id"]) if runs else None
 
     def get_unstructured_discovery_directory_page(
         self,
@@ -92,7 +103,7 @@ class UnstructuredDiscoveryClient(BaseClient):
         descending: bool = False,
         limit: int = 50,
         offset: int = 0,
-    ) -> UnstructuredDiscoveryPage[UnstructuredDiscoveryDirectory]:
+    ) -> Page[UnstructuredDiscoveryDirectory]:
         """
         Returns one page of the directories an unstructured discovery run found on the connection.
 
@@ -115,8 +126,8 @@ class UnstructuredDiscoveryClient(BaseClient):
             "limit": limit,
             "offset": offset,
         }
-        response = self.make_request("GET", f"/api/runs/{run_id}/unstructured-discovery/", params=params)
-        return UnstructuredDiscoveryPage[UnstructuredDiscoveryDirectory].model_validate(response.json())
+        response = self.make_request("GET", f"/api/runs/{run_id}/unstructured-discovery/directories/", params=params)
+        return Page[UnstructuredDiscoveryDirectory].model_validate(response.json())
 
     # `iter_unstructured_discovery_directories` and `iter_unstructured_discovery_files` have no `list_` counterparts,
     # because a run's directory and file counts are unbounded.
@@ -138,7 +149,7 @@ class UnstructuredDiscoveryClient(BaseClient):
         """
 
         return self._iter_paginated(
-            f"/api/runs/{run_id}/unstructured-discovery/",
+            f"/api/runs/{run_id}/unstructured-discovery/directories/",
             model=UnstructuredDiscoveryDirectory,
             params=self._build_unstructured_directory_page_params(search, labels, categories, ordering, descending),
             page_size=SERVER_MAX_PAGE_SIZE,
@@ -156,7 +167,7 @@ class UnstructuredDiscoveryClient(BaseClient):
         outcomes: Optional[list[UnstructuredDiscoveryFileOutcome]] = None,
         limit: int = 50,
         offset: int = 0,
-    ) -> UnstructuredDiscoveryPage[UnstructuredDiscoveryFile]:
+    ) -> Page[UnstructuredDiscoveryFile]:
         """
         Returns one page of the files an unstructured discovery run tried to read in one directory.
 
@@ -184,8 +195,8 @@ class UnstructuredDiscoveryClient(BaseClient):
             "limit": limit,
             "offset": offset,
         }
-        response = self.make_request("GET", f"/api/runs/{run_id}/unstructured-discovery/", params=params)
-        return UnstructuredDiscoveryPage[UnstructuredDiscoveryFile].model_validate(response.json())
+        response = self.make_request("GET", f"/api/runs/{run_id}/unstructured-discovery/files/", params=params)
+        return Page[UnstructuredDiscoveryFile].model_validate(response.json())
 
     def iter_unstructured_discovery_files(
         self,
@@ -206,7 +217,7 @@ class UnstructuredDiscoveryClient(BaseClient):
         """
 
         return self._iter_paginated(
-            f"/api/runs/{run_id}/unstructured-discovery/",
+            f"/api/runs/{run_id}/unstructured-discovery/files/",
             model=UnstructuredDiscoveryFile,
             params=self._build_unstructured_file_page_params(directory, status, search, labels, categories, outcomes),
             page_size=SERVER_MAX_PAGE_SIZE,
@@ -214,7 +225,7 @@ class UnstructuredDiscoveryClient(BaseClient):
 
     def get_unstructured_discovery_summary(self, run_id: RunId) -> UnstructuredDiscoverySummary:
         """
-        Returns an unstructured discovery run's totals, and how many times it found each label.
+        Returns an unstructured discovery run, the settings it used, its totals, and how many times it found each label.
 
         They are counted from the run's stored results on each request,
         so they change while results are still being stored.

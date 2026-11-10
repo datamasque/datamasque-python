@@ -2,14 +2,11 @@
 
 import enum
 from datetime import datetime
-from typing import Generic, Optional, TypeVar
+from typing import Optional
 
 from pydantic import BaseModel, ConfigDict
 
-from datamasque.client.models.pagination import Page
 from datamasque.client.models.runs import RunConnectionRef, RunId
-
-T = TypeVar("T")
 
 
 class UnstructuredDiscoveryFileStatus(enum.Enum):
@@ -55,15 +52,15 @@ class UnstructuredDiscoveryDirectoryOrdering(enum.Enum):
     """
 
 
-class UnstructuredDiscoverySampling(enum.Enum):
-    """How many files of each directory an unstructured discovery run read."""
+class UnstructuredDiscoverySampleOrder(enum.Enum):
+    """The order an unstructured discovery run takes a directory's files in when it reads only some of them."""
 
-    sampled = "sampled"
-    """At most `files_per_directory` files of each directory."""
-    all = "all"
-    """The run set no limit on how many files of each directory it read."""
-    unknown = "unknown"
-    """The run's discovery config cannot be read."""
+    hash = "hash"
+    """An order that is fixed for each file but looks random."""
+    modified_desc = "modified_desc"
+    """The most recently modified files first."""
+    name_asc = "name_asc"
+    """By name, ascending."""
 
 
 class UnstructuredDiscoverySkippedCount(BaseModel):
@@ -73,6 +70,9 @@ class UnstructuredDiscoverySkippedCount(BaseModel):
 
     # A string rather than an enum, because each server release can add reasons.
     skip_reason: str
+    """Why the run did not try to read these files, as a code such as `over_sample_limit`."""
+    skip_reason_text: str
+    """The same reason as a sentence, as the run report words it."""
     file_extension: str
     """The extension without a leading dot, blank for files that have none."""
     count: int
@@ -114,10 +114,11 @@ class UnstructuredDiscoveryFinding(BaseModel):
     model_config = ConfigDict(extra="allow")
 
     label: str
-    """The label's `name` in the discovery config."""
-    description: str
+    """
+    The label's `name` in the discovery config.
+    `get_unstructured_discovery_summary` gives its description and categories.
+    """
     occurrences: int
-    categories: list[str]
 
 
 class UnstructuredDiscoveryFile(BaseModel):
@@ -131,28 +132,40 @@ class UnstructuredDiscoveryFile(BaseModel):
     character_count: Optional[int] = None
     """How many characters of the file's text the run searched; `None` for a file the run could not read."""
     status: UnstructuredDiscoveryFileStatus
+    # A string rather than an enum, because each server release can add reasons.
     skip_reason: str
-    """Why the run could not read the file, blank if it did."""
+    """Why the run could not read the file, as a code such as `unscannable_file`; blank if it read it."""
+    skip_reason_text: str
+    """The same reason as a sentence, as the run report words it; blank if the run read the file."""
     outcome: UnstructuredDiscoveryFileOutcome
     """What the run made of the file."""
     findings: list[UnstructuredDiscoveryFinding]
 
 
-class UnstructuredDiscoveryPage(Page[T], Generic[T]):
-    """
-    A page of an unstructured discovery run's directories, or of one directory's files.
+class UnstructuredDiscoverySettings(BaseModel):
+    """The sampling and size settings an unstructured discovery run used."""
 
-    Every page also carries the run it belongs to and how the run sampled each directory.
-    `get_unstructured_discovery_summary` returns the run's totals.
-    """
+    model_config = ConfigDict(extra="allow")
 
-    run_id: RunId
-    connection: RunConnectionRef
-    finished_at: Optional[datetime] = None
-    """When the run ended, `None` until it has."""
-    sampling: UnstructuredDiscoverySampling
     files_per_directory: Optional[int] = None
-    """The sample size when `sampling` is `UnstructuredDiscoverySampling.sampled`, `None` otherwise."""
+    """How many files of each directory the run read at most, `None` when it read every file."""
+    sample_order: UnstructuredDiscoverySampleOrder
+    files_per_run: Optional[int] = None
+    """How many files the run read at most in all, `None` when it set no limit."""
+    max_bytes_per_file: int
+    """The size, in bytes, above which the run did not read a file."""
+
+
+class UnstructuredDiscoveryAiEngine(BaseModel):
+    """The AI Engine an unstructured discovery run's `ai_detect` matchers used."""
+
+    # pydantic before 2.10 warns on import about the `model_` prefix of `model_name`, the API's field name.
+    model_config = ConfigDict(extra="allow", protected_namespaces=())
+
+    model_name: Optional[str] = None
+    """The model the AI Engine reported, `None` when it reported none."""
+    engine_version: Optional[str] = None
+    """The version the AI Engine reported, `None` when it reported none."""
 
 
 class UnstructuredDiscoveryLabelTotal(BaseModel):
@@ -171,11 +184,25 @@ class UnstructuredDiscoveryLabelTotal(BaseModel):
 
 
 class UnstructuredDiscoverySummary(BaseModel):
-    """An unstructured discovery run's totals."""
+    """An unstructured discovery run, the settings it used and its totals."""
 
     model_config = ConfigDict(extra="allow")
 
     run_id: RunId
+    connection: RunConnectionRef
+    status: str
+    """The run's status, such as `finished`."""
+    finished_at: Optional[datetime] = None
+    """When the run ended, `None` until it has."""
+    settings: Optional[UnstructuredDiscoverySettings] = None
+    """The settings the run used, `None` when it ended before it read any directory."""
+    ai_engine: Optional[UnstructuredDiscoveryAiEngine] = None
+    """The AI Engine the run used, `None` when the run recorded neither its model nor its version."""
+    report_rows: int
+    """
+    How many rows the findings report has.
+    `get_unstructured_report` returns a zip of CSV parts above 1,000,000 rows.
+    """
     files_found: int
     """How many files were found on the connection, summed over the directories."""
     files_read: int
@@ -197,4 +224,7 @@ class UnstructuredDiscoverySummary(BaseModel):
     files_over_run_limit: int
     """How many files the run did not read because it reached the config's `files_per_run`."""
     labels: list[UnstructuredDiscoveryLabelTotal]
-    """Each label found, most found first; labels found equally often are listed by name."""
+    """
+    Each label of the run's discovery config, most found first; labels found equally often are listed by name.
+    A label the run never found is listed with 0 occurrences.
+    """

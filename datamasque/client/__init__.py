@@ -178,6 +178,7 @@ from datamasque.client.models.table_reference import (
     TableReferenceOptions,
 )
 from datamasque.client.models.unstructured_discovery import (
+    UnstructuredDiscoveryAiEngine,
     UnstructuredDiscoveryDirectory,
     UnstructuredDiscoveryDirectoryOrdering,
     UnstructuredDiscoveryFile,
@@ -185,8 +186,8 @@ from datamasque.client.models.unstructured_discovery import (
     UnstructuredDiscoveryFileStatus,
     UnstructuredDiscoveryFinding,
     UnstructuredDiscoveryLabelTotal,
-    UnstructuredDiscoveryPage,
-    UnstructuredDiscoverySampling,
+    UnstructuredDiscoverySampleOrder,
+    UnstructuredDiscoverySettings,
     UnstructuredDiscoverySkippedCount,
     UnstructuredDiscoverySummary,
 )
@@ -349,8 +350,9 @@ __all__ = [
     "UnstructuredDiscoveryFileStatus",
     "UnstructuredDiscoveryFinding",
     "UnstructuredDiscoveryLabelTotal",
-    "UnstructuredDiscoveryPage",
-    "UnstructuredDiscoverySampling",
+    "UnstructuredDiscoveryAiEngine",
+    "UnstructuredDiscoverySampleOrder",
+    "UnstructuredDiscoverySettings",
     "UnstructuredDiscoverySkippedCount",
     "UnstructuredDiscoverySummary",
     "UnsupportedPreview",

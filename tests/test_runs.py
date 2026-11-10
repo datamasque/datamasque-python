@@ -13,6 +13,7 @@ from datamasque.client.exceptions import (
     RunNotCancellableError,
 )
 from datamasque.client.models.connection import ConnectionId, DatabaseConnectionConfig, DatabaseType
+from datamasque.client.models.discovery_config import DiscoveryKind
 from datamasque.client.models.ruleset import Ruleset, RulesetId, RulesetType
 from datamasque.client.models.runs import (
     MaskingRunOptions,
@@ -372,6 +373,33 @@ def test_run_info_reads_the_ai_engine_model_and_version(
 
     assert run.ai_engine_model == expected_model
     assert run.ai_engine_version == expected_version
+    assert not run.model_extra
+
+
+@pytest.mark.parametrize(
+    "discovery_kind_field, expected",
+    [
+        ({"discovery_kind": "unstructured"}, DiscoveryKind.unstructured),
+        ({"discovery_kind": "structured"}, DiscoveryKind.structured),
+        ({"discovery_kind": None}, None),
+        ({}, None),
+    ],
+    ids=["unstructured_discovery_run", "structured_discovery_run", "masking_run", "server_without_the_field"],
+)
+def test_run_info_reads_the_discovery_kind(discovery_kind_field: dict, expected: Optional[DiscoveryKind]) -> None:
+    run = RunInfo.model_validate(
+        {
+            "id": 1,
+            "status": "finished",
+            "mask_type": "file_data_discovery",
+            "source_connection_name": "documents",
+            "ruleset_name": "",
+            "project": "1-default",
+            **discovery_kind_field,
+        }
+    )
+
+    assert run.discovery_kind is expected
     assert not run.model_extra
 
 
