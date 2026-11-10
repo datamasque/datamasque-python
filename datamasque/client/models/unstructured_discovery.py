@@ -56,11 +56,11 @@ class UnstructuredDiscoverySampleOrder(enum.Enum):
     """The order an unstructured discovery run takes a directory's files in when it reads only some of them."""
 
     hash = "hash"
-    """An order that is fixed for each file but looks random."""
+    """An order fixed by each file's path, so every run takes the same files."""
     modified_desc = "modified_desc"
     """The most recently modified files first."""
     name_asc = "name_asc"
-    """By name, ascending."""
+    """By path, ascending."""
 
 
 class UnstructuredDiscoverySkippedCount(BaseModel):
