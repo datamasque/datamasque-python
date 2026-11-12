@@ -1594,6 +1594,117 @@ def test_redshift_connection_keeps_its_cluster_s3_role_separate_from_its_tagging
     assert api_dict["iam_role_arn"] == "arn:aws:iam::119836602066:role/tagger"
 
 
+def _sql_server_connection_json(**extra) -> dict:
+    """A SQL Server connection as `GET /api/connections/` returns it, with no port of its own."""
+    return {
+        "id": "9f1d2c4e-5b6a-4f8d-9c0e-1a2b3c4d5e6f",
+        "name": "mssql_named_instance",
+        "mask_type": "database",
+        "db_type": "mssql",
+        "host": "sql-server.example.com",
+        "database": "mssqldb",
+        "user": "mssqluser",
+        "schema": "dbo",
+        "is_read_only": False,
+        **extra,
+    }
+
+
+def test_mssql_connection_read_from_the_api_keeps_its_named_instance_and_blank_port():
+    """A named instance is reached through the SQL Server Browser, so the server stores no port."""
+    conn = DatabaseConnectionConfig.model_validate(_sql_server_connection_json(instance="SQLEXPRESS"))
+
+    assert conn.instance == "SQLEXPRESS"
+    assert conn.port is None
+
+
+def test_mssql_connection_read_from_the_api_without_an_instance_has_none():
+    conn = DatabaseConnectionConfig.model_validate(_sql_server_connection_json(port=1433))
+
+    assert conn.instance is None
+    assert conn.port == 1433
+
+
+def test_mssql_connection_round_trips_its_named_instance_back_to_the_api():
+    conn = DatabaseConnectionConfig.model_validate(_sql_server_connection_json(instance="SQLEXPRESS"))
+
+    api_dict = conn.model_dump(exclude_none=True, by_alias=True, mode="json")
+
+    assert api_dict["instance"] == "SQLEXPRESS"
+    assert "port" not in api_dict
+
+
+def test_create_mssql_connection_sends_the_named_instance(client):
+    config = DatabaseConnectionConfig(
+        name="mssql_named_instance",
+        host="sql-server.example.com",
+        database="mssqldb",
+        user="mssqluser",
+        password="secret",
+        database_type=DatabaseType.mssql,
+        instance="SQLEXPRESS",
+    )
+
+    with requests_mock.Mocker() as m:
+        m.get("http://test-server/api/connections/", json=[], status_code=200)
+        m.post("http://test-server/api/connections/", json={"id": "mssql-id-1"}, status_code=201)
+
+        result = client.create_or_update_connection(config)
+
+    assert result.id == ConnectionId("mssql-id-1")
+    sent = m.last_request.json()
+    assert sent["instance"] == "SQLEXPRESS"
+    assert sent["db_type"] == "mssql"
+
+
+def test_mssql_linked_server_connection_keeps_its_named_instance():
+    """A linked-server connection names the instance that holds the linked server."""
+    conn = MssqlLinkedServerConnectionConfig(
+        name="mssql_linked",
+        host="sql-server.example.com",
+        database="mssqldb",
+        user="mssqluser",
+        password="secret",
+        database_type=DatabaseType.mssql_linked,
+        linked_server="other.db.dbo",
+        instance="SQLEXPRESS",
+    )
+
+    api_dict = conn.model_dump(exclude_none=True, by_alias=True, mode="json")
+
+    assert api_dict["instance"] == "SQLEXPRESS"
+
+
+@pytest.mark.parametrize(
+    "database_type",
+    [
+        DatabaseType.postgres,
+        DatabaseType.mysql,
+        DatabaseType.oracle,
+        DatabaseType.db2_luw,
+        DatabaseType.redshift,
+    ],
+)
+def test_database_connection_omits_the_named_instance_for_engines_without_one(database_type):
+    """These engines have no `instance` field on the server, so sending one would be rejected."""
+    extra = (
+        {"s3_bucket_name": "bucket", "s3_redshift_iam_role": "arn:aws:iam::123456789012:role/redshift-s3"}
+        if database_type is DatabaseType.redshift
+        else {}
+    )
+    conn = _database_connection(database_type, instance="SQLEXPRESS", **extra)
+
+    api_dict = conn.model_dump(exclude_none=True, by_alias=True, mode="json")
+
+    assert "instance" not in api_dict
+
+
+def test_database_connection_omits_the_named_instance_when_unset():
+    conn = _database_connection(DatabaseType.mssql)
+
+    assert "instance" not in conn.model_dump(exclude_none=True, by_alias=True, mode="json")
+
+
 @pytest.mark.parametrize(
     ("database_type", "message"),
     [

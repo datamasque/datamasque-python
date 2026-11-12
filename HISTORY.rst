@@ -14,6 +14,13 @@ History
 * ``RunInfo`` and ``UnfinishedRun`` gain a required ``project`` field:
   the run's project, taken from its ruleset's project when the run starts.
 * Added ``connect_timeout_seconds`` and ``read_timeout_seconds`` to the instance config models.
+* Added an optional ``instance`` field to ``DatabaseConnectionConfig``: the SQL Server named instance,
+  taken from the Instance input in the connection form's advanced settings.
+  It round-trips through ``list_connections`` and ``create_or_update_connection``,
+  and is sent only for ``mssql`` and ``mssql_linked``, the two engines that have it on the server.
+* ``DatabaseConnectionConfig.port`` is now optional.
+  A SQL Server connection that names an instance is reached through the SQL Server Browser and stores no port,
+  so a connection saved that way previously failed to deserialize.
 
 Requires server version 3.26.20
 

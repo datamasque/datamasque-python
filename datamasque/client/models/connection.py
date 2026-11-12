@@ -376,7 +376,9 @@ class DatabaseConnectionConfig(ConnectionConfig):
     """
 
     host: str
-    port: int
+    # The server leaves the port unset when the connection reaches its database another way: a SQL
+    # Server named instance resolved by the SQL Server Browser, or an engine with a default port.
+    port: Optional[int] = None
     database: str
     user: str
     password: Optional[str] = None
@@ -384,6 +386,9 @@ class DatabaseConnectionConfig(ConnectionConfig):
     engine_options: Optional[dict] = None
     db_schema: Optional[str] = Field(default=None, alias="schema")
     data_encoding: Optional[str] = None
+    # The SQL Server named instance to connect to, in place of a port. Only `mssql` and
+    # `mssql_linked` carry it on the server, so it is pruned for the rest.
+    instance: Optional[str] = None
     is_read_only: bool = False
     s3_bucket_name: Optional[str] = None
     s3_redshift_iam_role: Optional[str] = None
@@ -443,6 +448,8 @@ class DatabaseConnectionConfig(ConnectionConfig):
             d.pop("s3_redshift_iam_role", None)
         if db_type not in _AWS_TAGGABLE_DATABASE_TYPES:
             d.pop("iam_role_arn", None)
+        if db_type not in {DatabaseType.mssql, DatabaseType.mssql_linked}:
+            d.pop("instance", None)
         if not d.get("engine_options"):
             d.pop("engine_options", None)
         return d
