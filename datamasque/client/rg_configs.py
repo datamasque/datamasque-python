@@ -34,7 +34,7 @@ class RGConfigClient(BaseClient):
         response = self.make_request("GET", f"/api/ruleset-generation-configs/{config_id}/")
         return RGConfig.model_validate(response.json())
 
-    def _get_rg_config_id_by_name(self, name: str, project: Union[ProjectId, str]) -> Optional[RGConfigId]:
+    def _get_rg_config_id_by_name(self, name: str, project: Optional[Union[ProjectId, str]]) -> Optional[RGConfigId]:
         """Return the id of the config matching the name and project via a single list request, or `None`."""
 
         response = self.make_request(

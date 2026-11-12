@@ -318,13 +318,14 @@ class BaseClient:
 
         self._raise_for_status(response)
 
-    def _resolve_project(self, project: Optional[Union[ProjectId, str]]) -> Union[ProjectId, str]:
+    def _resolve_project(self, project: Optional[Union[ProjectId, str]]) -> Optional[Union[ProjectId, str]]:
         """
         Returns `project`, else the client's `default_project`, else the ID of the only active project.
 
         The last is the project the server puts a create into when it is sent no `project`.
         With no active project, or more than one, the server rejects such a create,
         so this raises `DataMasqueException` instead.
+        Returns `None` for a server older than projects, which has one set of names and no project filter.
         """
 
         if project is not None:
@@ -332,7 +333,11 @@ class BaseClient:
         if self.default_project is not None:
             return self.default_project
 
-        response = self.make_request("GET", "/api/projects/", params={"limit": 1})
+        response = self.make_request("GET", "/api/projects/", params={"limit": 1}, require_status_check=False)
+        if response.status_code == 404:
+            return None
+
+        self._raise_for_status(response)
         page = Page[Project].model_validate(response.json())
         if page.count != 1:
             raise DataMasqueException(

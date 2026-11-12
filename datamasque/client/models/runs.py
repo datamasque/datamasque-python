@@ -142,12 +142,13 @@ class RunInfo(BaseModel):
     start_time: Optional[datetime] = None
     end_time: Optional[datetime] = None
     options: Optional[dict[str, Any]] = None
-    project: str
+    project: Optional[str] = None
     """
     Its project's `<id>-<slug>` reference, e.g. `1-default`.
 
     The project of the run's ruleset, else its discovery config, else its source connection.
     The run moves when that resource moves to another project.
+    `None` from a server older than projects.
     """
 
     @model_validator(mode="before")
@@ -166,8 +167,8 @@ class UnfinishedRun(BaseModel):
     ruleset_name: str
     status: MaskingRunStatus
     destination_connection: Optional[RunConnectionRef] = None
-    project: str
-    """Its project's `<id>-<slug>` reference, e.g. `1-default`."""
+    project: Optional[str] = None
+    """Its project's `<id>-<slug>` reference, e.g. `1-default`. `None` from a server older than projects."""
 
     @model_validator(mode="before")
     @classmethod
