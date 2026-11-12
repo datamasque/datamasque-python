@@ -32,7 +32,7 @@ class DiscoveryConfigLibraryClient(BaseClient):
         return DiscoveryConfigLibrary.model_validate(response.json())
 
     def _get_discovery_config_library_id_by_name(
-        self, name: str, project: Union[ProjectId, str]
+        self, name: str, project: Optional[Union[ProjectId, str]]
     ) -> Optional[DiscoveryConfigLibraryId]:
         """Returns the ID of the library with the given name in the given project, or `None` if there is none."""
 

@@ -365,6 +365,22 @@ def test_get_run_info(client):
         assert result.name == "r1"
 
 
+def test_run_info_from_a_server_without_projects_has_no_project(client):
+    with requests_mock.Mocker() as m:
+        m.get(
+            "http://test-server/api/runs/1/",
+            json={
+                "id": 1,
+                "status": "finished",
+                "mask_type": "database",
+                "source_connection_name": "conn1",
+                "ruleset_name": "rs1",
+            },
+        )
+
+        assert client.get_run_info(1).project is None
+
+
 def test_masking_run_request_model_dump_minimal():
     """A minimal request dumps with an empty `options` object (the server rejects missing `options`)."""
     req = MaskingRunRequest(connection="conn-1", ruleset="rs-1")

@@ -18,6 +18,7 @@ from datamasque.client.models.table_reference import TableReference
 from tests.helpers import active_projects_page, database_connection_config
 
 BASE_URL = "http://test-server"
+EMPTY_PAGE = {"count": 0, "next": None, "previous": None, "results": []}
 
 
 def make_client(default_project: Optional[str] = None) -> DataMasqueClient:
@@ -41,36 +42,41 @@ def create_connection(client: DataMasqueClient, project: Optional[str], m: reque
 
 
 def create_discovery_config(client: DataMasqueClient, project: Optional[str], m: requests_mock.Mocker) -> Any:
+    m.get(f"{BASE_URL}/api/discovery/configs/", json=EMPTY_PAGE)
     m.post(
         f"{BASE_URL}/api/discovery/configs/",
         json={"id": "dc-1", "name": "dc", "config_type": "database", "project": "2-acme"},
     )
     config = DiscoveryConfig(name="dc", yaml="labels: []\n", config_type="database", project=project)
-    return client.create_discovery_config(config)
+    return client.create_or_update_discovery_config(config)
 
 
 def create_rg_config(client: DataMasqueClient, project: Optional[str], m: requests_mock.Mocker) -> Any:
+    m.get(f"{BASE_URL}/api/ruleset-generation-configs/", json=EMPTY_PAGE)
     m.post(f"{BASE_URL}/api/ruleset-generation-configs/", json={"id": "rg-1", "name": "rg", "project": "2-acme"})
-    return client.create_rg_config(RGConfig(name="rg", yaml="x: 1\n", project=project))
+    return client.create_or_update_rg_config(RGConfig(name="rg", yaml="x: 1\n", project=project))
 
 
 def create_table_reference(client: DataMasqueClient, project: Optional[str], m: requests_mock.Mocker) -> Any:
+    m.get(f"{BASE_URL}/api/table-references/", json=[])
     m.post(
         f"{BASE_URL}/api/table-references/",
         json={"id": "tr-1", "name": "tr", "connection": "c-1", "source": "people.csv", "project": "2-acme"},
     )
     table_reference = TableReference(name="tr", connection=ConnectionId("c-1"), source="people.csv", project=project)
-    return client.create_table_reference(table_reference)
+    return client.create_or_update_table_reference(table_reference)
 
 
 def create_ruleset_library(client: DataMasqueClient, project: Optional[str], m: requests_mock.Mocker) -> Any:
+    m.get(f"{BASE_URL}/api/ruleset-libraries/", json=EMPTY_PAGE)
     m.post(f"{BASE_URL}/api/ruleset-libraries/", json={"id": "rl-1", "name": "rl", "project": "2-acme"})
-    return client.create_ruleset_library(RulesetLibrary(name="rl", yaml="version: '1.0'\n", project=project))
+    return client.create_or_update_ruleset_library(RulesetLibrary(name="rl", yaml="version: '1.0'\n", project=project))
 
 
 def create_discovery_config_library(client: DataMasqueClient, project: Optional[str], m: requests_mock.Mocker) -> Any:
+    m.get(f"{BASE_URL}/api/discovery/config-libraries/", json=[])
     m.post(f"{BASE_URL}/api/discovery/config-libraries/", json={"id": "dl-1", "name": "dl", "project": "2-acme"})
-    return client.create_discovery_config_library(
+    return client.create_or_update_discovery_config_library(
         DiscoveryConfigLibrary(name="dl", yaml="labels: []\n", project=project)
     )
 
@@ -112,6 +118,17 @@ def test_a_create_with_no_default_project_sends_no_project(create: Create) -> No
         create(make_client(), None, m)
 
         assert "project" not in m.last_request.json()
+
+
+@pytest.mark.parametrize("create", CREATES)
+def test_a_create_on_a_server_without_projects_sends_no_project(create: Create) -> None:
+    """A server older than projects returns 404 for `/api/projects/`, and a create must still work there."""
+    with requests_mock.Mocker() as m:
+        m.get(f"{BASE_URL}/api/projects/", status_code=404)
+        create(make_client(), None, m)
+
+        assert "project" not in m.last_request.json()
+        assert all("project" not in request.qs for request in m.request_history)
 
 
 def test_a_connection_update_sends_no_project() -> None:

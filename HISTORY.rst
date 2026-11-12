@@ -28,6 +28,8 @@ History
 * ``list_connections``, ``list_table_references`` and ``list_files_of_type`` take an optional ``project`` filter.
 * ``DataMasqueFile`` gains a read-only ``project`` field, which is ``None`` for built-in seeds.
 * ``get_generated_rulesets`` sets each ruleset's ``project`` to the connection's project.
+* ``create_or_update_*`` works with a server older than projects, and ``RunInfo.project`` and ``UnfinishedRun.project``
+  are ``None`` from such a server.
 * Added Git APIs for rulesets, ruleset libraries, discovery configs and discovery config libraries.
 * Added bundle export and import APIs.
 

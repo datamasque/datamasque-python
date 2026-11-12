@@ -35,7 +35,7 @@ class DiscoveryConfigClient(BaseClient):
         return DiscoveryConfig.model_validate(response.json())
 
     def _get_discovery_config_id_by_name(
-        self, name: str, config_type: DiscoveryConfigType, project: Union[ProjectId, str]
+        self, name: str, config_type: DiscoveryConfigType, project: Optional[Union[ProjectId, str]]
     ) -> Optional[DiscoveryConfigId]:
         """Return the id of the config matching name, type and project via a single list request, or `None`."""
 

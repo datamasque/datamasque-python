@@ -50,7 +50,9 @@ class TableReferenceClient(BaseClient):
 
         return matches[0]
 
-    def _get_table_reference_id_by_name(self, name: str, project: Union[ProjectId, str]) -> Optional[TableReferenceId]:
+    def _get_table_reference_id_by_name(
+        self, name: str, project: Optional[Union[ProjectId, str]]
+    ) -> Optional[TableReferenceId]:
         """Return the ID of the table reference with the given name in the given project, or `None` if there is none."""
 
         response = self.make_request("GET", "/api/table-references/", params={"project": project})

@@ -35,7 +35,9 @@ class RulesetLibraryClient(BaseClient):
         response = self.make_request("GET", f"/api/ruleset-libraries/{library_id}/")
         return RulesetLibrary.model_validate(response.json())
 
-    def _get_ruleset_library_id_by_name(self, name: str, project: Union[ProjectId, str]) -> Optional[RulesetLibraryId]:
+    def _get_ruleset_library_id_by_name(
+        self, name: str, project: Optional[Union[ProjectId, str]]
+    ) -> Optional[RulesetLibraryId]:
         """Return the ID of the library with the given name in the given project, or `None` if there is none."""
 
         response = self.make_request(
