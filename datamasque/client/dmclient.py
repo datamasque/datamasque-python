@@ -1,10 +1,14 @@
 from datamasque.client.base import FileOrContent, UploadFile
+from datamasque.client.bundles import BundleClient
 from datamasque.client.connections import ConnectionClient
 from datamasque.client.discovery import DiscoveryClient
 from datamasque.client.discovery_config_libraries import DiscoveryConfigLibraryClient
 from datamasque.client.discovery_configs import DiscoveryConfigClient
 from datamasque.client.files import FileClient
+from datamasque.client.git import GitClient
 from datamasque.client.license import LicenseClient
+from datamasque.client.projects import ProjectClient
+from datamasque.client.resources import ResourceClient
 from datamasque.client.rg_configs import RGConfigClient
 from datamasque.client.ruleset_libraries import RulesetLibraryClient
 from datamasque.client.rulesets import RulesetClient
@@ -18,14 +22,18 @@ __all__ = ["DataMasqueClient", "FileOrContent", "UploadFile"]
 
 class DataMasqueClient(
     LicenseClient,
+    ProjectClient,
+    ResourceClient,
     ConnectionClient,
     RulesetClient,
     RulesetLibraryClient,
     FileClient,
+    BundleClient,
     RunClient,
     DiscoveryClient,
     DiscoveryConfigClient,
     DiscoveryConfigLibraryClient,
+    GitClient,
     TableReferenceClient,
     RGConfigClient,
     UserClient,
