@@ -138,7 +138,6 @@ class UnstructuredDiscoveryFile(BaseModel):
     skip_reason_text: str
     """The same reason as a sentence, as the run report words it; blank if the run read the file."""
     outcome: UnstructuredDiscoveryFileOutcome
-    """What the run made of the file."""
     findings: list[UnstructuredDiscoveryFinding]
 
 
