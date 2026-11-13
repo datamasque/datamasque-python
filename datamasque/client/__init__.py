@@ -92,6 +92,7 @@ from datamasque.client.models.discovery import (
 from datamasque.client.models.discovery_config import (
     DiscoveryConfig,
     DiscoveryConfigId,
+    DiscoveryConfigKind,
     DiscoveryConfigType,
     DiscoveryKind,
 )
@@ -224,6 +225,7 @@ __all__ = [
     "DatabricksConnectionConfig",
     "DiscoveryConfig",
     "DiscoveryConfigId",
+    "DiscoveryConfigKind",
     "DiscoveryConfigLibrary",
     "DiscoveryConfigLibraryId",
     "DiscoveryConfigNotFoundError",

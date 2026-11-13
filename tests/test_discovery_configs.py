@@ -12,6 +12,7 @@ from datamasque.client.exceptions import DataMasqueApiError, DataMasqueException
 from datamasque.client.models.discovery_config import (
     DiscoveryConfig,
     DiscoveryConfigId,
+    DiscoveryConfigKind,
     DiscoveryConfigType,
     DiscoveryKind,
     unwrap_discovery_config_id,
@@ -33,6 +34,7 @@ def sample_config_list_response() -> dict[str, Any]:
                 "id": CONFIG_ID_1,
                 "name": "my_config",
                 "config_type": "database",
+                "discovery_kind": "structured",
                 "archived": False,
                 "created": "2025-01-01T12:00:00Z",
                 "modified": "2025-01-02T12:00:00Z",
@@ -40,7 +42,8 @@ def sample_config_list_response() -> dict[str, Any]:
             {
                 "id": CONFIG_ID_2,
                 "name": "another_config",
-                "config_type": "database",
+                "config_type": "file",
+                "discovery_kind": "unstructured",
                 "archived": False,
                 "created": "2025-02-01T12:00:00Z",
                 "modified": "2025-02-02T12:00:00Z",
@@ -84,7 +87,9 @@ def test_list_discovery_configs(client: DataMasqueClient, sample_config_list_res
     assert configs[0].id == DiscoveryConfigId(CONFIG_ID_1)
     assert configs[0].name == "my_config"
     assert configs[0].yaml is None
+    assert configs[0].discovery_kind is DiscoveryConfigKind.structured
     assert configs[1].name == "another_config"
+    assert configs[1].discovery_kind is DiscoveryConfigKind.unstructured
 
 
 def test_list_discovery_configs_pagination(client: DataMasqueClient) -> None:
@@ -569,6 +574,21 @@ def test_discovery_config_validation_fields_optional() -> None:
 
     assert config.is_valid is None
     assert config.validation_error is None
+    assert config.discovery_kind is None
+
+
+def test_discovery_config_reads_an_unknown_discovery_kind_and_does_not_send_it() -> None:
+    config = DiscoveryConfig.model_validate(
+        {
+            "id": CONFIG_ID_1,
+            "name": "my_config",
+            "config_type": "file",
+            "discovery_kind": "unknown",
+        }
+    )
+
+    assert config.discovery_kind is DiscoveryConfigKind.unknown
+    assert "discovery_kind" not in config.model_dump(exclude_none=True, by_alias=True, mode="json")
 
 
 def test_unwrap_discovery_config_id_passes_through_strings() -> None:
