@@ -4,6 +4,7 @@ from collections.abc import Sequence
 from typing import Optional
 
 from datamasque.client.base import BaseClient
+from datamasque.client.exceptions import ResourceMoveConflictError
 from datamasque.client.models.project import ProjectIdentifier, unwrap_project_id
 from datamasque.client.models.resource import (
     RESOURCE_MODEL_BY_TYPE_NAME,
@@ -29,6 +30,10 @@ def _move_request(resources: ResourcesByType, destination: ProjectIdentifier) ->
 
     # The API takes the destination as a string: an id or `<id>-<slug>`.
     return {"destination": str(unwrap_project_id(destination)), "resources": keys}
+
+
+def _get_conflicts(body: dict) -> list[ResourceMoveConflict]:
+    return [ResourceMoveConflict.model_validate(conflict) for conflict in body["conflicts"]]
 
 
 class ResourceClient(BaseClient):
@@ -98,7 +103,7 @@ class ResourceClient(BaseClient):
         `resources` can contain up to 2,000 resources.
 
         Returns:
-            The conflicts that would keep any of `resources` from moving (if any).
+            The conflicts for `resources` (if any). An `already_in_destination` conflict does not stop a move.
 
         Raises:
             ValueError: `resources` is empty.
@@ -107,7 +112,7 @@ class ResourceClient(BaseClient):
         """
 
         response = self.make_request("POST", "/api/resources/move-check/", data=_move_request(resources, destination))
-        return [ResourceMoveConflict.model_validate(conflict) for conflict in response.json()["conflicts"]]
+        return _get_conflicts(response.json())
 
     def move_resources(
         self,
@@ -118,24 +123,41 @@ class ResourceClient(BaseClient):
         Moves `resources` to the destination project, with their files and runs.
 
         `resources` can be the result of `list_resources`, or any part of it, and can contain up to 2,000 resources.
-        A resource that conflicts with the destination, or with another resource in `resources`,
-        stays where it is and is listed in the result's `conflicts`; every other resource moves.
+        All of them move, or none do.
+        A resource already in the destination stays there, and the others move.
+        `get_resource_move_conflicts` lists the conflicts without trying to move anything. An `already_in_destination` conflict does not stop a move.
         Rulesets, discovery configs and RG configs whose library imports resolve differently after the move
         are marked invalid.
 
         Raises:
             ValueError: `resources` is empty.
+            ResourceMoveConflictError: a resource conflicts with the destination, or with another resource in
+                `resources`; its `conflicts` says why.
             DataMasqueApiError: the server rejects the move, for example because the destination does not exist,
                 `resources` contains more than 2,000 resources,
                 or the caller does not have permission to move one of the resource types.
         """
 
-        response = self.make_request("POST", "/api/resources/move/", data=_move_request(resources, destination))
-        result = ResourceMoveResult.model_validate(response.json())
-        logger.info(
-            "Moved %d resources to project %s; %d could not move",
-            result.moved,
-            unwrap_project_id(destination),
-            len(result.conflicts),
+        request_data = _move_request(resources, destination)
+        response = self.make_request(
+            "POST",
+            "/api/resources/move/",
+            data=request_data,
+            require_status_check=False,
         )
+        if response.status_code == 409:
+            try:
+                body = response.json()
+            except ValueError:
+                body = None
+            if isinstance(body, dict) and "conflicts" in body:
+                raise ResourceMoveConflictError(
+                    str(body["detail"]),
+                    response=response,
+                    conflicts=_get_conflicts(body),
+                )
+
+        self._raise_for_status(response, request_data=request_data)
+        result = ResourceMoveResult.model_validate(response.json())
+        logger.info("Moved %d resources to project %s", result.moved, unwrap_project_id(destination))
         return result

@@ -24,6 +24,7 @@ from datamasque.client.exceptions import (
     InvalidLibraryError,
     InvalidRulesetError,
     ProjectDeleteConflictError,
+    ResourceMoveConflictError,
     RGConfigNotFoundError,
     RunNotCancellableError,
 )
@@ -326,6 +327,7 @@ __all__ = [
     "Resource",
     "ResourceMoveConflict",
     "ResourceMoveConflictReason",
+    "ResourceMoveConflictError",
     "ResourceMoveResult",
     "ResourceOrdering",
     "ResourceTypeName",

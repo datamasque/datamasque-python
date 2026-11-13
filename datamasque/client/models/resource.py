@@ -88,7 +88,7 @@ ResourcesByType = Mapping[ResourceTypeName, Sequence[Union[Resource, str]]]
 
 
 class ResourceMoveConflictReason(str, Enum):
-    """Why a resource cannot move to the destination project."""
+    """The kind of a move conflict. Each kind stops a move, except `already_in_destination`."""
 
     already_in_destination = "already_in_destination"
     """The resource is already in the destination project."""
@@ -101,7 +101,7 @@ class ResourceMoveConflictReason(str, Enum):
 
 
 class ResourceMoveConflict(BaseModel):
-    """A conflict that keeps a resource from moving to the destination project."""
+    """A conflict of a resource with the destination project. Only `already_in_destination` does not stop a move."""
 
     model_config = ConfigDict(extra="allow")
 
@@ -116,11 +116,9 @@ class ResourceMoveConflict(BaseModel):
 
 
 class ResourceMoveResult(BaseModel):
-    """The outcome of `move_resources`: every resource asked for either moved or is listed in `conflicts`."""
+    """The outcome of `move_resources`."""
 
     model_config = ConfigDict(extra="allow")
 
     moved: int
-    """The number of resources that moved."""
-    conflicts: list[ResourceMoveConflict]
-    """The resources that did not move, and why."""
+    """The number of resources that moved, leaving out any that were already in the destination."""
