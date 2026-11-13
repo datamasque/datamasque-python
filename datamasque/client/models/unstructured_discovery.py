@@ -134,7 +134,7 @@ class UnstructuredDiscoveryFile(BaseModel):
     status: UnstructuredDiscoveryFileStatus
     # A string rather than an enum, because each server release can add reasons.
     skip_reason: str
-    """Why the run could not read the file, as a code such as `unscannable_file`; blank if it read it."""
+    """Why the run could not read the file, as a code such as `unreadable_file`; blank if it read it."""
     skip_reason_text: str
     """The same reason as a sentence, as the run report words it; blank if the run read the file."""
     outcome: UnstructuredDiscoveryFileOutcome

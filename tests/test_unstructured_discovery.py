@@ -200,7 +200,7 @@ def test_get_unstructured_discovery_file_page_parses_the_files_and_their_finding
         _file(
             "Finance/Invoices/0143.pdf",
             status="failed",
-            skip_reason="unscannable_file",
+            skip_reason="unreadable_file",
             skip_reason_text="File is encrypted, damaged or too large to unpack",
             character_count=None,
         ),
@@ -231,7 +231,7 @@ def test_get_unstructured_discovery_file_page_parses_the_files_and_their_finding
     assert not read_file.findings[0].model_extra
     assert failed_file.status is UnstructuredDiscoveryFileStatus.failed
     assert failed_file.outcome is UnstructuredDiscoveryFileOutcome.failed
-    assert failed_file.skip_reason == "unscannable_file"
+    assert failed_file.skip_reason == "unreadable_file"
     assert failed_file.skip_reason_text == "File is encrypted, damaged or too large to unpack"
     assert failed_file.character_count is None
     assert failed_file.findings == []
