@@ -5,6 +5,9 @@ History
 1.6.0 (unreleased)
 ------------------
 
+* Added an optional ``path`` field to ``SchemaDiscoveryColumn``: where a document-database field sits within its document,
+  as a list of keys with ``*`` for an array position, such as ``["contact", "*", "email"]``.
+  It is ``None`` for relational columns, and results stored by DataMasque 3.26.16 or earlier.
 * Added a read-only ``project`` field to ``ConnectionConfig``, ``Ruleset``, ``RulesetLibrary``, ``DiscoveryConfig``,
   ``DiscoveryConfigLibrary``, ``RGConfig`` and ``TableReference``:
   the ``<id>-<slug>`` reference of the project the resource belongs to, such as ``1-default``.

@@ -8,6 +8,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 from datamasque.client.models.connection import ConnectionConfig, ConnectionId, unwrap_connection_id
 from datamasque.client.models.data_selection import (
     HashColumnsTableConfig,
+    JsonPath,
     Locator,
     UserSelection,
     deserialize_locator,
@@ -375,7 +376,14 @@ class LengthUnit(Enum):
 
 
 class SchemaDiscoveryColumn(BaseModel):
-    """Column-level data in a schema discovery result."""
+    """
+    Column-level data in a schema discovery result.
+
+    `path` is where a document-database field sits within its document, as a list of keys,
+    with `*` for an array position, such as `["contact", "*", "email"]`.
+    The result's `column` holds the same path joined with dots.
+    It is absent for a relational column, and for a result stored by a DataMasque version that did not record paths.
+    """
 
     model_config = ConfigDict(extra="allow")
 
@@ -394,6 +402,7 @@ class SchemaDiscoveryColumn(BaseModel):
     referencing_foreign_keys: list[ReferencingForeignKey]
     constraint: str  # Primary or Unique, or empty string if column does not participate in a PK/UK
     safe_data_preview: Optional[SafeDataPreview] = None
+    path: Optional[JsonPath] = None
 
 
 class SchemaDiscoveryResult(BaseModel):

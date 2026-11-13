@@ -812,6 +812,33 @@ def test_schema_discovery_result_without_max_length_unit_is_none() -> None:
     assert result.data.max_length_unit is None
 
 
+def test_schema_discovery_result_parses_document_path():
+    row = _schema_discovery_row(1, "contact.*.email")
+    row["data"]["path"] = ["contact", "*", "email"]
+
+    result = SchemaDiscoveryResult.model_validate(row)
+
+    assert result.column == "contact.*.email"
+    assert result.data.path == ["contact", "*", "email"]
+
+
+def test_schema_discovery_result_parses_an_integer_path_segment():
+    """The server's path type allows an array index, so one must not fail to parse."""
+    row = _schema_discovery_row(1, "contact.0.email")
+    row["data"]["path"] = ["contact", 0, "email"]
+
+    result = SchemaDiscoveryResult.model_validate(row)
+
+    assert result.data.path == ["contact", 0, "email"]
+
+
+def test_schema_discovery_result_without_path_is_none():
+    """A relational column, or a result stored before DataMasque recorded paths, carries no path."""
+    result = SchemaDiscoveryResult.model_validate(_schema_discovery_row(1, "email"))
+
+    assert result.data.path is None
+
+
 def test_list_schema_discovery_results_follows_pagination(client):
     run_id = RunId(42)
     page1 = {
