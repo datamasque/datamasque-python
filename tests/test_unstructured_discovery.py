@@ -22,7 +22,6 @@ RESULTS_URL = "http://test-server/api/runs/41/unstructured-discovery/"
 DIRECTORIES_URL = f"{RESULTS_URL}directories/"
 FILES_URL = f"{RESULTS_URL}files/"
 REPORT_URL = f"{RESULTS_URL}report/"
-RUNS_URL = "http://test-server/api/runs/"
 CONNECTION_ID = "aaaaaaaa-1111-2222-3333-444444444444"
 
 ClientCall = Callable[[DataMasqueClient], object]
@@ -81,26 +80,20 @@ def _file(
 
 
 @pytest.mark.parametrize(
-    "runs, expected",
-    [([{"id": 19, "status": "finished"}], RunId(19)), ([], None)],
+    "run_ids, expected",
+    [
+        ({"last_discovery_run_id": 19, "run_in_progress_id": 23}, RunId(19)),
+        ({"last_discovery_run_id": None, "run_in_progress_id": None}, None),
+    ],
     ids=["finished_run", "no_finished_run"],
 )
-def test_get_last_unstructured_discovery_run_id_asks_the_run_list(
-    client: DataMasqueClient, runs: list[dict], expected: Optional[RunId]
+def test_get_last_unstructured_discovery_run_id_asks_the_connection(
+    client: DataMasqueClient, run_ids: dict, expected: Optional[RunId]
 ) -> None:
     with requests_mock.Mocker() as m:
-        m.get(RUNS_URL, json=_page(runs))
+        m.get(f"http://test-server/api/connections/{CONNECTION_ID}/unstructured-discovery-run-ids/", json=run_ids)
 
         assert client.get_last_unstructured_discovery_run_id(ConnectionId(CONNECTION_ID)) == expected
-
-    assert m.last_request.qs == {
-        "discovery_kind": ["unstructured"],
-        "source_connection": [CONNECTION_ID],
-        "dry_run": ["false"],
-        "run_status": ["finished", "finished_with_warnings"],
-        "ordering": ["-id"],
-        "limit": ["1"],
-    }
 
 
 def test_get_unstructured_discovery_directory_page_parses_the_directories(client: DataMasqueClient) -> None:

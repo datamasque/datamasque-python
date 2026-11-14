@@ -2,10 +2,8 @@ from typing import Iterator, Optional, Union
 
 from datamasque.client.base import BaseClient
 from datamasque.client.models.connection import ConnectionId
-from datamasque.client.models.discovery_config import DiscoveryKind
 from datamasque.client.models.pagination import Page
 from datamasque.client.models.runs import RunId
-from datamasque.client.models.status import MaskingRunStatus
 from datamasque.client.models.unstructured_discovery import (
     UnstructuredDiscoveryDirectory,
     UnstructuredDiscoveryDirectoryOrdering,
@@ -80,17 +78,9 @@ class UnstructuredDiscoveryClient(BaseClient):
         A dry run stores no results, so it is never returned.
         """
 
-        params = {
-            "discovery_kind": DiscoveryKind.unstructured.value,
-            "source_connection": connection_id,
-            "dry_run": "false",
-            "run_status": [MaskingRunStatus.finished.value, MaskingRunStatus.finished_with_warnings.value],
-            "ordering": "-id",
-            "limit": 1,
-        }
-        response = self.make_request("GET", "/api/runs/", params=params)
-        runs = response.json()["results"]
-        return RunId(runs[0]["id"]) if runs else None
+        response = self.make_request("GET", f"/api/connections/{connection_id}/unstructured-discovery-run-ids/")
+        run_id = response.json()["last_discovery_run_id"]
+        return None if run_id is None else RunId(run_id)
 
     def get_unstructured_discovery_directory_page(
         self,
