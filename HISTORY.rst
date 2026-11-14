@@ -14,6 +14,36 @@ History
 * ``RunInfo`` and ``UnfinishedRun`` gain a required ``project`` field:
   the run's project, taken from its ruleset's project when the run starts.
 * Added ``connect_timeout_seconds`` and ``read_timeout_seconds`` to the instance config models.
+* Added optional keyword-only ``config_type`` and ``discovery_kind`` arguments to ``get_default_discovery_config_yaml``,
+  typed by ``DiscoveryConfigType`` and the new ``DiscoveryKind`` enum.
+  ``discovery_kind=DiscoveryKind.unstructured`` with ``config_type=DiscoveryConfigType.file``
+  returns the template of an unstructured discovery config,
+  which counts the occurrences of its labels in the text of documents.
+* Added a read-only ``discovery_kind`` field to ``DiscoveryConfig``, typed by the new ``DiscoveryConfigKind`` enum:
+  what the config looks for, ``structured`` or ``unstructured``,
+  or ``unknown`` when its YAML does not parse, is not a mapping, or names a kind that does not exist.
+* Added methods that read an unstructured discovery run's results:
+  ``get_unstructured_discovery_directory_page`` and ``iter_unstructured_discovery_directories``
+  for the directories found on the connection,
+  optionally narrowed by ``search``, ``labels`` and ``categories``
+  and sorted by ``UnstructuredDiscoveryDirectoryOrdering``,
+  ``get_unstructured_discovery_file_page`` and ``iter_unstructured_discovery_files`` for the files of one directory,
+  optionally narrowed by ``UnstructuredDiscoveryFileStatus``, ``search``, ``labels``, ``categories``
+  and ``UnstructuredDiscoveryFileOutcome``,
+  ``get_unstructured_discovery_summary`` for the run's connection, status, end time,
+  ``UnstructuredDiscoverySettings``, ``UnstructuredDiscoveryAiEngine``, totals and how many times it found each label,
+  and ``get_unstructured_discovery_report`` for its findings CSV,
+  or a zip of CSV parts as ``bytes`` for a report of more than 1,000,000 rows.
+  A skip reason is a code such as ``over_sample_limit``, with its sentence in ``skip_reason_text``.
+* Added ``get_last_unstructured_discovery_run_id``,
+  which returns the ID of a connection's newest finished unstructured discovery run that is not a dry run,
+  or ``None`` when it has none.
+* Added ``discovery_kind`` to ``RunInfo``: ``DiscoveryKind.structured`` or ``DiscoveryKind.unstructured``
+  for a file discovery run, ``None`` for a run that ran no discovery task.
+* Added ``ai_engine_model`` and ``ai_engine_version`` to ``RunInfo``:
+  the AI Engine model and engine version the run's ``ai_detect`` matchers use,
+  ``None`` when the run recorded none, such as a run that uses no AI Engine,
+  or on a server that does not report them.
 
 Requires server version 3.26.20
 

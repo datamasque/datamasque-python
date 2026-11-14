@@ -11,6 +11,7 @@ from datamasque.client.rulesets import RulesetClient
 from datamasque.client.runs import RunClient
 from datamasque.client.settings import SettingsClient
 from datamasque.client.table_references import TableReferenceClient
+from datamasque.client.unstructured_discovery import UnstructuredDiscoveryClient
 from datamasque.client.users import UserClient
 
 __all__ = ["DataMasqueClient", "FileOrContent", "UploadFile"]
@@ -24,6 +25,7 @@ class DataMasqueClient(
     FileClient,
     RunClient,
     DiscoveryClient,
+    UnstructuredDiscoveryClient,
     DiscoveryConfigClient,
     DiscoveryConfigLibraryClient,
     TableReferenceClient,

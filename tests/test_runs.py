@@ -1,5 +1,7 @@
 """Tests for `RunClient` (start, status, log, run-report endpoints)."""
 
+from typing import Optional
+
 import pytest
 import requests_mock
 
@@ -11,6 +13,7 @@ from datamasque.client.exceptions import (
     RunNotCancellableError,
 )
 from datamasque.client.models.connection import ConnectionId, DatabaseConnectionConfig, DatabaseType
+from datamasque.client.models.discovery_config import DiscoveryKind
 from datamasque.client.models.ruleset import Ruleset, RulesetId, RulesetType
 from datamasque.client.models.runs import (
     MaskingRunOptions,
@@ -338,6 +341,66 @@ def test_get_run_info(client):
         assert isinstance(result, RunInfo)
         assert result.id == 1
         assert result.name == "r1"
+
+
+@pytest.mark.parametrize(
+    "ai_engine_fields, expected_model, expected_version",
+    [
+        (
+            {"ai_engine_model": "dm-ai-ner-small-1.0.0-20260601.tar.enc", "ai_engine_version": "1.26.11"},
+            "dm-ai-ner-small-1.0.0-20260601.tar.enc",
+            "1.26.11",
+        ),
+        ({"ai_engine_model": None, "ai_engine_version": None}, None, None),
+        ({}, None, None),
+    ],
+    ids=["ai_detect_run", "run_without_ai_detect", "server_without_the_fields"],
+)
+def test_run_info_reads_the_ai_engine_model_and_version(
+    ai_engine_fields: dict, expected_model: Optional[str], expected_version: Optional[str]
+) -> None:
+    run = RunInfo.model_validate(
+        {
+            "id": 1,
+            "status": "finished",
+            "mask_type": "file_data_discovery",
+            "source_connection_name": "documents",
+            "ruleset_name": "",
+            "project": "1-default",
+            **ai_engine_fields,
+        }
+    )
+
+    assert run.ai_engine_model == expected_model
+    assert run.ai_engine_version == expected_version
+    assert not run.model_extra
+
+
+@pytest.mark.parametrize(
+    "discovery_kind_field, expected",
+    [
+        ({"discovery_kind": "unstructured"}, DiscoveryKind.unstructured),
+        ({"discovery_kind": "structured"}, DiscoveryKind.structured),
+        ({"discovery_kind": None}, None),
+        ({}, None),
+    ],
+    ids=["unstructured_discovery_run", "structured_discovery_run", "masking_run", "server_without_the_field"],
+)
+def test_run_info_reads_the_discovery_kind(discovery_kind_field: dict, expected: Optional[DiscoveryKind]) -> None:
+    run = RunInfo.model_validate(
+        {
+            "id": 1,
+            "status": "finished",
+            "mask_type": "file_data_discovery",
+            "source_connection_name": "documents",
+            "ruleset_name": "",
+            "project": "1-default",
+            **discovery_kind_field,
+        }
+    )
+
+    assert run.discovery_kind is expected
+    assert not run.model_extra
 
 
 def test_masking_run_request_model_dump_minimal():

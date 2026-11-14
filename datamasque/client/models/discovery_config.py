@@ -16,6 +16,27 @@ class DiscoveryConfigType(enum.Enum):
     file = "file"
 
 
+class DiscoveryKind(enum.Enum):
+    """What a file discovery config looks for: sensitive locators, or its labels in the text of documents."""
+
+    structured = "structured"
+    unstructured = "unstructured"
+
+
+class DiscoveryConfigKind(enum.Enum):
+    """
+    What a saved discovery config looks for, as the server reads it from the config's YAML.
+
+    A database config is always `structured`.
+    A file config is the kind its YAML declares, or `structured` if it declares none;
+    `unknown` when its YAML does not parse, is not a mapping, or names a kind that does not exist.
+    """
+
+    structured = "structured"
+    unstructured = "unstructured"
+    unknown = "unknown"
+
+
 def unwrap_discovery_config_id(value: Any) -> Any:
     """
     Coerce a `DiscoveryConfig` to its `id`; pass other values through unchanged.
@@ -47,6 +68,11 @@ class DiscoveryConfig(BaseModel):
     id: Optional[DiscoveryConfigId] = Field(default=None, exclude=True)
     project: Optional[str] = Field(default=None, exclude=True)
     """Its project's `<id>-<slug>` reference, e.g. `1-default`; `None` until it is created on the server."""
+    discovery_kind: Optional[DiscoveryConfigKind] = Field(default=None, exclude=True)
+    """
+    What the config looks for, as `DiscoveryConfigKind` describes.
+    `None` until it is created on the server, or when a response leaves it out.
+    """
     is_valid: Optional[ValidationStatus] = Field(default=None, exclude=True)
     """Validation status; may be `in_progress` briefly after creating a large config."""
     validation_error: Optional[str] = Field(default=None, exclude=True)

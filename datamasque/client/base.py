@@ -313,6 +313,14 @@ class BaseClient:
 
         self._raise_for_status(response)
 
+    @staticmethod
+    def _read_csv_or_zip(response: Response) -> Union[str, bytes]:
+        """Returns a report's CSV text, or as `bytes` the zip of CSV parts the server splits a large report into."""
+
+        if response.headers.get("Content-Type", "").startswith("application/zip"):
+            return response.content
+        return response.text
+
     def _iter_paginated(
         self,
         path: str,

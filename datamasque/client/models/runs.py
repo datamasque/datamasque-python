@@ -7,6 +7,7 @@ from typing import Any, NewType, Optional, Union
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from datamasque.client.models.connection import ConnectionConfig, ConnectionId, unwrap_connection_id
+from datamasque.client.models.discovery_config import DiscoveryKind
 from datamasque.client.models.ruleset import Ruleset, RulesetId, unwrap_ruleset_id
 from datamasque.client.models.status import MaskingRunStatus
 
@@ -147,6 +148,25 @@ class RunInfo(BaseModel):
     Its project's `<id>-<slug>` reference, e.g. `1-default`.
 
     Taken from the ruleset's project when the run starts, and never changes after that.
+    """
+    ai_engine_model: Optional[str] = None
+    """
+    The AI Engine model the run's `ai_detect` matchers use:
+    for a Local AI Engine, the name of its model file or folder,
+    and for a Bedrock AI Engine, the Bedrock model set in its configuration.
+    `None` when the run recorded none, such as a run that uses no AI Engine,
+    or on a server that does not report it.
+    """
+    ai_engine_version: Optional[str] = None
+    """
+    The version the AI Engine reported when the run started.
+    `None` when the run recorded none, such as a run that uses no AI Engine,
+    or on a server that does not report it.
+    """
+    discovery_kind: Optional[DiscoveryKind] = None
+    """
+    What a file discovery run looked for: sensitive locators, or labels in the text of documents.
+    `None` for a run that ran no discovery task, or on a server that does not report it.
     """
 
     @model_validator(mode="before")

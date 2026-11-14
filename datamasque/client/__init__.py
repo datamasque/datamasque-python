@@ -89,7 +89,13 @@ from datamasque.client.models.discovery import (
     TableConstraints,
     ValueCountStatus,
 )
-from datamasque.client.models.discovery_config import DiscoveryConfig, DiscoveryConfigId, DiscoveryConfigType
+from datamasque.client.models.discovery_config import (
+    DiscoveryConfig,
+    DiscoveryConfigId,
+    DiscoveryConfigKind,
+    DiscoveryConfigType,
+    DiscoveryKind,
+)
 from datamasque.client.models.discovery_config_library import DiscoveryConfigLibrary, DiscoveryConfigLibraryId
 from datamasque.client.models.dm_instance import DataMasqueInstanceConfig
 from datamasque.client.models.files import (
@@ -172,6 +178,20 @@ from datamasque.client.models.table_reference import (
     TableReferenceId,
     TableReferenceOptions,
 )
+from datamasque.client.models.unstructured_discovery import (
+    UnstructuredDiscoveryAiEngine,
+    UnstructuredDiscoveryDirectory,
+    UnstructuredDiscoveryDirectoryOrdering,
+    UnstructuredDiscoveryFile,
+    UnstructuredDiscoveryFileOutcome,
+    UnstructuredDiscoveryFileStatus,
+    UnstructuredDiscoveryFinding,
+    UnstructuredDiscoveryLabelTotal,
+    UnstructuredDiscoverySampleOrder,
+    UnstructuredDiscoverySettings,
+    UnstructuredDiscoverySkippedCount,
+    UnstructuredDiscoverySummary,
+)
 from datamasque.client.models.user import User, UserId, UserRole
 
 __version__ = version("datamasque-python")
@@ -205,10 +225,12 @@ __all__ = [
     "DatabricksConnectionConfig",
     "DiscoveryConfig",
     "DiscoveryConfigId",
+    "DiscoveryConfigKind",
     "DiscoveryConfigLibrary",
     "DiscoveryConfigLibraryId",
     "DiscoveryConfigNotFoundError",
     "DiscoveryConfigType",
+    "DiscoveryKind",
     "DiscoveryMatch",
     "CosmosDbConnectionConfig",
     "DocumentDbConnectionConfig",
@@ -323,6 +345,18 @@ __all__ = [
     "TemporalStatistics",
     "TemporalSummaries",
     "UnfinishedRun",
+    "UnstructuredDiscoveryDirectory",
+    "UnstructuredDiscoveryDirectoryOrdering",
+    "UnstructuredDiscoveryFile",
+    "UnstructuredDiscoveryFileOutcome",
+    "UnstructuredDiscoveryFileStatus",
+    "UnstructuredDiscoveryFinding",
+    "UnstructuredDiscoveryLabelTotal",
+    "UnstructuredDiscoveryAiEngine",
+    "UnstructuredDiscoverySampleOrder",
+    "UnstructuredDiscoverySettings",
+    "UnstructuredDiscoverySkippedCount",
+    "UnstructuredDiscoverySummary",
     "UnsupportedPreview",
     "UnsupportedStatistics",
     "User",
