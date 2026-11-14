@@ -148,12 +148,12 @@ def test_unstructured_discovery_directories_send_the_search_and_label_filters(
 ) -> None:
     with requests_mock.Mocker(case_sensitive=True) as m:
         m.get(DIRECTORIES_URL, json=_page([_directory("Finance/Invoices")]))
-        call(client, search="Invoices", labels=["EMAIL", "CREDIT_CARD"], categories=["PII", "Financial"])
+        call(client, search="Invoices", labels=["EMAIL", "CREDIT_CARD"], categories=["PII", "Finance, Legal"])
 
     assert m.last_request.qs == {
         "search": ["Invoices"],
-        "labels": ["EMAIL,CREDIT_CARD"],
-        "categories": ["PII,Financial"],
+        "labels": ["EMAIL", "CREDIT_CARD"],
+        "categories": ["PII", "Finance, Legal"],
         "ordering": ["directory"],
         "limit": [expected_limit],
         "offset": ["0"],
@@ -308,9 +308,9 @@ def test_unstructured_discovery_files_send_the_search_label_and_outcome_filters(
     assert m.last_request.qs == {
         "directory": ["claims"],
         "search": ["Claim"],
-        "labels": ["EMAIL,CREDIT_CARD"],
-        "categories": ["PII,Financial"],
-        "outcomes": ["no_text,failed"],
+        "labels": ["EMAIL", "CREDIT_CARD"],
+        "categories": ["PII", "Financial"],
+        "outcomes": ["no_text", "failed"],
         "limit": [expected_limit],
         "offset": ["0"],
     }
@@ -448,7 +448,7 @@ def test_get_unstructured_discovery_summary_reads_an_engine_without_a_model_name
 def test_get_unstructured_discovery_report_returns_the_csv_text(client: DataMasqueClient) -> None:
     csv_text = (
         "\ufeffpath,directory,file_name,label,description,occurrences,categories,character_count\r\n"
-        "réunions/0142.pdf,réunions,0142.pdf,EMAIL,Email address,4,PII;Contact,5120\r\n"
+        "réunions/0142.pdf,réunions,0142.pdf,EMAIL,Email address,4,\"PII, Contact\",5120\r\n"
         "réunions/0143.pdf,réunions,0143.pdf,,,0,,96\r\n"
     )
     with requests_mock.Mocker() as m:

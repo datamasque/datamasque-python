@@ -16,7 +16,6 @@ from datamasque.client.models.unstructured_discovery import (
 )
 
 SERVER_MAX_PAGE_SIZE = 1000
-LIST_SEPARATOR = ","
 DESCENDING_PREFIX = "-"
 
 
@@ -31,14 +30,15 @@ class UnstructuredDiscoveryClient(BaseClient):
     @staticmethod
     def _build_label_filter_params(
         search: Optional[str], labels: Optional[list[str]], categories: Optional[list[str]]
-    ) -> dict[str, str]:
-        params = {}
+    ) -> dict[str, Union[str, list[str]]]:
+        # A category is free text that can hold a comma, so each list value is its own repeated parameter.
+        params: dict[str, Union[str, list[str]]] = {}
         if search is not None:
             params["search"] = search
         if labels is not None:
-            params["labels"] = LIST_SEPARATOR.join(labels)
+            params["labels"] = list(labels)
         if categories is not None:
-            params["categories"] = LIST_SEPARATOR.join(categories)
+            params["categories"] = list(categories)
 
         return params
 
@@ -49,7 +49,7 @@ class UnstructuredDiscoveryClient(BaseClient):
         categories: Optional[list[str]],
         ordering: UnstructuredDiscoveryDirectoryOrdering,
         is_descending: bool,
-    ) -> dict[str, str]:
+    ) -> dict[str, Union[str, list[str]]]:
         params = UnstructuredDiscoveryClient._build_label_filter_params(search, labels, categories)
         params["ordering"] = f"{DESCENDING_PREFIX}{ordering.value}" if is_descending else ordering.value
         return params
@@ -62,13 +62,13 @@ class UnstructuredDiscoveryClient(BaseClient):
         labels: Optional[list[str]],
         categories: Optional[list[str]],
         outcomes: Optional[list[UnstructuredDiscoveryFileOutcome]],
-    ) -> dict[str, str]:
-        params = {"directory": directory}
+    ) -> dict[str, Union[str, list[str]]]:
+        params: dict[str, Union[str, list[str]]] = {"directory": directory}
         if status is not None:
             params["status"] = status.value
         params |= UnstructuredDiscoveryClient._build_label_filter_params(search, labels, categories)
         if outcomes is not None:
-            params["outcomes"] = LIST_SEPARATOR.join(outcome.value for outcome in outcomes)
+            params["outcomes"] = [outcome.value for outcome in outcomes]
 
         return params
 
@@ -247,7 +247,7 @@ class UnstructuredDiscoveryClient(BaseClient):
         or a zip of numbered CSV parts as `bytes` when the server splits a report of more than 1,000,000 rows.
         The first row of each CSV names the columns:
         `path`, `directory`, `file_name`, `label`, `description`, `occurrences`, `categories` and `character_count`.
-        A label's categories share one cell, joined with `;`.
+        A label's categories share one cell, separated by a comma and a space.
         """
 
         response = self.make_request("GET", f"/api/runs/{run_id}/unstructured-discovery/report/")
