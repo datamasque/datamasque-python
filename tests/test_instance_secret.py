@@ -42,6 +42,29 @@ def test_get_instance_secret_fingerprint_returns_the_fingerprint(client):
         assert client.get_instance_secret_fingerprint() == "7KQ2-9MXA-3HDP-T0WZ"
 
 
+@pytest.mark.parametrize("in_flight_sync", list(InFlightSyncResult))
+def test_rotate_instance_secret_returns_the_in_flight_sync_result(client, in_flight_sync):
+    with requests_mock.Mocker() as m:
+        m.post("http://test-server/api/instance-secret/rotate/", json={"in_flight_sync": in_flight_sync.value})
+        result = client.rotate_instance_secret()
+
+    assert m.call_count == 1
+    assert result is in_flight_sync
+
+
+def test_rotate_instance_secret_by_a_user_who_is_not_an_admin_raises_data_masque_api_error(client):
+    with requests_mock.Mocker() as m:
+        m.post(
+            "http://test-server/api/instance-secret/rotate/",
+            json={"detail": "You do not have permission to perform this action."},
+            status_code=403,
+        )
+        with pytest.raises(DataMasqueApiError) as error_info:
+            client.rotate_instance_secret()
+
+    assert error_info.value.response.status_code == 403
+
+
 def test_create_instance_secret_link_request_posts_without_a_body(client):
     with requests_mock.Mocker() as m:
         m.post(f"{LINK_URL}/request/", json=LINK_REQUEST_JSON, status_code=201)
