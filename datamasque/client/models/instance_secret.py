@@ -55,17 +55,6 @@ class InstanceSecretEvent(BaseModel):
     """The user who initiated the event."""
 
 
-class InstanceSecretLinkHistory(BaseModel):
-    """The events of the instance secret of a DataMasque instance."""
-
-    model_config = ConfigDict(extra="allow")
-
-    current_links: list[InstanceSecretEvent]
-    """The shares and adoptions that no later change to the instance secret has ended."""
-    events: list[InstanceSecretEvent]
-    """Every event, newest first."""
-
-
 class InstanceSecretLinkRequest(BaseModel):
     """A request code that the joining DataMasque instance creates, to be pasted on the sharing instance."""
 
