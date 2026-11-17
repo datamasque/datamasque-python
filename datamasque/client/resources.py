@@ -57,7 +57,7 @@ class ResourceClient(BaseClient):
         Each group's resources come in `ordering`, descending when `descending` is set.
         Columns that break ties are always sorted ascending.
         Sort the resources of every group together by `position` to get the whole listing in order.
-        `ordering` and `descending` require server version 3.26.21.
+        `ordering` and `descending` require server version 3.26.22.
         An older server ignores them, and each resource's `position` is `None`.
         The groups are the requested types, or every type the server has when `types` is not given.
         An empty `projects` or `types` matches no resources, without a request to the server.

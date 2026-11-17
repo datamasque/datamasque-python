@@ -2,7 +2,7 @@
 History
 =======
 
-1.7.0 (2026-11-06)
+1.7.0 (2026-11-20)
 ------------------
 
 * Added project models and management APIs.
@@ -28,11 +28,11 @@ History
   because two connections in different projects can share a name.
 * ``list_connections``, ``list_table_references`` and ``list_files_of_type`` take an optional ``project`` filter.
 * ``DataMasqueFile`` gains a read-only ``project`` field, which is ``None`` for built-in seeds.
-* ``get_generated_rulesets`` sets each ruleset's ``project`` to the connection's project.
+* ``get_generated_rulesets`` sets each ruleset's ``project`` to the project the server put the generation result in.
 * Added Git APIs for rulesets, ruleset libraries, discovery configs and discovery config libraries.
 * Added bundle export and import APIs.
 
-Requires server version 3.26.21
+Requires server version 3.26.22
 
 1.6.0
 -----

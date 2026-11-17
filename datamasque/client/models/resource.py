@@ -33,7 +33,7 @@ class Resource(BaseModel):
     """
     Its index, counting from 0, among every resource the listing matched, in the listing's ordering.
     It changes with the filters and ordering, so it does not identify the resource.
-    Requires server version 3.26.21, and is `None` on an older server.
+    Requires server version 3.26.22, and is `None` on an older server.
     """
 
 

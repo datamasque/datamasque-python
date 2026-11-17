@@ -46,12 +46,12 @@ from datamasque.client.exceptions import (
 from datamasque.client.models.connection import ConnectionId, DatabaseConnectionConfig, DatabaseType
 from datamasque.client.models.data_selection import SelectedColumns, SelectedFileData, UserSelection
 from datamasque.client.models.status import AsyncRulesetGenerationTaskStatus
-from tests.helpers import PROJECT, parse_multipart_form, sample_mounted_share_connection_json
+from tests.helpers import PROJECT, parse_multipart_form
 
 DISCOVERY_CONFIG_ID = "aaaaaaaa-1111-2222-3333-444444444444"
 RG_CONFIG_ID = "bbbbbbbb-1111-2222-3333-444444444444"
-CONNECTION_PROJECT = "2-banking"
-"""The project of the connection the generated rulesets come from."""
+GENERATION_PROJECT = "2-banking"
+"""The project the server puts a ruleset generation result in, as its task-status response reports it."""
 
 
 def test_generate_ruleset(client):
@@ -161,14 +161,6 @@ def test_poll_async_ruleset_generation(client):
         assert status is AsyncRulesetGenerationTaskStatus.failed
 
 
-def mock_source_connection(m: requests_mock.Mocker, connection_id: ConnectionId) -> None:
-    """Mocks the connection lookup that `get_generated_rulesets` makes to find the rulesets' project."""
-    m.get(
-        f"http://test-server/api/connections/{connection_id}/",
-        json=sample_mounted_share_connection_json(id=connection_id, name="source") | {"project": CONNECTION_PROJECT},
-    )
-
-
 def test_get_generated_rulesets_success(client):
     connection_id = ConnectionId("1")
     yaml_content_1 = b"""
@@ -195,10 +187,9 @@ def test_get_generated_rulesets_success(client):
     """
 
     with requests_mock.Mocker() as m:
-        mock_source_connection(m, connection_id)
         m.get(
             f"http://test-server/api/async-generate-ruleset/{connection_id}/",
-            json={"status": "finished"},
+            json={"status": "finished", "project": GENERATION_PROJECT},
             status_code=200,
         )
 
@@ -222,7 +213,7 @@ def test_get_generated_rulesets_success(client):
         assert rulesets[0].yaml == yaml_content_1.decode("utf-8")
         assert rulesets[1].name == "ruleset2"
         assert rulesets[1].yaml == yaml_content_2.decode("utf-8")
-        assert [ruleset.project for ruleset in rulesets] == [CONNECTION_PROJECT, CONNECTION_PROJECT]
+        assert [ruleset.project for ruleset in rulesets] == [GENERATION_PROJECT, GENERATION_PROJECT]
 
 
 def test_get_generated_rulesets_finished_with_warnings_success(client):
@@ -241,7 +232,6 @@ def test_get_generated_rulesets_finished_with_warnings_success(client):
     """
 
     with requests_mock.Mocker() as m:
-        mock_source_connection(m, connection_id)
         m.get(
             f"http://test-server/api/async-generate-ruleset/{connection_id}/",
             json={"status": "finished_with_warnings"},
@@ -272,7 +262,6 @@ def test_get_generated_rulesets_empty_archive_raises(client):
     connection_id = ConnectionId("1")
 
     with requests_mock.Mocker() as m:
-        mock_source_connection(m, connection_id)
         m.get(
             f"http://test-server/api/async-generate-ruleset/{connection_id}/",
             json={"status": "finished"},
@@ -301,11 +290,10 @@ def test_get_generated_rulesets_from_selection_success(client):
     generated_yaml = 'version: "1.0"\ntasks:\n- type: mask_table\n  table: users\n  key: id\n  rules: []\n'
 
     with requests_mock.Mocker() as m:
-        mock_source_connection(m, connection_id)
         # Status check and the redirect target are the same URL; both resolve to the same JSON.
         m.get(
             f"http://test-server/api/async-generate-ruleset/{connection_id}/",
-            json={"status": "finished", "generated_ruleset": generated_yaml},
+            json={"status": "finished", "generated_ruleset": generated_yaml, "project": GENERATION_PROJECT},
             status_code=200,
         )
         m.get(
@@ -320,14 +308,13 @@ def test_get_generated_rulesets_from_selection_success(client):
     assert rulesets[0].yaml == generated_yaml
     # The server doesn't return a name — callers set one before create_or_update_ruleset.
     assert rulesets[0].name == "generated_ruleset"
-    assert rulesets[0].project == CONNECTION_PROJECT
+    assert rulesets[0].project == GENERATION_PROJECT
 
 
 def test_get_generated_rulesets_from_selection_empty_ruleset_raises(client):
     """A finished task with no `generated_ruleset` in the JSON body raises a clear error."""
     connection_id = ConnectionId("1")
     with requests_mock.Mocker() as m:
-        mock_source_connection(m, connection_id)
         m.get(
             f"http://test-server/api/async-generate-ruleset/{connection_id}/",
             json={"status": "finished", "generated_ruleset": None},
@@ -393,7 +380,6 @@ def test_get_generated_rulesets_download_fail(client):
     connection_id = ConnectionId("1")
 
     with requests_mock.Mocker() as m:
-        mock_source_connection(m, connection_id)
         m.get(
             f"http://test-server/api/async-generate-ruleset/{connection_id}/",
             json={"status": "finished"},
