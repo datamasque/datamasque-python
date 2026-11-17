@@ -6,7 +6,6 @@ from datamasque.client.base import BaseClient
 from datamasque.client.exceptions import InstanceSecretLinkError, InstanceSecretLinkErrorCode
 from datamasque.client.models.instance_secret import (
     InFlightSyncResult,
-    InstanceSecretLinkHistory,
     InstanceSecretLinkRequest,
     InstanceSecretLinkRequestVerification,
     InstanceSecretLinkResponse,
@@ -57,12 +56,6 @@ class InstanceSecretClient(BaseClient):
         response = self.make_request("GET", "/api/instance-secret/")
         fingerprint: str = response.json()["fingerprint"]
         return fingerprint
-
-    def get_instance_secret_link_history(self) -> InstanceSecretLinkHistory:
-        """Returns every event of the instance secret of this DataMasque instance, and the links that are current."""
-
-        response = self.make_request("GET", "/api/instance-secret/link/history/")
-        return InstanceSecretLinkHistory.model_validate(response.json())
 
     def create_instance_secret_link_request(self) -> InstanceSecretLinkRequest:
         """
