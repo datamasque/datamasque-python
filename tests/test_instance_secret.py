@@ -177,21 +177,33 @@ def test_a_linking_step_without_an_instance_secret_raises_data_masque_api_error(
     assert not isinstance(error_info.value, InstanceSecretLinkError)
 
 
-def test_verify_instance_secret_link_response_parses_the_links_ending(client):
+@pytest.mark.parametrize("event_kind", [InstanceSecretEventKind.shared, InstanceSecretEventKind.adopted])
+def test_verify_instance_secret_link_response_parses_the_links_ending(client, event_kind):
     with requests_mock.Mocker() as m:
         m.post(
             f"{LINK_URL}/response/verify/",
             json={
                 "hostname": "other.example.com",
                 "response_fingerprint": "ABCD-EFGH-JKMN-PQRS",
-                "links_ending": [event_json("adopted", peer_hostname="third.example.com")],
+                "links_ending": [
+                    event_json(
+                        event_kind.value,
+                        peer_hostname="third.example.com",
+                        request_fingerprint="7KQ2-9MXA-3HDP-T0WZ",
+                        response_fingerprint="WXYZ-2345-6789-BCDF",
+                    )
+                ],
                 "verification_token": "token",
             },
         )
         verification = client.verify_instance_secret_link_response("DMLINK-RESPONSE")
 
     assert m.last_request.json() == {"response_code": "DMLINK-RESPONSE"}
-    assert verification.links_ending[0].kind is InstanceSecretEventKind.adopted
+    link_ending = verification.links_ending[0]
+    assert link_ending.kind is event_kind
+    assert link_ending.peer_hostname == "third.example.com"
+    assert link_ending.request_fingerprint == "7KQ2-9MXA-3HDP-T0WZ"
+    assert link_ending.response_fingerprint == "WXYZ-2345-6789-BCDF"
     assert verification.verification_token == "token"
 
 
