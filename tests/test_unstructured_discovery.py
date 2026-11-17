@@ -42,7 +42,7 @@ def _directory(directory: str) -> dict:
         "skipped": [
             {
                 "skip_reason": "over_sample_limit",
-                "skip_reason_text": "Not selected by the per-directory sample",
+                "skip_reason_text": "Over the per-directory file limit",
                 "file_extension": "pdf",
                 "count": 318,
             }
@@ -113,7 +113,7 @@ def test_get_unstructured_discovery_directory_page_parses_the_directories(client
     assert directory.size_bytes == 14399
     assert directory.entity_counts == {"CREDIT_CARD": 3, "EMAIL": 62}
     assert directory.skipped[0].skip_reason == "over_sample_limit"
-    assert directory.skipped[0].skip_reason_text == "Not selected by the per-directory sample"
+    assert directory.skipped[0].skip_reason_text == "Over the per-directory file limit"
     assert directory.skipped[0].file_extension == "pdf"
     assert directory.skipped[0].count == 318
     assert not directory.skipped[0].model_extra
@@ -194,7 +194,7 @@ def test_get_unstructured_discovery_file_page_parses_the_files_and_their_finding
             "Finance/Invoices/0143.pdf",
             status="failed",
             skip_reason="unreadable_file",
-            skip_reason_text="File is encrypted, damaged or too large to unpack",
+            skip_reason_text="File is encrypted, corrupted or too large to unpack",
             character_count=None,
         ),
     ]
@@ -225,7 +225,7 @@ def test_get_unstructured_discovery_file_page_parses_the_files_and_their_finding
     assert failed_file.status is UnstructuredDiscoveryFileStatus.failed
     assert failed_file.outcome is UnstructuredDiscoveryFileOutcome.failed
     assert failed_file.skip_reason == "unreadable_file"
-    assert failed_file.skip_reason_text == "File is encrypted, damaged or too large to unpack"
+    assert failed_file.skip_reason_text == "File is encrypted, corrupted or too large to unpack"
     assert failed_file.character_count is None
     assert failed_file.findings == []
     assert not read_file.model_extra
