@@ -2,7 +2,7 @@
 History
 =======
 
-1.6.0 (unreleased)
+1.6.0 (2026-11-18)
 ------------------
 
 * Added a read-only ``project`` field to ``ConnectionConfig``, ``Ruleset``, ``RulesetLibrary``, ``DiscoveryConfig``,
@@ -13,7 +13,6 @@ History
   so creating a resource places it in the server's default project.
 * ``RunInfo`` and ``UnfinishedRun`` gain a required ``project`` field:
   the run's project, taken from its ruleset's project when the run starts.
-* Added ``connect_timeout_seconds`` and ``read_timeout_seconds`` to the instance config models.
 
 Requires server version 3.26.20
 
@@ -40,6 +39,14 @@ Requires server version 3.26.20
   or on a server that does not report them.
 
 Requires server version 3.26.22
+
+1.5.1 (2026-11-05)
+------------------
+
+* Every request now has a connect and a read timeout,
+  so a server that stops answering raises ``DataMasqueTransportError`` instead of hanging the caller.
+  Set them with ``connect_timeout_seconds`` (default 10) and ``read_timeout_seconds`` (default 300)
+  on the instance config models.
 
 1.5.0 (2026-10-07)
 ------------------
