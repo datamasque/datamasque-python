@@ -343,6 +343,16 @@ def test_get_run_info(client):
         assert result.name == "r1"
 
 
+_FILE_DISCOVERY_RUN_INFO = {
+    "id": 1,
+    "status": "finished",
+    "mask_type": "file_data_discovery",
+    "source_connection_name": "documents",
+    "ruleset_name": "",
+    "project": "1-default",
+}
+
+
 @pytest.mark.parametrize(
     "ai_engine_fields, expected_model, expected_version",
     [
@@ -359,17 +369,7 @@ def test_get_run_info(client):
 def test_run_info_reads_the_ai_engine_model_and_version(
     ai_engine_fields: dict, expected_model: Optional[str], expected_version: Optional[str]
 ) -> None:
-    run = RunInfo.model_validate(
-        {
-            "id": 1,
-            "status": "finished",
-            "mask_type": "file_data_discovery",
-            "source_connection_name": "documents",
-            "ruleset_name": "",
-            "project": "1-default",
-            **ai_engine_fields,
-        }
-    )
+    run = RunInfo.model_validate({**_FILE_DISCOVERY_RUN_INFO, **ai_engine_fields})
 
     assert run.ai_engine_model == expected_model
     assert run.ai_engine_version == expected_version
@@ -387,17 +387,7 @@ def test_run_info_reads_the_ai_engine_model_and_version(
     ids=["unstructured_discovery_run", "structured_discovery_run", "masking_run", "server_without_the_field"],
 )
 def test_run_info_reads_the_discovery_kind(discovery_kind_field: dict, expected: Optional[DiscoveryKind]) -> None:
-    run = RunInfo.model_validate(
-        {
-            "id": 1,
-            "status": "finished",
-            "mask_type": "file_data_discovery",
-            "source_connection_name": "documents",
-            "ruleset_name": "",
-            "project": "1-default",
-            **discovery_kind_field,
-        }
-    )
+    run = RunInfo.model_validate({**_FILE_DISCOVERY_RUN_INFO, **discovery_kind_field})
 
     assert run.discovery_kind is expected
     assert not run.model_extra
