@@ -154,7 +154,7 @@ def test_unstructured_discovery_directories_send_the_search_and_label_filters(
 
 
 @pytest.mark.parametrize(
-    "ordering, descending, expected_ordering",
+    "ordering, is_descending, expected_ordering",
     [
         (UnstructuredDiscoveryDirectoryOrdering.directory, True, "-directory"),
         (UnstructuredDiscoveryDirectoryOrdering.files_found, False, "files_found"),
@@ -176,12 +176,12 @@ def test_unstructured_discovery_directories_send_the_ordering(
     client: DataMasqueClient,
     call: Callable[..., object],
     ordering: UnstructuredDiscoveryDirectoryOrdering,
-    descending: bool,
+    is_descending: bool,
     expected_ordering: str,
 ) -> None:
     with requests_mock.Mocker(case_sensitive=True) as m:
         m.get(DIRECTORIES_URL, json=_page([_directory("Finance/Invoices")]))
-        call(client, ordering=ordering, descending=descending)
+        call(client, ordering=ordering, is_descending=is_descending)
 
     assert m.last_request.qs["ordering"] == [expected_ordering]
 

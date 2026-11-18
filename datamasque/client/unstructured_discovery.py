@@ -90,7 +90,7 @@ class UnstructuredDiscoveryClient(BaseClient):
         labels: Optional[list[str]] = None,
         categories: Optional[list[str]] = None,
         ordering: UnstructuredDiscoveryDirectoryOrdering = UnstructuredDiscoveryDirectoryOrdering.directory,
-        descending: bool = False,
+        is_descending: bool = False,
         limit: int = 50,
         offset: int = 0,
     ) -> Page[UnstructuredDiscoveryDirectory]:
@@ -108,11 +108,11 @@ class UnstructuredDiscoveryClient(BaseClient):
         or the run read it and found no text to search in it;
         a file the run could not read never matches.
         Each directory's `entity_counts` still counts every label it holds.
-        The directories come in `ordering`, descending when `descending` is set,
+        The directories come in `ordering`, descending when `is_descending` is set,
         and directories that tie are sorted by path, ascending.
         """
 
-        params = self._build_unstructured_directory_page_params(search, labels, categories, ordering, descending) | {
+        params = self._build_unstructured_directory_page_params(search, labels, categories, ordering, is_descending) | {
             "limit": limit,
             "offset": offset,
         }
@@ -129,19 +129,19 @@ class UnstructuredDiscoveryClient(BaseClient):
         labels: Optional[list[str]] = None,
         categories: Optional[list[str]] = None,
         ordering: UnstructuredDiscoveryDirectoryOrdering = UnstructuredDiscoveryDirectoryOrdering.directory,
-        descending: bool = False,
+        is_descending: bool = False,
     ) -> Iterator[UnstructuredDiscoveryDirectory]:
         """
         Lazily iterate every directory an unstructured discovery run found on the connection.
 
-        `search`, `labels`, `categories`, `ordering` and `descending`
+        `search`, `labels`, `categories`, `ordering` and `is_descending`
         are as for `get_unstructured_discovery_directory_page`.
         """
 
         return self._iter_paginated(
             f"/api/runs/{run_id}/unstructured-discovery/directories/",
             model=UnstructuredDiscoveryDirectory,
-            params=self._build_unstructured_directory_page_params(search, labels, categories, ordering, descending),
+            params=self._build_unstructured_directory_page_params(search, labels, categories, ordering, is_descending),
             page_size=SERVER_MAX_PAGE_SIZE,
         )
 
