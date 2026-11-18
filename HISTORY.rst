@@ -56,6 +56,9 @@ History
   the AI Engine model and engine version the run's ``ai_detect`` matchers use,
   ``None`` when the run recorded none, such as a run that uses no AI Engine,
   or on a server that does not report them.
+* Added an optional ``path`` field to ``SchemaDiscoveryColumn``: where a document-database field sits within its document,
+  as a list of keys with ``*`` for an array position, such as ``["contact", "*", "email"]``.
+  It is ``None`` for relational columns, and results stored by DataMasque 3.26.16 or earlier.
 
 Requires server version 3.26.22
 
