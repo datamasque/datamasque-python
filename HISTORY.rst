@@ -7,6 +7,12 @@ History
 
 * Added project models and management APIs.
 * Added resource management APIs.
+* Added ``CertificateFile``, the file type for X.509 certificates that DataMasque trusts to verify a server,
+  with the details of each certificate in ``certificates``.
+  ``ResourceTypeName`` gains ``certificates``.
+* ``list_resources`` leaves out a resource type that the client does not know,
+  and a ``ProjectDeleteConflict`` of such a type has ``type`` set to ``None``,
+  so a newer server's resource types do not break the client.
 * ``move_resources`` moves all the resources or none, skips a resource already in the destination, and raises ``ResourceMoveConflictError`` on a conflict.
 * Added ``default_project`` to ``DataMasqueInstanceConfig``.
 * Added a ``project`` field to ``ConnectionConfig``, ``Ruleset``, ``RulesetLibrary``, ``DiscoveryConfig``,
