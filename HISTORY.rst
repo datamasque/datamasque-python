@@ -2,16 +2,18 @@
 History
 =======
 
-1.7.0 (2026-11-20)
+1.6.0 (2026-11-20)
 ------------------
 
 * Added project models and management APIs.
 * Added resource management APIs.
 * ``move_resources`` moves all the resources or none, skips a resource already in the destination, and raises ``ResourceMoveConflictError`` on a conflict.
 * Added ``default_project`` to ``DataMasqueInstanceConfig``.
-* ``ConnectionConfig``, ``Ruleset``, ``RulesetLibrary``, ``DiscoveryConfig``, ``DiscoveryConfigLibrary``, ``RGConfig``
-  and ``TableReference`` send their ``project`` to the server when it is set.
-  It takes a project's ``<id>-<slug>`` reference, such as ``Project.reference``, or its ID as a string.
+* Added a ``project`` field to ``ConnectionConfig``, ``Ruleset``, ``RulesetLibrary``, ``DiscoveryConfig``,
+  ``DiscoveryConfigLibrary``, ``RGConfig`` and ``TableReference``.
+  A GET sets it to the ``<id>-<slug>`` reference of the resource's project, such as ``1-default``.
+  It takes a project's ``<id>-<slug>`` reference, such as ``Project.reference``, or its ID as a string,
+  and is sent to the server when it is set.
   Left unset, a create goes into the client's ``default_project``, else the server's default project.
   Each create sets the model's ``project`` to the project the server stored it in.
 * **Breaking:** names are unique per project, so every by-name helper takes a required ``project``:
@@ -31,6 +33,8 @@ History
 * ``get_generated_rulesets`` sets each ruleset's ``project`` to the project the server put the generation result in.
 * Added Git APIs for rulesets, ruleset libraries, discovery configs and discovery config libraries.
 * Added bundle export and import APIs.
+* ``RunInfo`` and ``UnfinishedRun`` gain a required ``project`` field:
+  the run's project, taken from its ruleset's project when the run starts.
 * Added optional keyword-only ``config_type`` and ``discovery_kind`` arguments to ``get_default_discovery_config_yaml``,
   typed by ``DiscoveryConfigType`` and the new ``DiscoveryKind`` enum.
   ``discovery_kind=DiscoveryKind.unstructured`` with ``config_type=DiscoveryConfigType.file``
@@ -55,20 +59,13 @@ History
 
 Requires server version 3.26.22
 
-1.6.0
------
+1.5.1 (2026-11-05)
+------------------
 
-* Added a read-only ``project`` field to ``ConnectionConfig``, ``Ruleset``, ``RulesetLibrary``, ``DiscoveryConfig``,
-  ``DiscoveryConfigLibrary``, ``RGConfig`` and ``TableReference``:
-  the ``<id>-<slug>`` reference of the project the resource belongs to, such as ``1-default``.
-  It is ``None`` until the resource is created on the server,
-  and is excluded when a model is serialized back to the API,
-  so creating a resource places it in the server's default project.
-* ``RunInfo`` and ``UnfinishedRun`` gain a required ``project`` field:
-  the run's project, taken from its ruleset's project when the run starts.
-* Added ``connect_timeout_seconds`` and ``read_timeout_seconds`` to the instance config models.
-
-Requires server version 3.26.20
+* Every request now has a connect and a read timeout,
+  so a server that stops answering raises ``DataMasqueTransportError`` instead of hanging the caller.
+  Set them with ``connect_timeout_seconds`` (default 10) and ``read_timeout_seconds`` (default 300)
+  on the instance config models.
 
 1.5.0 (2026-10-07)
 ------------------
