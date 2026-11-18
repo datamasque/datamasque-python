@@ -223,7 +223,4 @@ class UnstructuredDiscoverySummary(BaseModel):
     files_over_run_limit: int
     """How many files the run did not read because it reached the config's `files_per_run`."""
     labels: list[UnstructuredDiscoveryLabelTotal]
-    """
-    Each label of the run's discovery config, most found first; labels found equally often are listed by name.
-    A label the run never found is listed with 0 occurrences.
-    """
+    """Each label the run found, most found first; labels found equally often are listed by name."""

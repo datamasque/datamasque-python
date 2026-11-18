@@ -339,7 +339,7 @@ def _summary(**overrides: Any) -> dict:
                 "occurrences": 62,
                 "file_count": 11,
             },
-            {"label": "IBAN", "description": "Bank account", "categories": ["PCI"], "occurrences": 0, "file_count": 0},
+            {"label": "IBAN", "description": "Bank account", "categories": ["PCI"], "occurrences": 3, "file_count": 2},
         ],
         **overrides,
     }
@@ -374,13 +374,13 @@ def test_get_unstructured_discovery_summary_parses_the_run_its_totals_and_each_l
     assert summary.files_with_findings == 14
     assert summary.bytes_opened == 8123344
     assert summary.files_over_run_limit == 7
-    label_total, never_found = summary.labels
+    label_total, second_label = summary.labels
     assert label_total.label == "EMAIL"
     assert label_total.description == "Email address"
     assert label_total.categories == ["PII", "Contact"]
     assert label_total.occurrences == 62
     assert label_total.file_count == 11
-    assert never_found.occurrences == 0
+    assert second_label.label == "IBAN"
     assert not summary.model_extra
     assert not summary.settings.model_extra
     assert not summary.ai_engine.model_extra
