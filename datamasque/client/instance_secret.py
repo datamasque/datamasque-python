@@ -167,7 +167,7 @@ class InstanceSecretClient(BaseClient):
         Raises:
             ValueError: `response_code` or `verification_token` is empty.
             InstanceSecretLinkError: the response code is not valid, runs are in progress,
-              or the instance secret or its history changed after the response code was verified.
+              or the instance secret changed or was shared since the response code was verified.
         """
 
         response = self._post_link_step(
