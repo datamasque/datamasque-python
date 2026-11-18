@@ -14,6 +14,9 @@ History
 * ``RunInfo`` and ``UnfinishedRun`` gain a required ``project`` field:
   the run's project, taken from its ruleset's project when the run starts.
 * Added ``connect_timeout_seconds`` and ``read_timeout_seconds`` to the instance config models.
+
+Requires server version 3.26.20
+
 * Added optional keyword-only ``config_type`` and ``discovery_kind`` arguments to ``get_default_discovery_config_yaml``,
   typed by ``DiscoveryConfigType`` and the new ``DiscoveryKind`` enum.
   ``discovery_kind=DiscoveryKind.unstructured`` with ``config_type=DiscoveryConfigType.file``
@@ -36,7 +39,7 @@ History
   ``None`` when the run recorded none, such as a run that uses no AI Engine,
   or on a server that does not report them.
 
-Requires server version 3.26.20
+Requires server version 3.26.22
 
 1.5.0 (2026-10-07)
 ------------------
