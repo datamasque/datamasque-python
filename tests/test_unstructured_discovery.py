@@ -409,7 +409,7 @@ def test_get_unstructured_discovery_summary_reads_a_run_without_settings_or_ai_e
     assert summary.ai_engine is None
 
 
-def test_get_unstructured_discovery_summary_reads_all_and_an_engine_without_a_version(
+def test_get_unstructured_discovery_summary_reads_no_file_limits_and_an_engine_without_a_version(
     client: DataMasqueClient,
 ) -> None:
     settings = {"files_per_directory": None, "sample_order": "name_asc", "files_per_run": None, "max_bytes_per_file": 5}
