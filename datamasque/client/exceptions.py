@@ -1,4 +1,11 @@
+from typing import TYPE_CHECKING
+
 from requests import Response
+
+from datamasque.client.models.project import ProjectDeleteConflict
+
+if TYPE_CHECKING:
+    from datamasque.client.models.resource import ResourceMoveConflict
 
 
 class DataMasqueException(Exception):
@@ -64,6 +71,36 @@ class RGConfigNotFoundError(DataMasqueApiError):
 
     The config does not exist, or has been deleted.
     """
+
+
+class ProjectDeleteConflictError(DataMasqueApiError):
+    """
+    Raised when `delete_project` cannot move the project's resources to the destination project.
+
+    The server deletes and moves nothing in this case.
+
+    Attributes:
+        conflicts: Every reason the resources cannot move.
+    """
+
+    def __init__(self, message: str, *, response: Response, conflicts: list[ProjectDeleteConflict]) -> None:
+        super().__init__(message, response=response)
+        self.conflicts = conflicts
+
+
+class ResourceMoveConflictError(DataMasqueApiError):
+    """
+    Raised when `move_resources` finds a conflict.
+
+    The server moves nothing in this case.
+
+    Attributes:
+        conflicts: Every resource that stopped the move, and why.
+    """
+
+    def __init__(self, message: str, *, response: Response, conflicts: "list[ResourceMoveConflict]") -> None:
+        super().__init__(message, response=response)
+        self.conflicts = conflicts
 
 
 class DataMasqueTransportError(DataMasqueException):
