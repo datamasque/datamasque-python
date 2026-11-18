@@ -59,9 +59,7 @@ class RunClient(BaseClient):
         params = None if include_selection_column else {"include_selection_column": "false"}
         response = self.make_request("GET", url, params=params)
 
-        if response.headers.get("Content-Type", "").startswith("application/zip"):
-            return response.content
-        return response.text
+        return self._read_csv_or_zip(response)
 
     def get_unfinished_runs(self) -> dict[str, UnfinishedRun]:
         """Queries the DM instance for unfinished runs, and returns them organised by connection name."""

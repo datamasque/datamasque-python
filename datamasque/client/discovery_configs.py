@@ -3,7 +3,12 @@ from typing import Iterator, Optional
 
 from datamasque.client.base import BaseClient
 from datamasque.client.exceptions import DataMasqueApiError, DataMasqueException
-from datamasque.client.models.discovery_config import DiscoveryConfig, DiscoveryConfigId, DiscoveryConfigType
+from datamasque.client.models.discovery_config import (
+    DiscoveryConfig,
+    DiscoveryConfigId,
+    DiscoveryConfigType,
+    DiscoveryKind,
+)
 from datamasque.client.models.pagination import Page
 
 logger = logging.getLogger(__name__)
@@ -163,8 +168,28 @@ class DiscoveryConfigClient(BaseClient):
 
             self.delete_discovery_config_by_id_if_exists(config.id)
 
-    def get_default_discovery_config_yaml(self) -> str:
-        """Returns the server's built-in default discovery configuration as a YAML string."""
+    def get_default_discovery_config_yaml(
+        self,
+        *,
+        config_type: Optional[DiscoveryConfigType] = None,
+        discovery_kind: Optional[DiscoveryKind] = None,
+    ) -> str:
+        """
+        Returns the server's built-in default discovery configuration as a YAML string.
 
-        response = self.make_request("GET", "/api/discovery/configs/defaults/")
+        `config_type` selects the database or the file default;
+        the server returns the database default when it is omitted.
+        `discovery_kind` selects what a file config looks for;
+        the server returns the structured default when it is omitted.
+        Asking for `DiscoveryKind.unstructured` without `config_type=DiscoveryConfigType.file`
+        raises `DataMasqueApiError` with a 400 response.
+        """
+
+        params: dict[str, str] = {}
+        if config_type is not None:
+            params["config_type"] = config_type.value
+        if discovery_kind is not None:
+            params["discovery_kind"] = discovery_kind.value
+
+        response = self.make_request("GET", "/api/discovery/configs/defaults/", params=params or None)
         return response.content.decode("utf-8")

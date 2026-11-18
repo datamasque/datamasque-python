@@ -12,7 +12,9 @@ from datamasque.client.exceptions import DataMasqueApiError, DataMasqueException
 from datamasque.client.models.discovery_config import (
     DiscoveryConfig,
     DiscoveryConfigId,
+    DiscoveryConfigKind,
     DiscoveryConfigType,
+    DiscoveryKind,
     unwrap_discovery_config_id,
 )
 from datamasque.client.models.status import ValidationStatus
@@ -32,6 +34,7 @@ def sample_config_list_response() -> dict[str, Any]:
                 "id": CONFIG_ID_1,
                 "name": "my_config",
                 "config_type": "database",
+                "discovery_kind": "structured",
                 "archived": False,
                 "created": "2025-01-01T12:00:00Z",
                 "modified": "2025-01-02T12:00:00Z",
@@ -39,7 +42,8 @@ def sample_config_list_response() -> dict[str, Any]:
             {
                 "id": CONFIG_ID_2,
                 "name": "another_config",
-                "config_type": "database",
+                "config_type": "file",
+                "discovery_kind": "unstructured",
                 "archived": False,
                 "created": "2025-02-01T12:00:00Z",
                 "modified": "2025-02-02T12:00:00Z",
@@ -83,7 +87,9 @@ def test_list_discovery_configs(client: DataMasqueClient, sample_config_list_res
     assert configs[0].id == DiscoveryConfigId(CONFIG_ID_1)
     assert configs[0].name == "my_config"
     assert configs[0].yaml is None
+    assert configs[0].discovery_kind is DiscoveryConfigKind.structured
     assert configs[1].name == "another_config"
+    assert configs[1].discovery_kind is DiscoveryConfigKind.unstructured
 
 
 def test_list_discovery_configs_pagination(client: DataMasqueClient) -> None:
@@ -478,6 +484,61 @@ def test_get_default_discovery_config_yaml(client: DataMasqueClient) -> None:
         result = client.get_default_discovery_config_yaml()
 
     assert result == yaml_body
+    assert m.last_request.qs == {}
+
+
+def test_get_default_discovery_config_yaml_asks_for_the_type_and_kind(client: DataMasqueClient) -> None:
+    yaml_body = "discovery_kind: unstructured\nlabels: []\n"
+
+    with requests_mock.Mocker(case_sensitive=True) as m:
+        m.get(
+            "http://test-server/api/discovery/configs/defaults/",
+            text=yaml_body,
+            status_code=200,
+            headers={"Content-Type": "application/x-yaml"},
+        )
+        result = client.get_default_discovery_config_yaml(
+            config_type=DiscoveryConfigType.file, discovery_kind=DiscoveryKind.unstructured
+        )
+
+    assert result == yaml_body
+    assert m.last_request.qs == {"config_type": ["file"], "discovery_kind": ["unstructured"]}
+
+
+@pytest.mark.parametrize(
+    "kwargs, expected_query",
+    [
+        ({"config_type": DiscoveryConfigType.database}, {"config_type": ["database"]}),
+        ({"discovery_kind": DiscoveryKind.structured}, {"discovery_kind": ["structured"]}),
+    ],
+)
+def test_get_default_discovery_config_yaml_sends_only_the_parameters_given(
+    client: DataMasqueClient, kwargs: dict[str, Any], expected_query: dict[str, list[str]]
+) -> None:
+    with requests_mock.Mocker(case_sensitive=True) as m:
+        m.get("http://test-server/api/discovery/configs/defaults/", text="labels: []\n", status_code=200)
+        client.get_default_discovery_config_yaml(**kwargs)
+
+    assert m.last_request.qs == expected_query
+
+
+def test_get_default_discovery_config_yaml_raises_when_the_server_refuses_the_kind(client: DataMasqueClient) -> None:
+    refusal = {"discovery_kind": "`discovery_kind` `unstructured` is available for a `file` config only."}
+    with requests_mock.Mocker(case_sensitive=True) as m:
+        m.get("http://test-server/api/discovery/configs/defaults/", json=refusal, status_code=400)
+        with pytest.raises(DataMasqueApiError) as exc_info:
+            client.get_default_discovery_config_yaml(
+                config_type=DiscoveryConfigType.database, discovery_kind=DiscoveryKind.unstructured
+            )
+
+    assert m.last_request.qs == {"config_type": ["database"], "discovery_kind": ["unstructured"]}
+    assert exc_info.value.response.status_code == 400
+    assert exc_info.value.response.json() == refusal
+
+
+def test_default_discovery_config_parameters_are_keyword_only(client: DataMasqueClient) -> None:
+    with pytest.raises(TypeError, match="takes 1 positional argument but 2 were given"):
+        client.get_default_discovery_config_yaml(DiscoveryConfigType.file)
 
 
 def test_discovery_config_parses_validation_fields() -> None:
@@ -513,6 +574,21 @@ def test_discovery_config_validation_fields_optional() -> None:
 
     assert config.is_valid is None
     assert config.validation_error is None
+    assert config.discovery_kind is None
+
+
+def test_discovery_config_reads_an_unknown_discovery_kind_and_does_not_send_it() -> None:
+    config = DiscoveryConfig.model_validate(
+        {
+            "id": CONFIG_ID_1,
+            "name": "my_config",
+            "config_type": "file",
+            "discovery_kind": "unknown",
+        }
+    )
+
+    assert config.discovery_kind is DiscoveryConfigKind.unknown
+    assert "discovery_kind" not in config.model_dump(exclude_none=True, by_alias=True, mode="json")
 
 
 def test_unwrap_discovery_config_id_passes_through_strings() -> None:
