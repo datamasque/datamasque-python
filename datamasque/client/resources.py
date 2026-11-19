@@ -18,6 +18,8 @@ from datamasque.client.models.resource_type import ResourceTypeName
 
 logger = logging.getLogger(__name__)
 
+_RESOURCE_TYPE_NAME_VALUES = frozenset(type_name.value for type_name in ResourceTypeName)
+
 
 def _move_request(resources: ResourcesByType, destination: ProjectIdentifier) -> dict[str, object]:
     keys = [
@@ -60,6 +62,7 @@ class ResourceClient(BaseClient):
         `ordering` and `descending` require server version 3.26.22.
         An older server ignores them, and each resource's `position` is `None`.
         The groups are the requested types, or every type the server has when `types` is not given.
+        A type the server lists that this client does not know is left out.
         An empty `projects` or `types` matches no resources, without a request to the server.
         Connections, rulesets and discovery configs are listed as `ConnectionResource`, `RulesetResource`
         and `DiscoveryConfigResource`.
@@ -87,6 +90,10 @@ class ResourceClient(BaseClient):
         resources: defaultdict[ResourceTypeName, list[Resource]] = defaultdict(list)
         for results in self._iter_pages("/api/resources/", params=params, page_size=page_size):
             for type_name, rows in results.items():
+                if type_name not in _RESOURCE_TYPE_NAME_VALUES:
+                    # A newer server can list a type this client does not know; leave it out rather than fail.
+                    logger.debug('Skipped the resources of the unknown type "%s"', type_name)
+                    continue
                 model = RESOURCE_MODEL_BY_TYPE_NAME.get(type_name, Resource)
                 resources[ResourceTypeName(type_name)].extend(model.model_validate(row) for row in rows)
 

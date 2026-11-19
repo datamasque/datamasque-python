@@ -10,6 +10,7 @@ class ResourceTypeName(str, Enum):
     connection_filesets = "connection_filesets"
     oracle_wallets = "oracle_wallets"
     snowflake_keys = "snowflake_keys"
+    certificates = "certificates"
     table_references = "table_references"
     rulesets = "rulesets"
     ruleset_libraries = "ruleset_libraries"

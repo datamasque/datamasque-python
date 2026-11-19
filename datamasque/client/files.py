@@ -22,7 +22,7 @@ class FileClient(BaseClient):
         Uploads a file of the given type to the DataMasque server, into the given project.
 
         `file_type` must be a concrete subclass of `DataMasqueFile`
-        (`SeedFile`, `OracleWalletFile`, `SslZipFile`, `SnowflakeKeyFile`).
+        (`SeedFile`, `OracleWalletFile`, `SslZipFile`, `SnowflakeKeyFile`, `CertificateFile`).
         `file_path_or_content` may be a path (as `str` or `Path`), raw `bytes`, or a file-like object.
         `project` is a `Project`, its `ProjectId` or its `<id>-<slug>` form.
         """
