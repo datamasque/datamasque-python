@@ -42,6 +42,53 @@ def test_get_instance_secret_fingerprint_returns_the_fingerprint(client):
         assert client.get_instance_secret_fingerprint() == "7KQ2-9MXA-3HDP-T0WZ"
 
 
+def test_get_current_instance_secret_links_returns_the_links_in_order(client):
+    shared = event_json(
+        "shared",
+        peer_hostname="joining.example.com",
+        request_fingerprint="7KQ2-9MXA-3HDP-T0WZ",
+        response_fingerprint="0F2A-9QXH-7RZW-B4ND",
+    )
+    adopted = {
+        **event_json(
+            "adopted",
+            peer_hostname="sharing.example.com",
+            request_fingerprint="EBDV-ECVC-8QJ4-9XT5",
+            response_fingerprint="9GGM-DR1H-ETXX-41Q6",
+        ),
+        "id": "8a1c2d3e-4f5a-4b6c-8d7e-9f0a1b2c3d4e",
+    }
+    with requests_mock.Mocker() as m:
+        m.get("http://test-server/api/instance-secret/current-links/", json={"links": [shared, adopted]})
+        links = client.get_current_instance_secret_links()
+
+    assert [(link.kind, link.peer_hostname) for link in links] == [
+        (InstanceSecretEventKind.shared, "joining.example.com"),
+        (InstanceSecretEventKind.adopted, "sharing.example.com"),
+    ]
+    assert links[0].created_at == datetime(2026, 10, 30, 11, 0, tzinfo=timezone.utc)
+    assert links[1].response_fingerprint == "9GGM-DR1H-ETXX-41Q6"
+
+
+def test_get_current_instance_secret_links_returns_an_empty_list_when_there_are_none(client):
+    with requests_mock.Mocker() as m:
+        m.get("http://test-server/api/instance-secret/current-links/", json={"links": []})
+        assert client.get_current_instance_secret_links() == []
+
+
+def test_get_current_instance_secret_links_by_a_user_who_is_not_an_admin_raises_data_masque_api_error(client):
+    with requests_mock.Mocker() as m:
+        m.get(
+            "http://test-server/api/instance-secret/current-links/",
+            json={"detail": "You do not have permission to perform this action."},
+            status_code=403,
+        )
+        with pytest.raises(DataMasqueApiError) as error_info:
+            client.get_current_instance_secret_links()
+
+    assert error_info.value.response.status_code == 403
+
+
 @pytest.mark.parametrize("in_flight_sync", list(InFlightSyncResult))
 def test_rotate_instance_secret_returns_the_in_flight_sync_result(client, in_flight_sync):
     with requests_mock.Mocker() as m:

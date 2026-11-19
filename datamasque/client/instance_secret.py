@@ -6,6 +6,7 @@ from datamasque.client.base import BaseClient
 from datamasque.client.exceptions import InstanceSecretLinkError, InstanceSecretLinkErrorCode
 from datamasque.client.models.instance_secret import (
     InFlightSyncResult,
+    InstanceSecretEvent,
     InstanceSecretLinkRequest,
     InstanceSecretLinkRequestVerification,
     InstanceSecretLinkResponse,
@@ -56,6 +57,22 @@ class InstanceSecretClient(BaseClient):
         response = self.make_request("GET", "/api/instance-secret/")
         fingerprint: str = response.json()["fingerprint"]
         return fingerprint
+
+    def get_current_instance_secret_links(self) -> list[InstanceSecretEvent]:
+        """
+        Returns the shares and adoptions that link this DataMasque instance with others, newest first.
+
+        These are the links that `rotate_instance_secret` would end, and the list is empty after a rotation.
+        Another DataMasque instance can rotate or restore its own instance secret without telling this one,
+        so a link listed here may have ended already.
+        Requires an admin user, and works on every license type.
+
+        Raises:
+            DataMasqueApiError: the user is not an admin user.
+        """
+
+        response = self.make_request("GET", "/api/instance-secret/current-links/")
+        return [InstanceSecretEvent.model_validate(link) for link in response.json()["links"]]
 
     def rotate_instance_secret(self) -> InFlightSyncResult:
         """
