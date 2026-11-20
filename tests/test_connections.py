@@ -352,6 +352,40 @@ def test_list_connnections(client):
         assert minimal_snowflake_connection.snowflake_private_key == "2831289a-4398-abcd-4112-fe09a1239f89"
 
 
+def test_list_connections_keeps_a_sql_server_connection_without_a_port(client):
+    """A SQL Server connection on a named instance has no port, and must not drop the rest of the list."""
+    postgres = {
+        "id": "a1b2c3d4-0000-4000-8000-000000000001",
+        "name": "postgres",
+        "mask_type": "database",
+        "db_type": "postgres",
+        "host": "my-postgres-host",
+        "port": 5432,
+        "database": "mydatabase",
+        "user": "me",
+        "schema": "public",
+        "is_read_only": False,
+    }
+    mssql_named_instance = _sql_server_connection_json(instance="SQLEXPRESS")
+    mssql_null_port = _sql_server_connection_json(
+        id="a1b2c3d4-0000-4000-8000-000000000003",
+        name="mssql_null_port",
+        port=None,
+    )
+
+    with requests_mock.Mocker() as m:
+        m.get(
+            "http://test-server/api/connections/",
+            json=[postgres, mssql_named_instance, mssql_null_port],
+        )
+
+        connections = client.list_connections()
+
+    assert [c.name for c in connections] == ["postgres", "mssql_named_instance", "mssql_null_port"]
+    assert connections[1].port is None
+    assert connections[2].port is None
+
+
 def test_delete_connection_by_id(client):
     connection_id = ConnectionId("f0557fb3-1c9a-4cb1-bcf4-9699cf496bf7")
     with requests_mock.Mocker() as m:
