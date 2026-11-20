@@ -57,6 +57,25 @@ class InstanceSecretClient(BaseClient):
         fingerprint: str = response.json()["fingerprint"]
         return fingerprint
 
+    def rotate_instance_secret(self) -> InFlightSyncResult:
+        """
+        Replaces the instance secret of this DataMasque instance with a newly generated one.
+
+        Requires an admin user.
+        Hashed output of masking runs and in-flight masking changes differs from before this call,
+        and the instance no longer has the same instance secret as any DataMasque instance it was linked with.
+        Once this succeeds, masking runs use the new instance secret.
+        Returns an `InFlightSyncResult` stating whether the IFM service successfully received the new instance secret.
+        If DataMasque fails to notify the IFM service,
+        a DataMasque restart is required for in-flight masking to use the new instance secret.
+
+        Raises:
+            DataMasqueApiError: the user is not an admin user.
+        """
+
+        response = self.make_request("POST", "/api/instance-secret/rotate/")
+        return InFlightSyncResult(response.json()["in_flight_sync"])
+
     def create_instance_secret_link_request(self) -> InstanceSecretLinkRequest:
         """
         Creates a request code for joining the instance secret of another DataMasque instance.
@@ -148,7 +167,7 @@ class InstanceSecretClient(BaseClient):
         Raises:
             ValueError: `response_code` or `verification_token` is empty.
             InstanceSecretLinkError: the response code is not valid, runs are in progress,
-              or the instance secret or its history changed after the response code was verified.
+              or the instance secret changed or was shared since the response code was verified.
         """
 
         response = self._post_link_step(
