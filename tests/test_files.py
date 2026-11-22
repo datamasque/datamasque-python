@@ -10,7 +10,14 @@ import pytest
 import requests_mock
 
 from datamasque.client import DataMasqueClient
-from datamasque.client.models.files import DataMasqueFile, OracleWalletFile, SeedFile, SnowflakeKeyFile, SslZipFile
+from datamasque.client.models.files import (
+    CertificateFile,
+    DataMasqueFile,
+    OracleWalletFile,
+    SeedFile,
+    SnowflakeKeyFile,
+    SslZipFile,
+)
 from tests.helpers import OTHER_PROJECT, PROJECT, PROJECT_ID, fake, parse_multipart_form
 
 
@@ -26,7 +33,7 @@ from tests.helpers import OTHER_PROJECT, PROJECT, PROJECT_ID, fake, parse_multip
 )
 @pytest.mark.parametrize(
     "file_type",
-    [SeedFile, OracleWalletFile, SslZipFile, SnowflakeKeyFile],
+    [SeedFile, OracleWalletFile, SslZipFile, SnowflakeKeyFile, CertificateFile],
 )
 def test_upload_file(client, file_type, source_factory):
     source = source_factory()
@@ -66,7 +73,7 @@ def test_upload_file(client, file_type, source_factory):
 
 @pytest.mark.parametrize(
     "file_type",
-    [SeedFile, OracleWalletFile, SslZipFile, SnowflakeKeyFile],
+    [SeedFile, OracleWalletFile, SslZipFile, SnowflakeKeyFile, CertificateFile],
 )
 def test_get_files_by_type(client, file_type):
     id_1 = str(uuid.uuid4())
@@ -112,7 +119,7 @@ def test_get_files_by_type(client, file_type):
 
 @pytest.mark.parametrize(
     "file_type",
-    [SeedFile, OracleWalletFile, SslZipFile, SnowflakeKeyFile],
+    [SeedFile, OracleWalletFile, SslZipFile, SnowflakeKeyFile, CertificateFile],
 )
 def test_get_files_by_type_and_name(client, file_type):
     id_1 = str(uuid.uuid4())
@@ -153,7 +160,7 @@ def test_get_files_by_type_and_name(client, file_type):
 )
 @pytest.mark.parametrize(
     "file_type",
-    [SeedFile, OracleWalletFile, SslZipFile, SnowflakeKeyFile],
+    [SeedFile, OracleWalletFile, SslZipFile, SnowflakeKeyFile, CertificateFile],
 )
 def test_delete_file_if_exists(client, file_type, file_exists):
     file_id = str(uuid.uuid4())
@@ -185,7 +192,7 @@ def test_delete_file_if_exists_raises_when_id_not_set(client):
         client.delete_file_if_exists(unpersisted_file)
 
 
-@pytest.mark.parametrize("file_type", [SeedFile, OracleWalletFile, SslZipFile, SnowflakeKeyFile])
+@pytest.mark.parametrize("file_type", [SeedFile, OracleWalletFile, SslZipFile, SnowflakeKeyFile, CertificateFile])
 def test_upload_file_if_not_exists_skips_when_same_name_exists(client, file_type):
     """Returns `None` and does not POST when a file of this type already has the same name."""
     with patch("datamasque.client.base.open", mock_open(read_data=b"content")):
@@ -210,7 +217,7 @@ def test_upload_file_if_not_exists_skips_when_same_name_exists(client, file_type
             assert m_request.request_history[0].method == "GET"
 
 
-@pytest.mark.parametrize("file_type", [SeedFile, OracleWalletFile, SslZipFile, SnowflakeKeyFile])
+@pytest.mark.parametrize("file_type", [SeedFile, OracleWalletFile, SslZipFile, SnowflakeKeyFile, CertificateFile])
 def test_upload_file_if_not_exists_uploads_when_missing(client, file_type):
     """Uploads and returns the new file object when no existing file of the same name is present."""
     new_id = str(uuid.uuid4())
@@ -292,7 +299,7 @@ def test_upload_ssl_zip_file_sends_mysql_database_type(client):
     assert form["database_type"] == "mysql"
 
 
-@pytest.mark.parametrize("file_type", [SeedFile, OracleWalletFile, SnowflakeKeyFile])
+@pytest.mark.parametrize("file_type", [SeedFile, OracleWalletFile, SnowflakeKeyFile, CertificateFile])
 def test_upload_non_ssl_zip_file_omits_database_type(client, file_type):
     """Only `SslZipFile` carries the `database_type` form field; other file types must not send it."""
     with requests_mock.Mocker() as m_request:
@@ -312,7 +319,7 @@ def test_upload_non_ssl_zip_file_omits_database_type(client, file_type):
     assert "database_type" not in form
 
 
-@pytest.mark.parametrize("file_type", [SeedFile, OracleWalletFile, SslZipFile, SnowflakeKeyFile])
+@pytest.mark.parametrize("file_type", [SeedFile, OracleWalletFile, SslZipFile, SnowflakeKeyFile, CertificateFile])
 def test_upload_file_sends_project(client: DataMasqueClient, file_type: type[DataMasqueFile]) -> None:
     with requests_mock.Mocker() as m_request:
         m_request.post(
@@ -333,14 +340,14 @@ def test_upload_file_sends_project(client: DataMasqueClient, file_type: type[Dat
     assert file.project == PROJECT
 
 
-@pytest.mark.parametrize("file_type", [SeedFile, OracleWalletFile, SslZipFile, SnowflakeKeyFile])
+@pytest.mark.parametrize("file_type", [SeedFile, OracleWalletFile, SslZipFile, SnowflakeKeyFile, CertificateFile])
 def test_list_files_of_type_filters_by_project(client: DataMasqueClient, file_type: type[DataMasqueFile]) -> None:
     with requests_mock.Mocker() as m_request:
         m_request.get(f"http://test-server/{file_type.get_url()}?project={PROJECT_ID}", json=[], complete_qs=True)
         assert client.list_files_of_type(file_type, PROJECT_ID) == []
 
 
-@pytest.mark.parametrize("file_type", [SeedFile, OracleWalletFile, SslZipFile, SnowflakeKeyFile])
+@pytest.mark.parametrize("file_type", [SeedFile, OracleWalletFile, SslZipFile, SnowflakeKeyFile, CertificateFile])
 def test_get_file_of_type_by_name_is_scoped_to_the_project(
     client: DataMasqueClient, file_type: type[DataMasqueFile]
 ) -> None:
@@ -380,3 +387,33 @@ def test_upload_file_sends_the_id_of_a_project(client: DataMasqueClient) -> None
         )
 
     assert parse_multipart_form(m_request.request_history[0])["project"] == "2"
+
+
+def test_certificate_file_reads_each_certificate(client):
+    with requests_mock.Mocker() as m_request:
+        m_request.get(
+            f"http://test-server/{CertificateFile.get_url()}",
+            json=[
+                {
+                    "id": "c1",
+                    "name": "root-ca.pem",
+                    "project": "1-default",
+                    "created_date": "2026-11-18T00:00:00Z",
+                    "modified_date": "2026-11-18T00:00:00Z",
+                    "certificates": [
+                        {
+                            "is_ca": True,
+                            "is_self_signed": True,
+                            "not_valid_after": "2031-05-01T00:00:00Z",
+                        }
+                    ],
+                    "unusable_reason": None,
+                }
+            ],
+        )
+        (file,) = client.list_files_of_type(CertificateFile)
+
+    (certificate,) = file.certificates
+    assert certificate.is_ca is True
+    assert certificate.is_self_signed is True
+    assert certificate.not_valid_after == datetime(2031, 5, 1, tzinfo=timezone.utc)

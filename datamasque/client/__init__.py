@@ -111,6 +111,8 @@ from datamasque.client.models.discovery_config import (
 from datamasque.client.models.discovery_config_library import DiscoveryConfigLibrary, DiscoveryConfigLibraryId
 from datamasque.client.models.dm_instance import DataMasqueInstanceConfig
 from datamasque.client.models.files import (
+    CertificateDetails,
+    CertificateFile,
     DataMasqueFile,
     FileId,
     OracleWalletFile,
@@ -240,6 +242,8 @@ __all__ = [
     "BundleImportResult",
     "BundleImportStatus",
     "CassandraConnectionConfig",
+    "CertificateDetails",
+    "CertificateFile",
     "ColumnKind",
     "ColumnPreview",
     "CommonStatistics",

@@ -4,9 +4,9 @@ from datetime import datetime
 from enum import Enum
 from typing import NewType, Optional, Union
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, field_validator
 
-from datamasque.client.models.resource_type import ResourceTypeName
+from datamasque.client.models.resource_type import RESOURCE_TYPE_NAME_VALUES, ResourceTypeName
 
 ProjectId = NewType("ProjectId", int)
 
@@ -124,10 +124,18 @@ class ProjectDeleteConflict(BaseModel):
     detail: str
     """A message that describes the conflict."""
     type: Optional[ResourceTypeName] = None
-    """For `name_in_use` and `file_exists`: the type of the resource that would move."""
+    """
+    For `name_in_use` and `file_exists`: the type of the resource that would move.
+    `None` for a type this client does not know, which a newer server can report.
+    """
     id: Optional[str] = None
     """For `name_in_use` and `file_exists`: the ID of the resource that would move."""
     name: Optional[str] = None
     """For `name_in_use` and `file_exists`: the name of the resource that would move."""
     path: Optional[str] = None
     """For `file_exists` and `unexpected_file`: the path of the file or directory."""
+
+    @field_validator("type", mode="before")
+    @classmethod
+    def _drop_unknown_type(cls, value: object) -> object:
+        return value if value is None or value in RESOURCE_TYPE_NAME_VALUES else None

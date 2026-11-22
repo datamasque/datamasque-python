@@ -8,7 +8,11 @@ FileId = NewType("FileId", str)
 
 
 class DataMasqueFile(BaseModel):
-    """Base class for the concrete file types (`SeedFile`, `OracleWalletFile`, `SslZipFile`, `SnowflakeKeyFile`)."""
+    """
+    Base class for the concrete file types.
+
+    They are `SeedFile`, `OracleWalletFile`, `SslZipFile`, `SnowflakeKeyFile` and `CertificateFile`.
+    """
 
     model_config = ConfigDict(extra="allow")
 
@@ -100,3 +104,36 @@ class SnowflakeKeyFile(DataMasqueFile):
     @classmethod
     def get_content_param_name(cls) -> str:
         return "key_file"
+
+
+class CertificateDetails(BaseModel):
+    """One certificate in a `CertificateFile`."""
+
+    model_config = ConfigDict(extra="allow")
+
+    is_ca: bool
+    """Whether the certificate is a CA certificate, which can sign others."""
+    is_self_signed: bool
+    not_valid_after: datetime
+    """When the certificate expires."""
+
+
+class CertificateFile(DataMasqueFile):
+    """
+    Represents a file of one or more X.509 certificates that DataMasque trusts to verify a server.
+
+    The upload accepts PEM, DER and PKCS#7 files, and refuses a file that holds a private key.
+    The certificates cannot be changed after upload.
+    Requires server version 3.26.23.
+    """
+
+    certificates: list[CertificateDetails] = []
+    """The certificates in the file, in file order."""
+
+    @classmethod
+    def get_url(cls) -> str:
+        return "api/files/certificates/"
+
+    @classmethod
+    def get_content_param_name(cls) -> str:
+        return "certificate_file"

@@ -80,6 +80,27 @@ def test_list_resources_groups_them_by_type_name(client: DataMasqueClient) -> No
     assert seed.position is None
 
 
+def test_list_resources_lists_certificate_files(client: DataMasqueClient) -> None:
+    certificate = {**BUILT_IN_SEED, "name": "root-ca.pem", "project": "7-banking"}
+    with requests_mock.Mocker() as m:
+        m.get("http://test-server/api/resources/", json=page({"certificates": [certificate]}))
+        resources = client.list_resources()
+
+    (listed,) = resources[ResourceTypeName.certificates]
+    assert listed.name == "root-ca.pem"
+
+
+def test_list_resources_leaves_out_a_type_the_client_does_not_know(client: DataMasqueClient) -> None:
+    with requests_mock.Mocker() as m:
+        m.get(
+            "http://test-server/api/resources/",
+            json=page({"rulesets": [RULESET], "a_future_type": [{**RULESET, "id": "other"}]}),
+        )
+        resources = client.list_resources()
+
+    assert list(resources) == [ResourceTypeName.rulesets]
+
+
 def test_list_resources_sends_its_filters(client: DataMasqueClient) -> None:
     retail = Project.model_validate(
         {

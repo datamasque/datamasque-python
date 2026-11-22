@@ -177,6 +177,15 @@ def test_get_project_delete_conflicts_parses_each_reason(client: DataMasqueClien
     assert conflicts[2].name is None
 
 
+def test_a_delete_conflict_of_a_type_the_client_does_not_know_has_no_type() -> None:
+    conflict = ProjectDeleteConflict.model_validate(
+        {"reason": "name_in_use", "detail": "taken", "type": "a_future_type", "id": "1", "name": "x"}
+    )
+
+    assert conflict.type is None
+    assert conflict.name == "x"
+
+
 def test_get_project_delete_conflicts_returns_empty_list_when_project_can_be_deleted(
     client: DataMasqueClient,
 ) -> None:
