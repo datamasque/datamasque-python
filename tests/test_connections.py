@@ -10,6 +10,7 @@ from datamasque.client import DataMasqueClient, Project, ProjectId
 from datamasque.client.exceptions import DataMasqueApiError, DataMasqueException
 from datamasque.client.models.connection import (
     AzureConnectionConfig,
+    BigQueryConnectionConfig,
     CassandraConnectionConfig,
     ConnectionConfig,
     ConnectionId,
@@ -1730,6 +1731,7 @@ def test_redshift_connection_keeps_its_cluster_s3_role_separate_from_its_tagging
         (DatabaseType.cassandra, "For Apache Cassandra"),
         (DatabaseType.sap_ase, "For SAP ASE"),
         (DatabaseType.salesforce, "For Salesforce"),
+        (DatabaseType.bigquery, "For BigQuery"),
     ],
 )
 def test_database_connection_config_rejects_engines_with_their_own_class(
@@ -1931,3 +1933,89 @@ def test_connection_config_dispatch_picks_salesforce_subclass():
     assert "salesforce_private_key_passphrase_encrypted" not in conn.model_dump()
     # The version the server stored is kept, so sending the connection back does not change it.
     assert conn.model_dump(exclude_none=True)["api_version"] == "62.0"
+
+
+def _bigquery_connection(**overrides) -> BigQueryConnectionConfig:
+    fields = {
+        "project": PROJECT,
+        "name": "bigquery",
+        "project_id": "my-gcp-project",
+        "dataset": "people",
+        "location": "australia-southeast2",
+        "service_account_key": '{"type": "service_account"}',
+        "acknowledge_time_travel_recovery": True,
+    }
+    return BigQueryConnectionConfig(**{**fields, **overrides})
+
+
+def test_bigquery_connection_serializes_for_create():
+    conn = _bigquery_connection(maximum_bytes_billed=100 * 1024 * 1024, is_read_only=True)
+
+    d = conn.model_dump(exclude_none=True, by_alias=True, mode="json")
+
+    assert d == {
+        "project": PROJECT,
+        "name": "bigquery",
+        "project_id": "my-gcp-project",
+        "dataset": "people",
+        "location": "australia-southeast2",
+        "service_account_key": '{"type": "service_account"}',
+        "maximum_bytes_billed": 100 * 1024 * 1024,
+        "is_read_only": True,
+        "acknowledge_time_travel_recovery": True,
+        "mask_type": "database",
+        "db_type": "bigquery",
+    }
+    assert conn.database_type is DatabaseType.bigquery
+
+
+def test_bigquery_connection_omits_an_unset_byte_cap():
+    """Left unset, the server applies no cap of its own."""
+    d = _bigquery_connection().model_dump(exclude_none=True, by_alias=True, mode="json")
+
+    assert "maximum_bytes_billed" not in d
+    assert d["is_read_only"] is False
+
+
+def test_bigquery_connection_hides_the_key_from_repr():
+    assert "service_account" not in repr(_bigquery_connection())
+
+
+@pytest.mark.parametrize("missing", ["project_id", "dataset", "location", "acknowledge_time_travel_recovery"])
+def test_bigquery_connection_requires_its_fields(missing: str) -> None:
+    fields = _bigquery_connection().model_dump(exclude_none=True)
+    del fields[missing]
+
+    with pytest.raises(ValueError, match=missing):
+        BigQueryConnectionConfig(**fields)
+
+
+@pytest.mark.parametrize("maximum_bytes_billed", [0, -1])
+def test_bigquery_connection_rejects_a_byte_cap_below_one(maximum_bytes_billed: int) -> None:
+    with pytest.raises(ValueError, match="maximum_bytes_billed"):
+        _bigquery_connection(maximum_bytes_billed=maximum_bytes_billed)
+
+
+def test_connection_config_dispatch_picks_bigquery_subclass():
+    payload = {
+        "id": "bigquery-id-1",
+        "name": "bigquery",
+        "project": PROJECT,
+        "mask_type": "database",
+        "db_type": "bigquery",
+        "project_id": "my-gcp-project",
+        "dataset": "people",
+        "location": "australia-southeast2",
+        "service_account_key_encrypted": "some_base64_here",
+        "maximum_bytes_billed": 1024,
+        "is_read_only": False,
+        "acknowledge_time_travel_recovery": True,
+        "version": "1.0",
+    }
+
+    conn = validate_connection(payload)
+
+    assert isinstance(conn, BigQueryConnectionConfig)
+    assert conn.service_account_key is None
+    assert conn.maximum_bytes_billed == 1024
+    assert "service_account_key_encrypted" not in conn.model_dump()

@@ -41,6 +41,7 @@ from datamasque.client.models.bundle import (
 )
 from datamasque.client.models.connection import (
     AzureConnectionConfig,
+    BigQueryConnectionConfig,
     CassandraConnectionConfig,
     ConnectionConfig,
     ConnectionId,
@@ -233,6 +234,7 @@ __all__ = [
     "AsyncRulesetGenerationInProgressError",
     "AsyncRulesetGenerationTaskStatus",
     "AzureConnectionConfig",
+    "BigQueryConnectionConfig",
     "BooleanPreview",
     "BooleanStatistics",
     "BundleImportCounts",
