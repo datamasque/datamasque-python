@@ -116,8 +116,6 @@ class CertificateDetails(BaseModel):
     is_self_signed: bool
     not_valid_after: datetime
     """When the certificate expires."""
-    sha1_fingerprint: str
-    """The SHA-1 fingerprint, as colon-separated uppercase hexadecimal bytes."""
 
 
 class CertificateFile(DataMasqueFile):
@@ -126,6 +124,7 @@ class CertificateFile(DataMasqueFile):
 
     The upload accepts PEM, DER and PKCS#7 files, and refuses a file that holds a private key.
     The certificates cannot be changed after upload.
+    Requires server version 3.26.23.
     """
 
     certificates: list[CertificateDetails] = []

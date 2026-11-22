@@ -14,11 +14,9 @@ from datamasque.client.models.resource import (
     ResourceOrdering,
     ResourcesByType,
 )
-from datamasque.client.models.resource_type import ResourceTypeName
+from datamasque.client.models.resource_type import RESOURCE_TYPE_NAME_VALUES, ResourceTypeName
 
 logger = logging.getLogger(__name__)
-
-_RESOURCE_TYPE_NAME_VALUES = frozenset(type_name.value for type_name in ResourceTypeName)
 
 
 def _move_request(resources: ResourcesByType, destination: ProjectIdentifier) -> dict[str, object]:
@@ -90,7 +88,7 @@ class ResourceClient(BaseClient):
         resources: defaultdict[ResourceTypeName, list[Resource]] = defaultdict(list)
         for results in self._iter_pages("/api/resources/", params=params, page_size=page_size):
             for type_name, rows in results.items():
-                if type_name not in _RESOURCE_TYPE_NAME_VALUES:
+                if type_name not in RESOURCE_TYPE_NAME_VALUES:
                     # A newer server can list a type this client does not know; leave it out rather than fail.
                     logger.debug('Skipped the resources of the unknown type "%s"', type_name)
                     continue

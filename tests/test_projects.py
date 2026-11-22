@@ -173,7 +173,6 @@ def test_get_project_delete_conflicts_parses_each_reason(client: DataMasqueClien
     ]
     assert conflicts[0].path is None
     assert conflicts[2].type is None
-
     assert conflicts[2].id is None
     assert conflicts[2].name is None
 

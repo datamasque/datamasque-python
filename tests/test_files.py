@@ -405,7 +405,6 @@ def test_certificate_file_reads_each_certificate(client):
                             "is_ca": True,
                             "is_self_signed": True,
                             "not_valid_after": "2031-05-01T00:00:00Z",
-                            "sha1_fingerprint": "AA:BB",
                         }
                     ],
                     "unusable_reason": None,
@@ -418,4 +417,3 @@ def test_certificate_file_reads_each_certificate(client):
     assert certificate.is_ca is True
     assert certificate.is_self_signed is True
     assert certificate.not_valid_after == datetime(2031, 5, 1, tzinfo=timezone.utc)
-    assert certificate.sha1_fingerprint == "AA:BB"

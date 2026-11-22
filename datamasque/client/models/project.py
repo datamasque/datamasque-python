@@ -6,7 +6,7 @@ from typing import NewType, Optional, Union
 
 from pydantic import BaseModel, ConfigDict, field_validator
 
-from datamasque.client.models.resource_type import ResourceTypeName
+from datamasque.client.models.resource_type import RESOURCE_TYPE_NAME_VALUES, ResourceTypeName
 
 ProjectId = NewType("ProjectId", int)
 
@@ -138,4 +138,4 @@ class ProjectDeleteConflict(BaseModel):
     @field_validator("type", mode="before")
     @classmethod
     def _drop_unknown_type(cls, value: object) -> object:
-        return value if value is None or value in {type_name.value for type_name in ResourceTypeName} else None
+        return value if value is None or value in RESOURCE_TYPE_NAME_VALUES else None

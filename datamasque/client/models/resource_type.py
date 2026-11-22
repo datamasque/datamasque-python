@@ -18,3 +18,7 @@ class ResourceTypeName(str, Enum):
     discovery_config_libraries = "discovery_config_libraries"
     ruleset_generation_configs = "ruleset_generation_configs"
     seeds = "seeds"
+
+
+RESOURCE_TYPE_NAME_VALUES = frozenset(type_name.value for type_name in ResourceTypeName)
+"""Every `ResourceTypeName` value, to tell a type this client knows from one a newer server reports."""
