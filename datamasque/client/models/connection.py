@@ -54,6 +54,7 @@ class DatabaseType(Enum):
     cassandra = "cassandra"
     sap_ase = "sap_ase"
     salesforce = "salesforce"
+    bigquery = "bigquery"
 
 
 class SseSelection(Enum):
@@ -374,7 +375,8 @@ class DatabaseConnectionConfig(ConnectionConfig):
 
     Use `DynamoConnectionConfig` for DynamoDB, `SnowflakeConnectionConfig` for Snowflake,
     `MongoConnectionConfig` for MongoDB, `CassandraConnectionConfig` for Apache Cassandra,
-    `SapAseConnectionConfig` for SAP ASE (Sybase) and `SalesforceConnectionConfig` for Salesforce.
+    `SapAseConnectionConfig` for SAP ASE (Sybase), `SalesforceConnectionConfig` for Salesforce
+    and `BigQueryConnectionConfig` for BigQuery.
     """
 
     host: str
@@ -415,6 +417,8 @@ class DatabaseConnectionConfig(ConnectionConfig):
             raise ValueError("For SAP ASE (Sybase), use the SapAseConnectionConfig class instead")
         if self.database_type is DatabaseType.salesforce:
             raise ValueError("For Salesforce, use the SalesforceConnectionConfig class instead")
+        if self.database_type is DatabaseType.bigquery:
+            raise ValueError("For BigQuery, use the BigQueryConnectionConfig class instead")
         return self
 
     mask_type: Literal["database"] = "database"
@@ -716,6 +720,48 @@ class SalesforceConnectionConfig(ConnectionConfig):
         return data
 
 
+class BigQueryConnectionConfig(ConnectionConfig):
+    """
+    Connection configuration for a BigQuery dataset, reached with a service account key.
+
+    `project_id` is the Google Cloud project, not the DataMasque `project` the connection belongs to.
+    `service_account_key` holds the contents of a service account's JSON key file,
+    or the ARN of an AWS Secrets Manager secret that holds it.
+    `maximum_bytes_billed` fails any BigQuery job that would bill more than that many bytes.
+    `acknowledge_time_travel_recovery` acknowledges that original data can be recovered through BigQuery time travel
+    until the dataset's time travel window and its 7-day fail-safe end;
+    the server refuses to save the connection unless it is `True`.
+
+    Requires server version 3.26.22.
+    BigQuery is a preview connection type there:
+    the server refuses to create one until an administrator enables preview features
+    under Settings, Preview Features.
+    """
+
+    project_id: str
+    dataset: str
+    location: str
+    service_account_key: Optional[str] = Field(default=None, repr=False)
+    maximum_bytes_billed: Optional[int] = Field(default=None, ge=1)
+    is_read_only: bool = False
+    acknowledge_time_travel_recovery: bool
+
+    mask_type: Literal["database"] = "database"
+    db_type: Literal["bigquery"] = "bigquery"
+
+    @property
+    def database_type(self) -> DatabaseType:
+        return DatabaseType.bigquery
+
+    @model_validator(mode="before")
+    @classmethod
+    def _strip_encrypted_service_account_key(cls, data: dict) -> dict:
+        if isinstance(data, dict):
+            # The API returns the encrypted form; drop it so `service_account_key` stays None.
+            data.pop("service_account_key_encrypted", None)
+        return data
+
+
 FILE_TYPE_MAP: dict[str, type[FileConnectionConfig]] = {
     "s3_connection": S3ConnectionConfig,
     "azure_blob_connection": AzureConnectionConfig,
@@ -734,6 +780,7 @@ DB_TYPE_MAP: dict[str, type[ConnectionConfig]] = {
     DatabaseType.cassandra.value: CassandraConnectionConfig,
     DatabaseType.sap_ase.value: SapAseConnectionConfig,
     DatabaseType.salesforce.value: SalesforceConnectionConfig,
+    DatabaseType.bigquery.value: BigQueryConnectionConfig,
     # others use the default `DatabaseConnectionConfig`
 }
 

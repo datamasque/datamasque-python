@@ -2,6 +2,15 @@
 History
 =======
 
+1.7.0 (2026-11-23)
+------------------
+
+* Added ``BigQueryConnectionConfig`` and ``DatabaseType.bigquery`` for BigQuery connections.
+  BigQuery is a preview connection type: the server refuses to create one until an administrator enables preview features.
+  ``acknowledge_time_travel_recovery`` is required, and the server refuses to save the connection unless it is ``True``.
+
+Requires server version 3.26.22.
+
 1.6.0 (2026-11-20)
 ------------------
 
