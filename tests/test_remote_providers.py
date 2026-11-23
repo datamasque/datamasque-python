@@ -23,6 +23,8 @@ from datamasque.client import (
 from datamasque.client.exceptions import DataMasqueApiError
 
 REMOTE_PROVIDERS_URL = "http://test-server/api/remote-providers/"
+VALUE_PATHS = [["body", "values", "*"]]
+TOKENS_RESPONSE_PATH = ["tokens", "*"]
 PROVIDER_ID_1 = "aaaaaaaa-1111-2222-3333-444444444444"
 PROVIDER_ID_2 = "bbbbbbbb-1111-2222-3333-444444444444"
 CERTIFICATE_ID = "cccccccc-1111-2222-3333-444444444444"
@@ -51,7 +53,7 @@ def tokens_provider_json() -> dict[str, object]:
         "path": "/api/v1/protect",
         "headers": {},
         "body": {},
-        "value_paths": [["body", "values", "*"]],
+        "value_paths": VALUE_PATHS,
         "parameters": [{"name": "crypt_id", "required": True, "paths": [["body", "cryptId"]]}],
         "response_value_path": ["protectedValues", "*"],
         "max_values_per_request": 0,
@@ -83,9 +85,9 @@ def plain_http_provider_json() -> dict[str, object]:
         "path": "/tokenize",
         "headers": {"Accept": "application/json"},
         "body": {"format": "text"},
-        "value_paths": [["body", "values", "*"]],
+        "value_paths": VALUE_PATHS,
         "parameters": [],
-        "response_value_path": ["tokens", "*"],
+        "response_value_path": TOKENS_RESPONSE_PATH,
         "max_values_per_request": 1000,
         "max_request_bytes": 1048576,
         "max_concurrent_requests": 4,
@@ -107,7 +109,7 @@ def tokens_provider() -> RemoteProvider:
         client_id="datamasque",
         secret=CLIENT_SECRET,
         path="/api/v1/protect",
-        value_paths=[["body", "values", "*"]],
+        value_paths=VALUE_PATHS,
         parameters=[RemoteProviderParameter(name="crypt_id", required=True, paths=[["body", "cryptId"]])],
         response_value_path=["protectedValues", "*"],
         max_values_per_request=0,
@@ -120,8 +122,8 @@ def test_defaults_match_the_servers_defaults() -> None:
         name="minimal",
         base_url="https://tokenizer.example.com",
         path="/tokenize",
-        value_paths=[["body", "values", "*"]],
-        response_value_path=["tokens", "*"],
+        value_paths=VALUE_PATHS,
+        response_value_path=TOKENS_RESPONSE_PATH,
     )
 
     assert provider.certificate_verification is CertificateVerification.uploaded_root_ca
@@ -149,8 +151,8 @@ def test_certificate_file_accepts_a_certificate_file() -> None:
         base_url="https://tokenizer.internal",
         certificate_file=certificate,
         path="/tokenize",
-        value_paths=[["body", "values", "*"]],
-        response_value_path=["tokens", "*"],
+        value_paths=VALUE_PATHS,
+        response_value_path=TOKENS_RESPONSE_PATH,
     )
 
     assert provider.certificate_file == FileId(CERTIFICATE_ID)
@@ -163,8 +165,8 @@ def test_certificate_file_without_an_id_is_refused() -> None:
             base_url="https://tokenizer.internal",
             certificate_file=CertificateFile(name="internal-ca.pem", created_date=UPLOADED_AT),
             path="/tokenize",
-            value_paths=[["body", "values", "*"]],
-            response_value_path=["tokens", "*"],
+            value_paths=VALUE_PATHS,
+            response_value_path=TOKENS_RESPONSE_PATH,
         )
 
 
@@ -235,7 +237,7 @@ def test_create_remote_provider_sends_the_secret_and_returns_the_saved_provider(
     assert sent["auth_type"] == "oauth2_client_credentials"
     assert sent["token_body_format"] == "form"
     assert sent["parameters"] == [{"name": "crypt_id", "required": True, "paths": [["body", "cryptId"]]}]
-    assert sent["value_paths"] == [["body", "values", "*"]]
+    assert sent["value_paths"] == VALUE_PATHS
     for read_only in ("id", "has_secret", "created_date", "modified_date"):
         assert read_only not in sent
 
@@ -252,8 +254,8 @@ def test_create_remote_provider_sends_a_blank_token_body_format_for_no_oauth2(
         base_url="http://tokenizer.internal:8080",
         certificate_verification=None,
         path="/tokenize",
-        value_paths=[["body", "values", "*"]],
-        response_value_path=["tokens", "*"],
+        value_paths=VALUE_PATHS,
+        response_value_path=TOKENS_RESPONSE_PATH,
     )
 
     with requests_mock.Mocker() as m:
