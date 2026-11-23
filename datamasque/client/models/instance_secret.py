@@ -103,4 +103,4 @@ class InstanceSecretLinkResponseVerification(BaseModel):
     links_ending: list[InstanceSecretEvent]
     """The current links that accepting the response code will end."""
     verification_token: str
-    """Pass this when accepting the response code, which then fails if the instance secret or its history has changed."""
+    """Pass this when accepting the response code, which then fails if the instance secret changed or was shared since."""

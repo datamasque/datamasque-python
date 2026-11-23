@@ -130,7 +130,7 @@ class InstanceSecretLinkErrorCode(enum.Enum):
     active_runs = "active_runs"
     """Runs are in progress. Cancel them or wait for them to finish."""
     verification_stale = "verification_stale"
-    """The instance secret or its history changed after the response code was verified. Verify the response again."""
+    """The instance secret changed or was shared since the response code was verified. Verify the response again."""
     host_header_too_long = "host_header_too_long"
     """The hostname used to access DataMasque is longer than 253 characters, the longest that DNS allows."""
     insecure_instance_secret = "insecure_instance_secret"
