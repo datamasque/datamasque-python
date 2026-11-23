@@ -146,6 +146,7 @@ from datamasque.client.models.project import (
 )
 from datamasque.client.models.remote_provider import (
     CertificateVerification,
+    ParameterValue,
     RemoteProvider,
     RemoteProviderAuthType,
     RemoteProviderId,
@@ -346,6 +347,7 @@ __all__ = [
     "NumericSummaries",
     "NumericTemporalDisclosureLevel",
     "OracleWalletFile",
+    "ParameterValue",
     "PatternComposition",
     "PatternEntry",
     "PatternsStatistics",

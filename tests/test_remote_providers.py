@@ -2,6 +2,7 @@
 
 import json
 from datetime import datetime, timezone
+from types import MappingProxyType
 
 import pytest
 import requests_mock
@@ -383,7 +384,9 @@ def test_test_remote_provider_returns_the_output(client: DataMasqueClient) -> No
     with requests_mock.Mocker() as m:
         m.post(f"{REMOTE_PROVIDERS_URL}{PROVIDER_ID_1}/test/", json={"output": "SSN123-45-6789", "error": None})
 
-        result = client.test_remote_provider(RemoteProviderId(PROVIDER_ID_1), "123-45-6789", {"crypt_id": "SSN"})
+        result = client.test_remote_provider(
+            RemoteProviderId(PROVIDER_ID_1), "123-45-6789", MappingProxyType({"crypt_id": "SSN"})
+        )
 
         sent = m.last_request.json()
 

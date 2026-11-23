@@ -1,4 +1,5 @@
 import logging
+from collections.abc import Mapping
 from typing import Optional
 
 from datamasque.client.base import BaseClient
@@ -128,7 +129,7 @@ class RemoteProviderClient(BaseClient):
         self,
         remote_provider_id: RemoteProviderId,
         value: str,
-        params: Optional[dict[str, ParameterValue]] = None,
+        params: Optional[Mapping[str, ParameterValue]] = None,
     ) -> RemoteProviderTestResult:
         """
         Sends one value, with the provider's parameters, to the remote provider.
@@ -142,6 +143,6 @@ class RemoteProviderClient(BaseClient):
         response = self.make_request(
             "POST",
             f"/api/remote-providers/{remote_provider_id}/test/",
-            data={"value": value, "params": params or {}},
+            data={"value": value, "params": dict(params or {})},
         )
         return RemoteProviderTestResult.model_validate(response.json())
