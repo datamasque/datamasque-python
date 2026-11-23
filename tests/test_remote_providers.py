@@ -410,6 +410,22 @@ def test_test_remote_provider_returns_the_error(client: DataMasqueClient) -> Non
     assert result.error == error
 
 
+def test_a_refused_test_does_not_log_the_value_or_the_params(
+    client: DataMasqueClient, caplog: pytest.LogCaptureFixture
+) -> None:
+    with requests_mock.Mocker() as m:
+        m.post(f"{REMOTE_PROVIDERS_URL}{PROVIDER_ID_1}/test/", json={"params": ["Unknown parameter."]}, status_code=400)
+
+        with pytest.raises(DataMasqueApiError):
+            client.test_remote_provider(
+                RemoteProviderId(PROVIDER_ID_1), "123-45-6789", MappingProxyType({"crypt_id": "SSN-CRYPT"})
+            )
+
+    logged = caplog.text + json.dumps([record.args for record in caplog.records], default=str)
+    assert "123-45-6789" not in logged
+    assert "SSN-CRYPT" not in logged
+
+
 def test_a_refused_create_does_not_log_the_secret(
     client: DataMasqueClient, tokens_provider: RemoteProvider, caplog: pytest.LogCaptureFixture
 ) -> None:

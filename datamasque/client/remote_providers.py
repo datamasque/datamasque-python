@@ -144,5 +144,8 @@ class RemoteProviderClient(BaseClient):
             "POST",
             f"/api/remote-providers/{remote_provider_id}/test/",
             data={"value": value, "params": dict(params or {})},
+            require_status_check=False,
         )
+        # No `request_data`: the value and params would be logged in clear on an error.
+        self._raise_for_status(response)
         return RemoteProviderTestResult.model_validate(response.json())
