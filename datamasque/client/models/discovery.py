@@ -476,6 +476,10 @@ class FileDiscoveryLocatorResult(BaseModel):
     data_types: list[str]
     safe_data_preview: Optional[SafeDataPreview] = None
     value_count: Optional[int] = None
+    # Each `n` means the first `n` segments of `locator` held a string that holds JSON,
+    # and the rest of `locator` is the path inside it.
+    # None when the locator passes through no such string, and from a server that predates the field.
+    json_string_prefix_lengths: Optional[list[int]] = None
 
 
 class FileDiscoveryFile(BaseModel):
