@@ -132,6 +132,14 @@ datamasque.client.rg_configs module
    :undoc-members:
    :show-inheritance:
 
+datamasque.client.remote_providers module
+-----------------------------------------
+
+.. automodule:: datamasque.client.remote_providers
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 datamasque.client.ruleset_libraries module
 ------------------------------------------
 

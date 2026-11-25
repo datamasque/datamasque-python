@@ -8,6 +8,7 @@ from datamasque.client.files import FileClient
 from datamasque.client.git import GitClient
 from datamasque.client.license import LicenseClient
 from datamasque.client.projects import ProjectClient
+from datamasque.client.remote_providers import RemoteProviderClient
 from datamasque.client.resources import ResourceClient
 from datamasque.client.rg_configs import RGConfigClient
 from datamasque.client.ruleset_libraries import RulesetLibraryClient
@@ -38,6 +39,7 @@ class DataMasqueClient(
     GitClient,
     TableReferenceClient,
     RGConfigClient,
+    RemoteProviderClient,
     UserClient,
     SettingsClient,
 ):

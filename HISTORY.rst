@@ -5,6 +5,16 @@ History
 1.7.0 (unreleased)
 ------------------
 
+* Added remote providers, the customer-hosted services that the ``remote_http`` mask sends values to:
+  ``RemoteProvider`` and ``list_remote_providers``, ``get_remote_provider``, ``get_remote_provider_by_name``,
+  ``create_remote_provider``, ``update_remote_provider``, ``create_or_update_remote_provider``,
+  ``delete_remote_provider_by_id_if_exists``, ``delete_remote_provider_by_name_if_exists``
+  and ``test_remote_provider``.
+  The secret is write-only: the server never returns it, and ``has_secret`` says whether one is saved.
+  ``query`` holds fixed query string pairs that every request carries,
+  and ``item_values`` (a list of ``RemoteProviderItemValue``) holds fixed fields written into every item of the request body.
+  The server refuses the parameter names ``dm_values``, ``dm_value`` and ``dm_key`` in any case.
+  Every call needs an administrator.
 * Added an optional ``instance`` field to ``DatabaseConnectionConfig``: the SQL Server named instance,
   taken from the Instance input in the connection form's advanced settings.
   It round-trips through ``list_connections`` and ``create_or_update_connection``,
