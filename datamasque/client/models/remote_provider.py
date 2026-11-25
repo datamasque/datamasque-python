@@ -109,7 +109,7 @@ class RemoteProvider(BaseModel):
     """The name rulesets use for the provider. It cannot change after the provider is created."""
     base_url: str
     """The `http` or `https` URL of the provider."""
-    certificate_verification: Optional[CertificateVerification] = CertificateVerification.uploaded_root_ca
+    certificate_verification: Optional[CertificateVerification] = CertificateVerification.public_cas
     """How DataMasque verifies the certificate of an `https` base URL; `None` for an `http` base URL."""
     certificate_file: Optional[FileId] = None
     """

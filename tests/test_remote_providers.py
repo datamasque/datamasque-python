@@ -131,7 +131,7 @@ def test_defaults_match_the_servers_defaults() -> None:
         response_value_path=TOKENS_RESPONSE_PATH,
     )
 
-    assert provider.certificate_verification is CertificateVerification.uploaded_root_ca
+    assert provider.certificate_verification is CertificateVerification.public_cas
     assert provider.auth_type is RemoteProviderAuthType.none
     assert provider.method is RemoteProviderMethod.POST
     assert provider.timeout_seconds == 30
