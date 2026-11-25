@@ -15,6 +15,7 @@ from datamasque.client import (
     RemoteProvider,
     RemoteProviderAuthType,
     RemoteProviderId,
+    RemoteProviderItemValue,
     RemoteProviderMethod,
     RemoteProviderParameter,
     RemoteProviderTestResult,
@@ -52,8 +53,10 @@ def tokens_provider_json() -> dict[str, object]:
         "method": "POST",
         "path": "/api/v1/protect",
         "headers": {},
+        "query": {},
         "body": {},
         "value_paths": VALUE_PATHS,
+        "item_values": [],
         "parameters": [{"name": "crypt_id", "required": True, "paths": [["body", "cryptId"]]}],
         "response_value_path": ["protectedValues", "*"],
         "max_values_per_request": 0,
@@ -84,8 +87,10 @@ def plain_http_provider_json() -> dict[str, object]:
         "method": "PUT",
         "path": "/tokenize",
         "headers": {"Accept": "application/json"},
+        "query": {},
         "body": {"format": "text"},
         "value_paths": VALUE_PATHS,
+        "item_values": [],
         "parameters": [],
         "response_value_path": TOKENS_RESPONSE_PATH,
         "max_values_per_request": 1000,
@@ -134,7 +139,9 @@ def test_defaults_match_the_servers_defaults() -> None:
     assert provider.max_request_bytes == 1048576
     assert provider.max_concurrent_requests == 4
     assert provider.headers == {}
+    assert provider.query == {}
     assert provider.body == {}
+    assert provider.item_values == []
     assert provider.parameters == []
     assert provider.has_secret is False
 
@@ -268,6 +275,47 @@ def test_create_remote_provider_sends_a_blank_token_body_format_for_no_oauth2(
     assert sent["token_body_format"] == ""
     assert sent["certificate_verification"] is None
     assert "secret" not in sent
+
+
+def test_create_remote_provider_round_trips_fixed_query_pairs_and_item_values(
+    client: DataMasqueClient, plain_http_provider_json: dict[str, object]
+) -> None:
+    query = {"tenant": "claims"}
+    item_values_json = [
+        {"path": ["body", "items", "*", "type"], "value": "text"},
+        {"path": ["body", "items", "*", "options"], "value": {"keep_case": True}},
+    ]
+    provider = RemoteProvider(
+        name="plain_http",
+        base_url="http://tokenizer.internal:8080",
+        certificate_verification=None,
+        path="/tokenize",
+        query=query,
+        value_paths=[["body", "items", "*", "data"]],
+        item_values=[
+            RemoteProviderItemValue(path=["body", "items", "*", "type"], value="text"),
+            RemoteProviderItemValue(path=["body", "items", "*", "options"], value={"keep_case": True}),
+        ],
+        response_value_path=TOKENS_RESPONSE_PATH,
+    )
+    saved_json = {
+        **plain_http_provider_json,
+        "query": query,
+        "value_paths": [["body", "items", "*", "data"]],
+        "item_values": item_values_json,
+    }
+
+    with requests_mock.Mocker() as m:
+        m.post(REMOTE_PROVIDERS_URL, json=saved_json, status_code=201)
+
+        created = client.create_remote_provider(provider)
+
+        sent = m.last_request.json()
+
+    assert sent["query"] == query
+    assert sent["item_values"] == item_values_json
+    assert created.query == query
+    assert created.item_values == provider.item_values
 
 
 def test_create_remote_provider_raises_the_servers_field_errors(

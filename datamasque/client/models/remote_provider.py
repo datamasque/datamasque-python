@@ -62,6 +62,7 @@ class RemoteProviderParameter(BaseModel):
 
     A `body` path can have one `*` to repeat the parameter for each value.
     A `query` or `header` path has two elements and no `*`.
+    The names `dm_values`, `dm_value` and `dm_key`, in any case, are reserved and refused by the server.
     """
 
     model_config = ConfigDict(extra="allow")
@@ -69,6 +70,22 @@ class RemoteProviderParameter(BaseModel):
     name: str
     required: bool
     paths: list[Path]
+
+
+class RemoteProviderItemValue(BaseModel):
+    """
+    A fixed value that DataMasque writes into every item of the repeated list in a request body.
+
+    The path starts with `body` and has one `*`, followed by the field to write.
+    The part before `*` is the list that the value paths repeat,
+    for example `["body", "items", "*", "type"]` with the value path `["body", "items", "*", "data"]`.
+    """
+
+    model_config = ConfigDict(extra="allow")
+
+    path: Path
+    value: Any
+    """Any JSON value."""
 
 
 class RemoteProvider(BaseModel):
@@ -119,10 +136,26 @@ class RemoteProvider(BaseModel):
     """The path of a request, relative to the base URL, for example `/api/v1/protect`."""
     headers: dict[str, str] = {}
     """Headers that every request carries. A header that also carries the secret is refused."""
+    query: dict[str, str] = {}
+    """
+    Fixed query string pairs, name to value, that every request carries.
+
+    For example, `{"tenant": "claims"}` adds `?tenant=claims`.
+    They follow the path, in name order, before the parameters' query pairs.
+    A value cannot hold a `{{...}}` placeholder,
+    and a name cannot also be the name of a parameter's `query` path.
+    """
     body: dict[str, Any] = {}
     """The JSON body that every request starts from."""
     value_paths: list[Path]
     """Where the values go in a request. Each path starts with `body` and has one `*`."""
+    item_values: list[RemoteProviderItemValue] = []
+    """
+    Fixed fields that DataMasque writes into every item of the repeated list in a request body.
+
+    Refused when a value path ends in `*`, since a list of plain values has no item to hold a field.
+    A path cannot equal or overlap a value path, a parameter path, or another item value's path.
+    """
     parameters: list[RemoteProviderParameter] = []
     response_value_path: Path
     """Where the outputs are in the response, with one `*`."""
