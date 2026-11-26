@@ -20,6 +20,8 @@ from datamasque.client.exceptions import (
     DiscoveryConfigNotFoundError,
     FailedToStartError,
     IfmAuthError,
+    InstanceSecretLinkError,
+    InstanceSecretLinkErrorCode,
     InvalidDiscoveryConfigError,
     InvalidLibraryError,
     InvalidRulesetError,
@@ -133,6 +135,15 @@ from datamasque.client.models.ifm import (
     RulesetPlanOptions,
     RulesetPlanPartialUpdateRequest,
     RulesetPlanUpdateRequest,
+)
+from datamasque.client.models.instance_secret import (
+    InFlightSyncResult,
+    InstanceSecretLink,
+    InstanceSecretLinkKind,
+    InstanceSecretLinkRequest,
+    InstanceSecretLinkRequestVerification,
+    InstanceSecretLinkResponse,
+    InstanceSecretLinkResponseVerification,
 )
 from datamasque.client.models.license import LicenseInfo, SwitchableLicenseMetadata
 from datamasque.client.models.project import (
@@ -309,6 +320,15 @@ __all__ = [
     "IfmTokenInfo",
     "InDataDiscoveryConfig",
     "InDataDiscoveryRule",
+    "InFlightSyncResult",
+    "InstanceSecretLink",
+    "InstanceSecretLinkError",
+    "InstanceSecretLinkErrorCode",
+    "InstanceSecretLinkKind",
+    "InstanceSecretLinkRequest",
+    "InstanceSecretLinkRequestVerification",
+    "InstanceSecretLinkResponse",
+    "InstanceSecretLinkResponseVerification",
     "InvalidDiscoveryConfigError",
     "InvalidLibraryError",
     "InvalidRulesetError",

@@ -100,6 +100,14 @@ datamasque.client.ifm module
    :undoc-members:
    :show-inheritance:
 
+datamasque.client.instance_secret module
+----------------------------------------
+
+.. automodule:: datamasque.client.instance_secret
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 datamasque.client.license module
 --------------------------------
 
