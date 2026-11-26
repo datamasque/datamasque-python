@@ -2,7 +2,7 @@
 History
 =======
 
-1.7.0 (unreleased)
+1.7.0 (2026-11-27)
 ------------------
 
 * Added ``json_string_prefix_lengths`` to ``FileDiscoveryLocatorResult``:
