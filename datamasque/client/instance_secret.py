@@ -6,7 +6,7 @@ from datamasque.client.base import BaseClient
 from datamasque.client.exceptions import InstanceSecretLinkError, InstanceSecretLinkErrorCode
 from datamasque.client.models.instance_secret import (
     InFlightSyncResult,
-    InstanceSecretEvent,
+    InstanceSecretLink,
     InstanceSecretLinkRequest,
     InstanceSecretLinkRequestVerification,
     InstanceSecretLinkResponse,
@@ -35,12 +35,14 @@ class InstanceSecretClient(BaseClient):
 
         # On the sharing instance: check the request fingerprint, then share the instance secret.
         request_verification = sharing_client.verify_instance_secret_link_request(link_request.request_code)
-        assert request_verification.fingerprint == link_request.fingerprint
+        if request_verification.request_fingerprint != link_request.request_fingerprint:
+            raise ValueError("The request fingerprints differ.")
         link_response = sharing_client.accept_instance_secret_link_request(link_request.request_code)
 
         # On the joining instance: check the response fingerprint, then adopt the instance secret.
         response_verification = joining_client.verify_instance_secret_link_response(link_response.response_code)
-        assert response_verification.response_fingerprint == link_response.response_fingerprint
+        if response_verification.response_fingerprint != link_response.response_fingerprint:
+            raise ValueError("The response fingerprints differ.")
         joining_client.accept_instance_secret_link_response(
             link_response.response_code,
             response_verification.verification_token,
@@ -58,7 +60,7 @@ class InstanceSecretClient(BaseClient):
         fingerprint: str = response.json()["fingerprint"]
         return fingerprint
 
-    def get_current_instance_secret_links(self) -> list[InstanceSecretEvent]:
+    def get_current_instance_secret_links(self) -> list[InstanceSecretLink]:
         """
         Returns the shares and adoptions that link this DataMasque instance with others, newest first.
 
@@ -68,11 +70,11 @@ class InstanceSecretClient(BaseClient):
         Requires an admin user, and works on every license type.
 
         Raises:
-            DataMasqueApiError: the user is not an admin user.
+            DataMasqueApiError: the request fails, for example because the user is not an admin user.
         """
 
         response = self.make_request("GET", "/api/instance-secret/current-links/")
-        return [InstanceSecretEvent.model_validate(link) for link in response.json()["links"]]
+        return [InstanceSecretLink.model_validate(link) for link in response.json()["links"]]
 
     def rotate_instance_secret(self) -> InFlightSyncResult:
         """
@@ -82,12 +84,12 @@ class InstanceSecretClient(BaseClient):
         Hashed output of masking runs and in-flight masking changes differs from before this call,
         and the instance no longer has the same instance secret as any DataMasque instance it was linked with.
         Once this succeeds, masking runs use the new instance secret.
-        Returns an `InFlightSyncResult` stating whether the IFM service successfully received the new instance secret.
-        If DataMasque fails to notify the IFM service,
+        Returns an `InFlightSyncResult` stating whether the in-flight masking service received the new instance secret.
+        If DataMasque fails to notify the in-flight masking service,
         a DataMasque restart is required for in-flight masking to use the new instance secret.
 
         Raises:
-            DataMasqueApiError: the user is not an admin user.
+            DataMasqueApiError: the request fails, for example because the user is not an admin user.
         """
 
         response = self.make_request("POST", "/api/instance-secret/rotate/")
@@ -132,6 +134,7 @@ class InstanceSecretClient(BaseClient):
         Raises:
             ValueError: `request_code` is empty.
             InstanceSecretLinkError: the request code is not valid.
+            DataMasqueApiError: the request fails for another reason.
         """
 
         response = self._post_link_step("/api/instance-secret/link/request/verify/", {"request_code": request_code})
@@ -147,6 +150,7 @@ class InstanceSecretClient(BaseClient):
         Raises:
             ValueError: `request_code` is empty.
             InstanceSecretLinkError: the request code is not valid.
+            DataMasqueApiError: the request fails for another reason.
         """
 
         response = self._post_link_step("/api/instance-secret/link/request/accept/", {"request_code": request_code})
@@ -162,6 +166,7 @@ class InstanceSecretClient(BaseClient):
         Raises:
             ValueError: `response_code` is empty.
             InstanceSecretLinkError: the response code is not valid.
+            DataMasqueApiError: the request fails for another reason.
         """
 
         response = self._post_link_step(
@@ -177,14 +182,15 @@ class InstanceSecretClient(BaseClient):
         Call this on the joining DataMasque instance,
         with the `verification_token` from `verify_instance_secret_link_response` for the same response code.
         Once this succeeds, masking runs use the new instance secret.
-        Returns an `InFlightSyncResult` stating whether the IFM service successfully received the new instance secret.
-        If DataMasque fails to notify the IFM service,
+        Returns an `InFlightSyncResult` stating whether the in-flight masking service received the new instance secret.
+        If DataMasque fails to notify the in-flight masking service,
         a DataMasque restart is required for in-flight masking to use the new instance secret.
 
         Raises:
             ValueError: `response_code` or `verification_token` is empty.
             InstanceSecretLinkError: the response code is not valid, runs are in progress,
               or the instance secret changed or was shared since the response code was verified.
+            DataMasqueApiError: the request fails for another reason.
         """
 
         response = self._post_link_step(

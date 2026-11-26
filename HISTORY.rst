@@ -5,7 +5,8 @@ History
 1.8.0 (unreleased)
 ------------------
 
-* Added methods for the instance secret fingerprint and for linking the instance secret with another DataMasque instance.
+* Added methods for the instance secret fingerprint
+  and for linking the instance secret with another DataMasque instance.
 * Added ``rotate_instance_secret``, which replaces the instance secret with a newly generated one.
 * Added ``get_current_instance_secret_links``, which returns the links that rotating the instance secret would end.
 

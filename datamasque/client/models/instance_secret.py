@@ -2,20 +2,14 @@
 
 import enum
 from datetime import datetime
-from typing import NewType, Optional
+from typing import Optional
 
 from pydantic import BaseModel, ConfigDict
 
-InstanceSecretEventId = NewType("InstanceSecretEventId", str)
 
+class InstanceSecretLinkKind(enum.Enum):
+    """How a DataMasque instance came to share its instance secret with another DataMasque instance."""
 
-class InstanceSecretEventKind(enum.Enum):
-    """Something that happened to the instance secret of a DataMasque instance."""
-
-    initialised = "initialised"
-    """The instance secret was created when DataMasque was installed."""
-    rotated = "rotated"
-    """The instance secret was replaced with a new random one."""
     shared = "shared"
     """The instance secret was sent to another DataMasque instance."""
     adopted = "adopted"
@@ -24,35 +18,35 @@ class InstanceSecretEventKind(enum.Enum):
 
 class InFlightSyncResult(enum.Enum):
     """
-    Whether the IFM service successfully received a new instance secret.
+    Whether the in-flight masking service successfully received a new instance secret.
 
-    Masking runs use the new instance secret with every result; only in-flight masking can need a DataMasque restart.
+    Only in-flight masking can need a DataMasque restart after a new instance secret.
     """
 
     notified = "notified"
-    """The IFM service uses the new instance secret, and nothing more is needed."""
+    """The in-flight masking service uses the new instance secret, and nothing more is needed."""
     notify_failed = "notify_failed"
-    """Restart DataMasque so that the IFM service uses the new instance secret."""
+    """Restart DataMasque so that the in-flight masking service uses the new instance secret."""
     file_write_failed = "file_write_failed"
-    """Restart DataMasque so that the IFM service uses the new instance secret."""
+    """Restart DataMasque so that the in-flight masking service uses the new instance secret."""
 
 
-class InstanceSecretEvent(BaseModel):
-    """An initialisation, rotation, share or adoption of the instance secret of a DataMasque instance."""
+class InstanceSecretLink(BaseModel):
+    """A share or adoption that linked the instance secret of a DataMasque instance with another instance."""
 
     model_config = ConfigDict(extra="allow")
 
-    id: InstanceSecretEventId
+    id: str
     created_at: datetime
-    kind: InstanceSecretEventKind
-    peer_hostname: Optional[str]
-    """The hostname of the other DataMasque instance, or `None` when the event involved no other instance."""
-    request_fingerprint: Optional[str]
-    """The fingerprint of the request code, or `None` when the event involved no other instance."""
-    response_fingerprint: Optional[str]
-    """The fingerprint of the response code, or `None` when the event involved no other instance."""
+    kind: InstanceSecretLinkKind
+    peer_hostname: str
+    """The hostname of the other DataMasque instance."""
+    request_fingerprint: str
+    """The fingerprint of the request code."""
+    response_fingerprint: str
+    """The fingerprint of the response code."""
     username: str
-    """The user who initiated the event."""
+    """The user who initiated the share or adoption."""
 
 
 class InstanceSecretLinkRequest(BaseModel):
@@ -61,7 +55,7 @@ class InstanceSecretLinkRequest(BaseModel):
     model_config = ConfigDict(extra="allow")
 
     request_code: str
-    fingerprint: str
+    request_fingerprint: str
     """The request fingerprint, which must match the one shown on the sharing DataMasque instance."""
     expires_at: datetime
 
@@ -71,9 +65,9 @@ class InstanceSecretLinkRequestVerification(BaseModel):
 
     model_config = ConfigDict(extra="allow")
 
-    hostname: str
+    peer_hostname: str
     """The reported hostname of the joining DataMasque instance."""
-    fingerprint: str
+    request_fingerprint: str
     """The request fingerprint, which must match the one shown on the joining DataMasque instance."""
     expires_at: datetime
     """When the request expires."""
@@ -96,11 +90,14 @@ class InstanceSecretLinkResponseVerification(BaseModel):
 
     model_config = ConfigDict(extra="allow")
 
-    hostname: str
+    peer_hostname: str
     """The reported hostname of the sharing DataMasque instance."""
     response_fingerprint: str
     """The response fingerprint, which must match the one shown on the sharing DataMasque instance."""
-    links_ending: list[InstanceSecretEvent]
+    links_ending: list[InstanceSecretLink]
     """The current links that accepting the response code will end."""
     verification_token: str
-    """Pass this when accepting the response code, which then fails if the instance secret changed or was shared since."""
+    """
+    Pass this when accepting the response code.
+    The accept fails if the instance secret changed or was shared since.
+    """
