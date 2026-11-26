@@ -119,6 +119,8 @@ class InstanceSecretLinkErrorCode(enum.Enum):
     """The linking request was sent to the same DataMasque instance that generated it."""
     request_expired = "request_expired"
     """The request code has expired. Create a new request code."""
+    request_created_in_future = "request_created_in_future"
+    """The request code has a creation time in the future. Check the clocks of both DataMasque instances."""
     unknown_request = "unknown_request"
     """The request that matches the response code was not found."""
     unseal_failed = "unseal_failed"

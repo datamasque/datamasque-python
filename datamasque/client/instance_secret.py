@@ -43,6 +43,8 @@ class InstanceSecretClient(BaseClient):
         response_verification = joining_client.verify_instance_secret_link_response(link_response.response_code)
         if response_verification.response_fingerprint != link_response.response_fingerprint:
             raise ValueError("The response fingerprints differ.")
+        if response_verification.instance_secret_fingerprint != sharing_client.get_instance_secret_fingerprint():
+            raise ValueError("The instance secret fingerprints differ.")
         joining_client.accept_instance_secret_link_response(
             link_response.response_code,
             response_verification.verification_token,

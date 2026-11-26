@@ -10,7 +10,7 @@ History
 * Added ``rotate_instance_secret``, which replaces the instance secret with a newly generated one.
 * Added ``get_current_instance_secret_links``, which returns the links that rotating the instance secret would end.
 
-Requires server version TBD
+Requires server version 3.26.23
 
 1.7.0 (unreleased)
 ------------------

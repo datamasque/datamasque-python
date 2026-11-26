@@ -94,6 +94,11 @@ class InstanceSecretLinkResponseVerification(BaseModel):
     """The reported hostname of the sharing DataMasque instance."""
     response_fingerprint: str
     """The response fingerprint, which must match the one shown on the sharing DataMasque instance."""
+    instance_secret_fingerprint: str
+    """
+    The fingerprint that the instance secret of this DataMasque instance will have after the link.
+    It must match the fingerprint on the sharing DataMasque instance.
+    """
     links_ending: list[InstanceSecretLink]
     """The current links that accepting the response code will end."""
     verification_token: str

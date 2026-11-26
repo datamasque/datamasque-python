@@ -10,11 +10,14 @@ from pydantic import ValidationError
 from datamasque.client.exceptions import DataMasqueApiError, InstanceSecretLinkError, InstanceSecretLinkErrorCode
 from datamasque.client.models.instance_secret import InFlightSyncResult, InstanceSecretLink, InstanceSecretLinkKind
 
+REQUEST_FINGERPRINT = "7KQ2-9MXA-3HDP-T0WZ"
+SECRET_FINGERPRINT = "5NBC-2WTR-8JKE-X7YH"
+RESPONSE_FINGERPRINT = "9GGM-DR1H-ETXX-41Q6"
 LINK_URL = "http://test-server/api/instance-secret/link"
 
 LINK_REQUEST_JSON = {
     "request_code": "DMLINK-REQUEST",
-    "request_fingerprint": "7KQ2-9MXA-3HDP-T0WZ",
+    "request_fingerprint": REQUEST_FINGERPRINT,
     "expires_at": "2026-10-30T12:00:00Z",
 }
 
@@ -26,6 +29,7 @@ SERVER_LINK_ERROR_CODES = (
     "invalid_public_key",
     "own_request",
     "request_expired",
+    "request_created_in_future",
     "unknown_request",
     "unseal_failed",
     "invalid_secret",
@@ -41,8 +45,8 @@ def link_json(
     kind: str,
     *,
     peer_hostname: str = "peer.example.com",
-    request_fingerprint: str = "7KQ2-9MXA-3HDP-T0WZ",
-    response_fingerprint: str = "9GGM-DR1H-ETXX-41Q6",
+    request_fingerprint: str = REQUEST_FINGERPRINT,
+    response_fingerprint: str = RESPONSE_FINGERPRINT,
 ) -> dict:
     return {
         "id": "3f2b8c1e-5d4a-4e6f-9a7b-1c2d3e4f5a6b",
@@ -57,15 +61,15 @@ def link_json(
 
 def test_get_instance_secret_fingerprint_returns_the_fingerprint(client):
     with requests_mock.Mocker() as m:
-        m.get("http://test-server/api/instance-secret/", json={"fingerprint": "7KQ2-9MXA-3HDP-T0WZ"})
-        assert client.get_instance_secret_fingerprint() == "7KQ2-9MXA-3HDP-T0WZ"
+        m.get("http://test-server/api/instance-secret/", json={"fingerprint": SECRET_FINGERPRINT})
+        assert client.get_instance_secret_fingerprint() == SECRET_FINGERPRINT
 
 
 def test_get_current_instance_secret_links_returns_the_links_in_order(client):
     shared = link_json(
         "shared",
         peer_hostname="joining.example.com",
-        request_fingerprint="7KQ2-9MXA-3HDP-T0WZ",
+        request_fingerprint=REQUEST_FINGERPRINT,
         response_fingerprint="0F2A-9QXH-7RZW-B4ND",
     )
     adopted = {
@@ -73,7 +77,7 @@ def test_get_current_instance_secret_links_returns_the_links_in_order(client):
             "adopted",
             peer_hostname="sharing.example.com",
             request_fingerprint="EBDV-ECVC-8QJ4-9XT5",
-            response_fingerprint="9GGM-DR1H-ETXX-41Q6",
+            response_fingerprint=RESPONSE_FINGERPRINT,
         ),
         "id": "8a1c2d3e-4f5a-4b6c-8d7e-9f0a1b2c3d4e",
     }
@@ -87,16 +91,16 @@ def test_get_current_instance_secret_links_returns_the_links_in_order(client):
     ]
     assert links[0].id == "3f2b8c1e-5d4a-4e6f-9a7b-1c2d3e4f5a6b"
     assert links[0].username == "admin"
-    assert links[0].request_fingerprint == "7KQ2-9MXA-3HDP-T0WZ"
+    assert links[0].request_fingerprint == REQUEST_FINGERPRINT
     assert links[0].created_at == datetime(2026, 10, 30, 11, 0, tzinfo=timezone.utc)
-    assert links[1].response_fingerprint == "9GGM-DR1H-ETXX-41Q6"
+    assert links[1].response_fingerprint == RESPONSE_FINGERPRINT
 
 
 @pytest.mark.parametrize("kind", ["rotated", "initialised"])
 def test_get_current_instance_secret_links_rejects_an_unknown_kind(client, kind):
     with requests_mock.Mocker() as m:
         m.get("http://test-server/api/instance-secret/current-links/", json={"links": [link_json(kind)]})
-        with pytest.raises(ValidationError, match="kind"):
+        with pytest.raises(ValidationError, match="Input should be 'shared' or 'adopted'"):
             client.get_current_instance_secret_links()
 
 
@@ -166,7 +170,7 @@ def test_get_pending_instance_secret_link_request_returns_the_request(client):
 
     assert link_request is not None
     assert link_request.request_code == "DMLINK-REQUEST"
-    assert link_request.request_fingerprint == "7KQ2-9MXA-3HDP-T0WZ"
+    assert link_request.request_fingerprint == REQUEST_FINGERPRINT
     assert link_request.expires_at == datetime(2026, 10, 30, 12, 0, tzinfo=timezone.utc)
 
 
@@ -217,7 +221,7 @@ def test_verify_instance_secret_link_request_returns_what_the_admins_compare(cli
             f"{LINK_URL}/request/verify/",
             json={
                 "peer_hostname": "joining.example.com",
-                "request_fingerprint": "7KQ2-9MXA-3HDP-T0WZ",
+                "request_fingerprint": REQUEST_FINGERPRINT,
                 "expires_at": "2026-10-30T12:00:00Z",
                 "datamasque_version": None,
             },
@@ -226,7 +230,7 @@ def test_verify_instance_secret_link_request_returns_what_the_admins_compare(cli
 
     assert m.last_request.json() == {"request_code": "DMLINK-REQUEST"}
     assert verification.peer_hostname == "joining.example.com"
-    assert verification.request_fingerprint == "7KQ2-9MXA-3HDP-T0WZ"
+    assert verification.request_fingerprint == REQUEST_FINGERPRINT
     assert verification.datamasque_version is None
 
 
@@ -343,11 +347,12 @@ def test_verify_instance_secret_link_response_parses_the_links_ending(client, li
             json={
                 "peer_hostname": "other.example.com",
                 "response_fingerprint": "ABCD-EFGH-JKMN-PQRS",
+                "instance_secret_fingerprint": SECRET_FINGERPRINT,
                 "links_ending": [
                     link_json(
                         link_kind.value,
                         peer_hostname="third.example.com",
-                        request_fingerprint="7KQ2-9MXA-3HDP-T0WZ",
+                        request_fingerprint=REQUEST_FINGERPRINT,
                         response_fingerprint="WXYZ-2345-6789-BCDF",
                     )
                 ],
@@ -358,11 +363,12 @@ def test_verify_instance_secret_link_response_parses_the_links_ending(client, li
 
     assert m.last_request.json() == {"response_code": "DMLINK-RESPONSE"}
     assert verification.peer_hostname == "other.example.com"
+    assert verification.instance_secret_fingerprint == SECRET_FINGERPRINT
     link_ending = verification.links_ending[0]
     assert isinstance(link_ending, InstanceSecretLink)
     assert link_ending.kind is link_kind
     assert link_ending.peer_hostname == "third.example.com"
-    assert link_ending.request_fingerprint == "7KQ2-9MXA-3HDP-T0WZ"
+    assert link_ending.request_fingerprint == REQUEST_FINGERPRINT
     assert link_ending.response_fingerprint == "WXYZ-2345-6789-BCDF"
     assert verification.verification_token == "token"
 
