@@ -6,9 +6,8 @@ History
 ------------------
 
 * Added ``json_string_indexes`` to ``FileDiscoveryLocatorResult``:
-  where a JSON or NDJSON locator passes through a string that holds JSON.
-  Each number is the index, counted from 0, of a locator segment that held such a string.
-  It is ``None`` when the locator passes through none, and from a server that predates the field.
+  the indexes into ``locator``, counted from 0, of the elements whose value is a string that holds JSON.
+  It is ``None`` when there are none, or when the server predates the field.
 * Added an optional ``instance`` field to ``DatabaseConnectionConfig``: the SQL Server named instance,
   taken from the Instance input in the connection form's advanced settings.
   It round-trips through ``list_connections`` and ``create_or_update_connection``,

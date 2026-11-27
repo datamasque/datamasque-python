@@ -476,9 +476,8 @@ class FileDiscoveryLocatorResult(BaseModel):
     data_types: list[str]
     safe_data_preview: Optional[SafeDataPreview] = None
     value_count: Optional[int] = None
-    # The indexes, counted from 0, of the `locator` segments that held a string that holds JSON;
-    # the segments after each one are the path inside it.
-    # None when the locator passes through no such string, and from a server that predates the field.
+    # Indexes into `locator`, counted from 0, of the elements whose value is a string that holds JSON.
+    # None when there are none, or when the server predates the field.
     json_string_indexes: Optional[list[int]] = None
 
 
