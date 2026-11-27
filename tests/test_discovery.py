@@ -1094,8 +1094,8 @@ def test_file_discovery_value_counts_parse():
     assert result.results[0].value_count == 30
 
 
-def test_file_discovery_json_string_prefix_lengths_parse():
-    """A locator through a string that holds JSON carries its prefix lengths; one from an older server has none."""
+def test_file_discovery_json_string_indexes_parse():
+    """A locator through a string that holds JSON carries its string indexes; one from an older server has none."""
 
     def locator_result(**extra: object) -> dict:
         return {
@@ -1111,13 +1111,13 @@ def test_file_discovery_json_string_prefix_lengths_parse():
             "connection": {"id": "conn-1", "name": "my files"},
             "file_type": "json",
             "files": [{"path": "data/events.json", "file_type": "json"}],
-            "results": [locator_result(json_string_prefix_lengths=[2]), locator_result()],
+            "results": [locator_result(json_string_indexes=[1]), locator_result()],
         }
     )
 
     through_a_string, from_an_older_server = result.results
-    assert through_a_string.json_string_prefix_lengths == [2]
-    assert from_an_older_server.json_string_prefix_lengths is None
+    assert through_a_string.json_string_indexes == [1]
+    assert from_an_older_server.json_string_indexes is None
 
 
 def test_file_discovery_uncounted_values_parse():

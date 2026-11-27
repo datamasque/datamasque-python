@@ -5,9 +5,9 @@ History
 1.7.0 (2026-11-27)
 ------------------
 
-* Added ``json_string_prefix_lengths`` to ``FileDiscoveryLocatorResult``:
+* Added ``json_string_indexes`` to ``FileDiscoveryLocatorResult``:
   where a JSON or NDJSON locator passes through a string that holds JSON.
-  Each number ``n`` means the first ``n`` segments of the locator held such a string.
+  Each number is the index, counted from 0, of a locator segment that held such a string.
   It is ``None`` when the locator passes through none, and from a server that predates the field.
 * Added an optional ``instance`` field to ``DatabaseConnectionConfig``: the SQL Server named instance,
   taken from the Instance input in the connection form's advanced settings.
