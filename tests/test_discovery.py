@@ -1095,7 +1095,7 @@ def test_file_discovery_value_counts_parse():
 
 
 def test_file_discovery_json_string_indexes_parse():
-    """A locator through a string that holds JSON carries its string indexes; one from an older server has none."""
+    """A locator through serialized JSON carries its string indexes; one from an older server has none."""
 
     def locator_result(**extra: object) -> dict:
         return {
