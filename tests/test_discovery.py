@@ -1094,6 +1094,32 @@ def test_file_discovery_value_counts_parse():
     assert result.results[0].value_count == 30
 
 
+def test_file_discovery_json_string_indexes_parse():
+    """A locator through serialized JSON carries its string indexes; one from an older server has none."""
+
+    def locator_result(**extra: object) -> dict:
+        return {
+            "locator": ["*", "event_payload", "email"],
+            "data_types": ["str"],
+            "matches": [{"flagged_by": "MDD", "description": "Email", "label": "email"}],
+            **extra,
+        }
+
+    result = FileDiscoveryResult.model_validate(
+        {
+            "id": 10,
+            "connection": {"id": "conn-1", "name": "my files"},
+            "file_type": "json",
+            "files": [{"path": "data/events.json", "file_type": "json"}],
+            "results": [locator_result(json_string_indexes=[1]), locator_result()],
+        }
+    )
+
+    through_a_string, from_an_older_server = result.results
+    assert through_a_string.json_string_indexes == [1]
+    assert from_an_older_server.json_string_indexes is None
+
+
 def test_file_discovery_uncounted_values_parse():
     """A file type that holds no values reports the reason, no counts, and a null count on the locator."""
     result = FileDiscoveryResult.model_validate(

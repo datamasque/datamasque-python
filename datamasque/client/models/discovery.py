@@ -476,6 +476,9 @@ class FileDiscoveryLocatorResult(BaseModel):
     data_types: list[str]
     safe_data_preview: Optional[SafeDataPreview] = None
     value_count: Optional[int] = None
+    # Indexes into `locator`, counted from 0, of the elements whose value is serialized JSON.
+    # None when there are none, or when the server predates the field.
+    json_string_indexes: Optional[list[int]] = None
 
 
 class FileDiscoveryFile(BaseModel):

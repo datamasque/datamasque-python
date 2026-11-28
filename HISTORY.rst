@@ -2,9 +2,12 @@
 History
 =======
 
-1.7.0 (unreleased)
+1.7.0 (2026-11-27)
 ------------------
 
+* Added ``json_string_indexes`` to ``FileDiscoveryLocatorResult``:
+  the indexes into ``locator``, counted from 0, of the elements whose value is serialized JSON.
+  It is ``None`` when there are none, or when the server predates the field.
 * Added an optional ``instance`` field to ``DatabaseConnectionConfig``: the SQL Server named instance,
   taken from the Instance input in the connection form's advanced settings.
   It round-trips through ``list_connections`` and ``create_or_update_connection``,
